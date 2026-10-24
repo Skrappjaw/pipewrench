@@ -21,7 +21,7 @@ PRESETS = [{"name": "mix", "label": "Mixing", "values": {"clock.force-quantum": 
 STATES = {
     "settings": pc.UIState(tab="settings"),
     "top": pc.UIState(tab="top"),
-    "presets": pc.UIState(tab="settings", cursor=pc.THEME_ROW + 1),  # a preset row inside Settings
+    "presets": pc.UIState(tab="settings", cursor=pc.PRESETS_ROW),  # a preset row inside Settings
     "devices": pc.UIState(tab="devices"),
     "devices menu": pc.UIState(tab="devices", dev_menu=("card", 95), dev_cursor=5),
     "patch columns": pc.UIState(tab="patch"),

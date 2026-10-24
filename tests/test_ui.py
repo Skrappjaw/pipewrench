@@ -123,7 +123,7 @@ def test_up_down_moves_cursor_and_clamps():
     st, _ = key(UIState(), "up")
     assert st.cursor == 0
     st, _ = key(st, *["down"] * 20)
-    assert st.cursor == pc.THEME_ROW + len(PRESETS)  # clock rows, Theme, then the presets
+    assert st.cursor == pc.PRESETS_ROW + len(PRESETS) - 1  # clock rows, Display, then the presets
 
 
 def test_left_right_sets_pending_without_action():
@@ -201,7 +201,7 @@ def test_q_quits():
 
 
 def test_presets_keys():
-    st = UIState(tab="settings", cursor=pc.THEME_ROW + 1)
+    st = UIState(tab="settings", cursor=pc.PRESETS_ROW)
     st, actions = key(st, "down", "enter")
     assert actions == [("apply_preset", "mix")]
     _, actions = key(st, "s")
@@ -215,7 +215,7 @@ def test_presets_keys():
 
 
 def test_presets_keys_with_no_presets():
-    st = UIState(tab="settings", cursor=pc.THEME_ROW + 1)
+    st = UIState(tab="settings", cursor=pc.PRESETS_ROW)
     _, actions = key(st, "enter", "d", "e", presets=[])
     assert actions == []
     _, actions = key(st, "s", presets=[])
@@ -316,7 +316,7 @@ def test_presets_mouse():
     st = UIState(tab="settings")
     _, hits = screen(st, height=40)
     st, actions = click(st, hits, ("preset", 1))
-    assert st.cursor == pc.THEME_ROW + 2 and actions == []
+    assert st.cursor == pc.PRESETS_ROW + 1 and actions == []
     _, actions = click(st, hits, ("preset", 0), event="double")
     assert actions == [("apply_preset", "tracking")]
     _, hits = screen(st, height=40)  # a preset row's legend adds e and d
@@ -366,13 +366,13 @@ def test_every_theme_defines_every_role():
 
 def test_ui_file_round_trips_and_tolerates_junk(tmp_path):
     p = tmp_path / "pwctl" / "ui.json"
-    assert pc.load_ui(p) == {"theme": "dark"}
-    pc.save_ui(p, {"theme": "light"})
-    assert pc.load_ui(p) == {"theme": "light"}
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10}
+    pc.save_ui(p, {"theme": "light", "meter_fps": 20})
+    assert pc.load_ui(p) == {"theme": "light", "meter_fps": 20}
     p.write_text("{not json")
-    assert pc.load_ui(p) == {"theme": "dark"}
-    p.write_text('{"theme": "neon"}')
-    assert pc.load_ui(p) == {"theme": "dark"}
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10}
+    p.write_text('{"theme": "neon", "meter_fps": 60}')
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10}
 
 
 def test_failed_messages_are_red_and_others_green():
@@ -407,7 +407,7 @@ def test_crowbar_theme_is_mint_y_dark_orange():
 def test_saved_orange_loads_as_crowbar(tmp_path):
     p = tmp_path / "ui.json"
     p.write_text('{"theme": "orange"}')
-    assert pc.load_ui(p) == {"theme": "crowbar"}
+    assert pc.load_ui(p)["theme"] == "crowbar"
 
 
 # --- no button rows; the legend's chips take the mouse --------------------------------------
@@ -423,3 +423,16 @@ def test_multi_key_chips_have_no_hit():
     _, hits = screen(UIState())
     keys = {t[1] for *_, t in hits if t[0] == "key"}
     assert keys == {"enter", "esc", "s", "R", "q"}  # not ↑↓, ←→ or Tab/1-n
+
+
+def test_meter_frame_rate_steps_and_saves():
+    st = UIState(cursor=pc.FPS_ROW)
+    st, actions = key(st, "right")
+    assert st.meter_fps == 15 and actions == [("save_ui",)]
+    st, _ = key(st, "right", "right", "right")
+    assert st.meter_fps == 20  # stops at the top; nothing new past 20
+    st, _ = key(st, *["left"] * 6)
+    assert st.meter_fps == 5
+    text = "\n".join(t for t, _ in screen(st, height=40)[0])
+    assert "Meter frame rate" in text and "5 fps" in text
+    assert text.index("Theme") < text.index("Meter frame rate") < text.index("Presets")

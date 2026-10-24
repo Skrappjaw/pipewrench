@@ -606,7 +606,7 @@ class Meters:
 class Tui:
     def __init__(self, runner):
         self.runner = runner
-        self.st = pc.UIState(theme=pc.load_ui(pc.ui_path())["theme"])
+        self.st = pc.UIState(**pc.load_ui(pc.ui_path()))
         self.current = {}
         self.presets = []
         self.block = None
@@ -718,7 +718,7 @@ class Tui:
         last_refresh = time.monotonic()
         while True:
             self._draw(scr)
-            scr.timeout(100 if self.meters.procs else 250)  # meters move at 10 fps; elsewhere stay idle
+            scr.timeout(1000 // self.st.meter_fps if self.meters.procs else 250)  # elsewhere stay idle
             ch = scr.getch()
             if time.monotonic() - last_refresh > 1.0:
                 self._refresh()
@@ -897,9 +897,12 @@ class Tui:
                 self.st.message = "WirePlumber restarted" if rc == 0 else f"restart failed: {out.strip()}"
                 self.st.failed = "" if rc == 0 else self.st.message
             elif kind == "set_theme":
-                pc.save_ui(pc.ui_path(), {"theme": action[1]})
+                pc.save_ui(pc.ui_path(), {"theme": self.st.theme, "meter_fps": self.st.meter_fps})
                 self.st.message = f"theme: {action[1]}"
                 self._apply_theme(scr)  # may replace the message: a theme the terminal can't show
+            elif kind == "save_ui":
+                pc.save_ui(pc.ui_path(), {"theme": self.st.theme, "meter_fps": self.st.meter_fps})
+                self.st.message = f"meters redraw at {self.st.meter_fps} fps"
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
             elif kind == "mix_cmd":

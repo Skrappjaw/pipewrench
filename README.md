@@ -166,6 +166,8 @@ PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata 
   `clock.allowed-rates`, applies with a warning.
 - Below the rows: the allowed rates and the defaults (`clock.rate`, `clock.quantum`).
 - These settings are runtime only. A PipeWire restart clears them.
+- **Meter frame rate** (Display): 5, 10, 15 or 20 fps for the Mixer's meters; default 10. It's saved with the
+  theme in `~/.config/pwctl/ui.json`. Past 20 fps there's no new audio to show.
 - **Theme** (the Display section) is pwctl's own: dark, light, or crowbar (orange, after Mint-Y-Dark-Orange; needs 256 colours). ←→ switches it at once, and it's kept in
   `~/.config/pwctl/ui.json`. The colour roles are described in `docs/ui-conventions.md`.
 

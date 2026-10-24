@@ -201,9 +201,9 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
         app.expect("Playback")
         app.send(tab("settings"))
         app.expect("light")
-        app.send("\x1bOB" * 10 + "\x1bOD")  # down to the theme row, then left: light → dark
+        app.send("\x1bOB" * pc.THEME_ROW + "\x1bOD")  # down to the theme row, then left: light → dark
         app.expect("theme: dark")
-        assert json.loads((tmp_path / "pwctl" / "ui.json").read_text()) == {"theme": "dark"}
+        assert json.loads((tmp_path / "pwctl" / "ui.json").read_text()) == {"theme": "dark", "meter_fps": 10}
         app.send(tab("patch"))
         app.expect("Destinations")
         app.send("q")

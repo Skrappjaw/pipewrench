@@ -43,6 +43,7 @@ THEMES = {
                "chip": ("#2e2e33", "#dedee0", "")},
 }
 THEME_NAMES = list(THEMES)
+METER_FPS = [5, 10, 15, 20]  # meters get new audio every 50 ms, so past 20 fps nothing changes
 THEME_MIN_COLOURS = {"crowbar": 256}  # below this the theme falls back to dark
 
 
@@ -76,7 +77,8 @@ def load_ui(path):
         ui = {}
     theme = ui.get("theme") if isinstance(ui, dict) else None
     theme = {"orange": "crowbar"}.get(theme, theme)  # renamed 2026-10-24
-    return {"theme": theme if theme in THEMES else "dark"}
+    fps = ui.get("meter_fps") if isinstance(ui, dict) else None
+    return {"theme": theme if theme in THEMES else "dark", "meter_fps": fps if fps in METER_FPS else 10}
 
 
 def save_ui(path, ui):
@@ -395,6 +397,7 @@ class UIState:
     message: str = ""
     failed: str = ""             # the message is drawn red while it still equals this
     theme: str = "dark"
+    meter_fps: int = 10
 
 
 def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
@@ -430,18 +433,24 @@ def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
     return {"settings": _key_settings, "top": _key_top}[st.tab](st, key, current, presets)
 
 
-# Settings is one list: the clock rows, then Theme (pwctl's own; applies at once), then the presets.
+# Settings is one list: the clock rows, then Display (pwctl's own rows; they apply at once), then presets.
 THEME_ROW = len(SETTINGS)
+FPS_ROW = THEME_ROW + 1
+PRESETS_ROW = FPS_ROW + 1  # the first preset
 
 
 def _key_settings(st, key, current, presets):
-    st.cursor = max(0, min(THEME_ROW + len(presets), st.cursor))
+    last = PRESETS_ROW + len(presets) - 1
+    st.cursor = max(0, min(last, st.cursor))
     if key == "s":
         return st, [("prompt_save",)]
-    if st.cursor > THEME_ROW and key in ("enter", "e", "d", "left", "right"):
-        return _key_preset_row(st, key, presets[st.cursor - THEME_ROW - 1]["name"])
+    if st.cursor >= PRESETS_ROW and key in ("enter", "e", "d", "left", "right"):
+        return _key_preset_row(st, key, presets[st.cursor - PRESETS_ROW]["name"])
+    if key in ("left", "right") and st.cursor == FPS_ROW:
+        st.meter_fps = METER_FPS[max(0, min(len(METER_FPS) - 1, METER_FPS.index(st.meter_fps) + (1 if key == "right" else -1)))]
+        return st, [("save_ui",)]
     if key in ("up", "down"):
-        st.cursor = max(0, min(THEME_ROW + len(presets), st.cursor + (1 if key == "down" else -1)))
+        st.cursor = max(0, min(last, st.cursor + (1 if key == "down" else -1)))
     elif key in ("left", "right") and st.cursor == THEME_ROW:
         st.theme = THEME_NAMES[(THEME_NAMES.index(st.theme) + (1 if key == "right" else -1)) % len(THEME_NAMES)]
         return st, [("set_theme", st.theme)]
@@ -610,7 +619,7 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
     elif kind == "key":  # a legend chip
         keys = [target[1]] if event in ("click", "double") else []
     elif kind == "preset":
-        st = dataclasses.replace(st, cursor=THEME_ROW + 1 + target[1])
+        st = dataclasses.replace(st, cursor=PRESETS_ROW + target[1])
         keys = ["enter"] if event == "double" else []
     elif kind == "mix_row":
         st = dataclasses.replace(st, mix_cursor=target[1])
@@ -703,7 +712,7 @@ def _chip_key(label):
 def legend(st):
     if st.tab == "devices" and st.dev_menu:
         return LEGENDS["devices menu"]
-    if st.tab == "settings" and st.cursor > THEME_ROW:
+    if st.tab == "settings" and st.cursor >= PRESETS_ROW:
         return LEGENDS["presets"]
     if st.tab == "patch" and st.patch_menu:
         return LEGENDS["patch menu"]
@@ -789,7 +798,7 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
 
 
 def _render_settings(cv, st, current, block, presets, body_h):
-    st.cursor = max(0, min(THEME_ROW + len(presets), st.cursor))
+    st.cursor = max(0, min(PRESETS_ROW + len(presets) - 1, st.cursor))
     cv.add("  Clock", "title")
     for i, s in enumerate(SETTINGS):
         value = st.pending.get(s.key, current.get(s.key))
@@ -815,16 +824,21 @@ def _render_settings(cv, st, current, block, presets, body_h):
         cv.add(f"  ! {w}", "alert")
     cv.add("")
     cv.add("  Display", "title")
-    head = f"{'> ' if st.cursor == THEME_ROW else '  '}{'Theme':<20} "
-    row = cv.add(f"{head}◀ {st.theme:^14} ▶   applies at once", "selected" if st.cursor == THEME_ROW else "normal")
-    arrow_l, arrow_r = len(head), len(head) + 17
-    cv.hit(row, 0, arrow_l, ("setting", THEME_ROW))
-    cv.hit(row, arrow_l, arrow_l + 1, ("arrow", THEME_ROW, -1))
-    cv.hit(row, arrow_l + 1, arrow_r, ("setting", THEME_ROW))
-    cv.hit(row, arrow_r, arrow_r + 1, ("arrow", THEME_ROW, +1))
+    _display_row(cv, st, THEME_ROW, "Theme", st.theme, "applies at once")
+    _display_row(cv, st, FPS_ROW, "Meter frame rate", f"{st.meter_fps} fps", "how often Mixer meters redraw")
     cv.add("")
     cv.add("  Presets", "title")
     _render_presets(cv, st, presets)
+
+
+def _display_row(cv, st, idx, label, value, note):
+    head = f"{'> ' if st.cursor == idx else '  '}{label:<20} "
+    row = cv.add(f"{head}◀ {value:^14} ▶   {note}", "selected" if st.cursor == idx else "normal")
+    arrow_l, arrow_r = len(head), len(head) + 17
+    cv.hit(row, 0, arrow_l, ("setting", idx))
+    cv.hit(row, arrow_l, arrow_l + 1, ("arrow", idx, -1))
+    cv.hit(row, arrow_l + 1, arrow_r, ("setting", idx))
+    cv.hit(row, arrow_r, arrow_r + 1, ("arrow", idx, +1))
 
 
 _TOP_HDR = f"{'S':<2}{'ID':>5}{'QUANT':>7}{'RATE':>7}{'WAIT':>9}{'BUSY':>9}{'W/Q':>6}{'B/Q':>6}{'ERR':>5}  {'FORMAT':<16} NAME"
@@ -851,7 +865,7 @@ def _render_presets(cv, st, presets):
     if not presets:
         cv.add("  no presets yet; s saves the current clock settings as one", "dim")
     for i, p in enumerate(presets):
-        sel = st.cursor == THEME_ROW + 1 + i
+        sel = st.cursor == PRESETS_ROW + i
         line = f"{'> ' if sel else '  '}{p['name']:<16} {p['label']:<28} {summarize_preset(p)}"
         row = cv.add(line, "selected" if sel else "normal")
         cv.hit(row, 0, cv.width, ("preset", i))
