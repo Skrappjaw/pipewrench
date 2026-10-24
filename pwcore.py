@@ -1021,7 +1021,8 @@ def _render_devices(cv, st, devices, body_h):
 def mixer_view(inv, config, streams):
     """What the Mixer lists: devices (not hidden, not monitors) and app streams, by direction."""
     hidden = set(config["hidden"])
-    devs = [r for r in inv.rows() if r.kind != "monitor" and r.name not in hidden]
+    hidden_cards = {c.id for c in inv.cards if c.name in hidden}
+    devs = [r for r in inv.rows() if r.kind != "monitor" and r.name not in hidden and r.card_id not in hidden_cards]
     return {"defaults": inv.defaults,
             "playback": ([r for r in devs if r.direction in ("out", "duplex")], [a for a in streams if a.direction == "out"]),
             "recording": ([r for r in devs if r.direction in ("in", "duplex")], [a for a in streams if a.direction == "in"])}

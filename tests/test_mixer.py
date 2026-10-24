@@ -70,6 +70,13 @@ def test_mixer_leaves_out_hidden_rows_and_monitors():
     assert not any(r.kind == "monitor" for _, _, r in pc.mixer_selectable(MX))
 
 
+def test_mixer_leaves_out_the_rows_of_a_hidden_card():
+    ds4 = next(c for c in pi.inventory(DUMP).cards if c.label.startswith("DualShock"))
+    hidden = mx(config=pcfg.toggle_hidden(pcfg.default_config(), ds4.name))
+    names = [r.name for _, _, r in pc.mixer_selectable(hidden)]
+    assert ds4.rows and not any(r.name in names for r in ds4.rows)
+
+
 # --- screen -------------------------------------------------------------------------------
 
 def test_mixer_is_the_first_tab_and_the_default():
