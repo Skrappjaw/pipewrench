@@ -45,10 +45,22 @@ muted. ★ marks the default playback and recording device. Apps show what they'
 | ↑ ↓ | click a row | select |
 | ← → | the wheel over a row | volume −5% / +5% |
 | Space | its chip | mute or unmute |
-| Enter, d | double-click a device | make it the default |
+| Enter | double-click a row | open its menu |
 | v | its chip | live meters on or off |
 
-Volume, mute and the default act at once (`wpctl`). Running rows and the selected one show a live peak
+**Enter opens a menu,** so the system default never changes on one stray key or click. Making a device
+the default moves every app that follows it.
+
+| Selected | Its menu |
+|---|---|
+| an output | Set as system default (★ System default if it already is), Mute/Unmute, Test sound, Device settings… |
+| an input | the same, without Test sound |
+| an app | Mute/Unmute |
+
+Enter, Enter sets the system default. **Device settings…** opens the row on Devices with its menu
+open. Esc or any other key closes a menu.
+
+Volume and mute act at once (`wpctl`). Running rows and the selected one show a live peak
 meter (green, yellow past −18 dB, red past −6 dB); a suspended device has no audio and isn't woken just
 to meter it. Design notes and CPU figures: `docs/mixer-plan.md`.
 
@@ -57,13 +69,14 @@ to meter it. Design notes and CPU figures: `docs/mixer-plan.md`.
 An inventory of every audio card, sink, source and bus on the system, read from `pw-dump`.
 
 - **Layout:** hardware cards first (in name order), each with its active profile. Then
-  **Virtual**: buses and other null sinks, and loopbacks.
+  **Virtual**: buses and other null sinks, and loopbacks. Then **Off**: cards on profile `off`.
   - Hardware means a node with a device API (`alsa`, `bluez5`); everything else is virtual.
-  - A card whose profile is `off` still shows, so you can switch it on.
+  - An off card has no devices, so it waits at the bottom. Enter on it opens its profiles to switch
+    it on.
 - **Each row shows:**
   - ★ on the default output and input
   - direction: out / in / duplex
-  - label, state, volume (wpctl's scale, so 100% is unity) and node id
+  - label, state, volume (wpctl's scale, so 100% is unity; set it on the Mixer) and node id
   - connections, from PipeWire's links:
     - `← Brave`: what plays into the device
     - `→ OBS`: what records from it; on an output that's its monitor, marked `(monitor)`
@@ -84,19 +97,19 @@ An inventory of every audio card, sink, source and bus on the system, read from 
 
 | Selected | Its menu |
 |---|---|
-| a device | Rename…, Make default, Mute/Unmute, Test sound (outputs), Hide |
+| a device | Set as system default (★ System default if it already is), Rename…, Test sound (outputs), Hide |
 | a bus | the same, plus Delete bus (after y/n) |
 | a pending bus | Create now, Rename…, Delete bus |
 | a card heading | its profiles (● is active; picking one asks y/n, since it interrupts that card), Hide card |
 | + Add bus… | asks for a name and creates it live |
 
 - **Rename** saves the label and writes the label file, then asks "Restart WirePlumber now to show it?"
-  An empty name restores the default.
-  (y/n), because labels only appear after WirePlumber reloads. A bus shows its new name after the next
-  login.
-- **Without opening a menu:** ←→ change the volume.
-- **Shortcuts for the menu items:**
-  - `d` make default, `Space` mute, `t` test
+  (y/n), because labels only appear after WirePlumber reloads. An empty name restores the default. A
+  bus shows its new name after the next login.
+- **Volume and mute live on the Mixer.** Here, ←→ and Space only say so.
+- **The system default is menu-only** on both tabs; `d` points to the menu.
+- **Shortcuts for the other menu items:**
+  - `t` test
   - `p` the card's profile menu
   - `h` hide, `a` add bus, `x` delete bus
   - `v` preview, `A` write files, `R` restart WirePlumber
@@ -113,7 +126,7 @@ for one) don't reconnect. So:
   re-creating it.
 
 Mouse:
-- click selects; double-click edits the label; the wheel moves the selection
+- click selects; double-click opens the menu; the wheel moves the selection
 - click a key chip in the legend to press that key
 
 The key legend is always on screen.
