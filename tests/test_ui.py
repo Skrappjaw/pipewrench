@@ -176,10 +176,12 @@ def test_restart_needs_confirmation():
     assert actions == [("restart_wireplumber",)] and st3.confirm is None
 
 
-def test_confirm_swallows_other_keys():
-    st, _ = key(pc.UIState(), "R")
-    st, actions = key(st, "q")
-    assert actions == [] and st.confirm == ("restart",)
+def test_confirm_any_other_key_cancels_and_says_so():
+    # A missed y/n prompt used to swallow every key, which looked like a frozen screen.
+    for k in ("q", "down", "A", "x"):
+        st, _ = key(pc.UIState(), "R")
+        st, actions = key(st, k)
+        assert actions == [] and st.confirm is None and "cancelled" in st.message and "y" in st.message
 
 
 def test_q_quits():
@@ -320,8 +322,8 @@ def test_wheel_scrolls_top():
     assert st.top_scroll == 0
 
 
-def test_mouse_ignored_while_confirming():
+def test_click_while_confirming_cancels_without_acting():
     st, _ = key(pc.UIState(), "R")
     _, hits = screen(st)
     st2, actions = click(st, hits, ("tab", "top"))
-    assert st2.tab == "settings" and actions == []
+    assert st2.tab == "settings" and actions == [] and st2.confirm is None and "y confirms" in st2.message

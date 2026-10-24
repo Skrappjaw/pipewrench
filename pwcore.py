@@ -325,8 +325,8 @@ def handle_key(st, key, current, presets, devices=None):
             st.confirm = None
             # confirm tuples name their action, except the two v1 ones
             return st, [{"restart": ("restart_wireplumber",), "delete": ("delete_preset", *kind[1:])}.get(kind[0], kind)]
-        if key in ("n", "esc"):
-            st.confirm, st.message = None, "cancelled"
+        # Any other key cancels: a missed prompt that swallowed keys looked like a frozen screen.
+        st.confirm, st.message = None, "cancelled" if key in ("n", "esc") else "cancelled (y confirms)"
         return st, []
     if key == "q":
         return st, [("quit",)]
@@ -504,7 +504,7 @@ _MOUSE_BUTTONS = {"apply": "enter", "revert": "esc", "restart": "R", "preset_app
 def handle_mouse(st, hits, y, x, event, current, presets, devices=None):
     """Map a mouse event onto the same keys the keyboard uses."""
     if st.confirm:
-        return st, []
+        return dataclasses.replace(st, confirm=None, message="cancelled (y confirms)"), []
     target = next((t for row, c0, c1, t in hits if row == y and c0 <= x < c1), None)
     if target is None:
         return st, []
