@@ -55,12 +55,15 @@ the default moves every app that follows it.
 
 | Selected | Its menu |
 |---|---|
-| an output | Set as system default (★ System default if it already is), Mute/Unmute, Test sound, Device settings… |
+| an output | Set as system default (★ System default if it already is), Mute/Unmute, Test sound, Rename…, Card profile… |
 | an input | the same, without Test sound |
+| a bus | the same, without Card profile… (a bus has no card) |
 | an app | Mute/Unmute |
 
-Enter, Enter sets the system default. **Device settings…** opens the row on Devices with its menu
-open. Esc or any other key closes a menu.
+Enter, Enter sets the system default. **All channel work happens here** (Skrappjaw, 2026-10-24):
+**Rename…** saves the label and writes the label file, then asks "Restart WirePlumber now to show it?"
+(y/n); an empty name restores the default. **Card profile…** opens that channel's card on Devices with
+its profile menu open. Esc or any other key closes a menu.
 
 Volume and mute act at once (`wpctl`). Running rows and the selected one show a live peak
 meter (green, yellow past −18 dB, red past −6 dB); a suspended device has no audio and isn't woken just
@@ -94,29 +97,29 @@ An inventory of every audio card, sink, source and bus on the system, read from 
   multichannel interface such as the BOSS GCS-8 (see github.com/Skrappjaw/gcs-8-linux) therefore
   reads in channel order.
 
-**Everything starts with Enter.** Select something with ↑↓, press Enter, and pick from its menu with
-↑↓ and Enter. Esc or ← closes the menu, and so does any other key.
+**Devices is for the hardware and the buses; channels are listed read-only** (dim, no cursor) under
+their card, so you can see what a profile gives you. Default, rename, test and levels for a channel
+are on the Mixer. The cursor lands on card headings, buses, pending buses and "+ Add bus…"; press
+Enter and pick from the menu with ↑↓ and Enter. Esc or ← closes the menu, and so does any other key.
 
 | Selected | Its menu |
 |---|---|
-| a device | Set as system default (★ System default if it already is), Rename…, Test sound (outputs), Hide |
-| a bus | the same, plus Delete bus (after y/n) |
+| a card heading | its profiles (● is active; picking one asks y/n, since it interrupts that card), Hide card; Unhide N channels if an older config hid single channels |
+| a bus | Hide, Delete bus (after y/n) |
 | a pending bus | Create now, Rename…, Delete bus |
-| a card heading | its profiles (● is active; picking one asks y/n, since it interrupts that card), Hide card |
 | + Add bus… | asks for a name and creates it live |
 
-- **Rename** saves the label and writes the label file, then asks "Restart WirePlumber now to show it?"
-  (y/n), because labels only appear after WirePlumber reloads. An empty name restores the default. A
-  bus shows its new name after the next login.
-- **Volume and mute live on the Mixer.** Here, ←→ and Space only say so.
-- **The system default is menu-only** on both tabs; `d` points to the menu.
+- **Hiding is for whole devices** (a card or a bus), e.g. onboard audio you never use. Hidden cards
+  leave the Mixer too.
+- A bus shows a new name (set on the Mixer) after the next login.
+- **Volume, mute, default and rename live on the Mixer.** Here, ←→, Space and `d` only say so.
 - **Shortcuts for the other menu items:**
-  - `t` test
+  - `t` test (a bus)
   - `p` the card's profile menu
-  - `h` hide, `a` add bus, `x` delete bus
+  - `h` hide a card or bus, `a` add bus, `x` delete bus
   - `v` preview, `A` write files, `R` restart WirePlumber
 
-View toggles: **H** shows hidden rows (dimmed), **m** adds a "(monitor)" input per output, as
+View toggles: **H** shows hidden cards and buses (dimmed), **m** lists a "(monitor)" input per output, as
 capture apps such as OBS see them.
 
 **Nothing restarts unless you ask.** A restart drops app connections, and some apps (Discord,

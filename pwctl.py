@@ -767,7 +767,7 @@ class Tui:
             return
         owned, clash, pending = _bus_status(c, inv)
         self.devices = pc.devices_view(inv, c, dirty=dirty, owned=owned, clash=clash, pending=pending)
-        self.st = pc.focus_device(self.st, self.devices)  # Mixer → Device settings… lands on its row
+        self.st = pc.focus_device(self.st, self.devices)  # Mixer → Card profile… lands on its card
 
     def _main(self, scr):
         c = self.curses
@@ -1020,6 +1020,10 @@ class Tui:
 
     def _do_devices(self, scr, action):
         kind = action[0]
+        if self.devices is None or self.st.tab != "devices":
+            self._refresh_devices()  # the Mixer renames too; read devices.json fresh, not a stale copy
+            if self.devices is None:
+                return
         c, inv = self.devices["config"], self.devices["inv"]
         if kind == "dev_cmd":
             _run(self.runner, action[1])

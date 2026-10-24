@@ -140,7 +140,7 @@ def row_at(st, m=MX):
 def test_enter_opens_a_menu_and_enter_again_sets_the_system_default():
     st, actions = key(at("GCS-8 CH 3-AUX"), "enter")
     assert actions == [] and st.mix_menu == ("playback", row_at(st).id)
-    assert labels(st) == ["Set as system default", "Mute", "Test sound", "Device settings…", "Back"]
+    assert labels(st) == ["Set as system default", "Mute", "Test sound", "Rename…", "Card profile…", "Back"]
     st, actions = key(st, "enter")
     assert actions == [("mix_cmd", ["wpctl", "set-default", str(row_at(st).id)])] and st.mix_menu is None
 
@@ -154,7 +154,7 @@ def test_the_current_default_says_so_and_picking_it_just_closes():
 
 def test_inputs_have_no_test_sound():
     st, _ = key(at("GCS-8 CH 3", "recording"), "enter")
-    assert labels(st) == ["Set as system default", "Mute", "Device settings…", "Back"]
+    assert labels(st) == ["Set as system default", "Mute", "Rename…", "Card profile…", "Back"]
 
 
 def test_an_app_menu_mutes_and_d_is_no_longer_a_shortcut():
@@ -172,8 +172,9 @@ def test_menu_items_map_to_their_actions():
     row = row_at(st)
     assert key(st, "down", "enter")[1] == [("mix_cmd", ["wpctl", "set-mute", str(row.id), "toggle"])]
     assert key(st, "down", "down", "enter")[1] == [("mix_test", row.name)]
-    st2, actions = key(st, "down", "down", "down", "enter")
-    assert actions == [] and st2.tab == "devices" and st2.dev_focus == row.name
+    assert key(st, "down", "down", "down", "enter")[1] == [("dev_rename", row.name, row.label)]
+    st2, actions = key(st, "down", "down", "down", "down", "enter")
+    assert actions == [] and st2.tab == "devices" and st2.dev_focus == ("card", row.card_id)
     st2, actions = key(st, "up", "enter")  # clamps on the first item
     assert actions[0][1][1] == "set-default"
     st2, actions = key(st, *["down"] * 9, "enter")  # Back
@@ -200,13 +201,13 @@ def test_menu_follows_its_row_not_a_stale_index():
         next(r.id for _, _, r in pc.mixer_selectable(MX) if r.label == "GCS-8 CH 3-AUX"))
 
 
-def test_device_settings_lands_on_the_row_with_its_menu_open():
+def test_card_profile_lands_on_the_card_with_its_menu_open():
     inv = pi.inventory(DUMP)
     devices = pc.devices_view(inv, pcfg.default_config())
-    st, _ = key(at("GCS-8 CH 3-AUX"), "enter", "down", "down", "down", "enter")
+    st, _ = key(at("GCS-8 CH 3-AUX"), "enter", "down", "down", "down", "down", "enter")
     st = pc.focus_device(st, devices)
     kind, obj = pc.dev_selectable(devices, st)[st.dev_cursor]
-    assert obj.label == "GCS-8 CH 3-AUX" and st.dev_menu == ("row", obj.name) and st.dev_focus is None
+    assert kind == "card" and obj.label == "GCS-8" and st.dev_menu == ("card", obj.id) and st.dev_focus is None
 
 
 def test_the_menu_box_sits_under_its_row_and_stays_in_view():

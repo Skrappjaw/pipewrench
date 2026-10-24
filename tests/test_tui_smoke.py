@@ -144,27 +144,22 @@ def test_patch_tab_shows_both_views(app):
     assert app.wait_exit() == 0
 
 
-def test_mixer_enter_opens_a_menu_and_device_settings_lands_on_devices(app):
+def test_mixer_enter_opens_a_menu_and_card_profile_lands_on_devices(app):
     app.expect("Playback")      # pwctl opens on the Mixer, cursor on the first output
     app.send("\r")              # Enter: actions, not the default
-    app.expect("Set as system default")
-    app.send("\x1bOB\x1bOB\x1bOB\r")  # ↓↓↓ Enter: Device settings…
-    app.expect("Rename")        # Devices, with that row's menu open
+    app.expect("Card profile")
+    app.send("\x1bOB" * 4 + "\r")  # default, Mute, Test sound, Rename…, then Card profile…
+    app.expect("Hide card")     # Devices, with that card's menu open
     app.send("q")
     app.send("q")
     assert app.wait_exit() == 0
 
 
-def test_devices_rename_is_enter_enter_type_enter(app, tmp_path):
-    app.expect("Playback")  # pwctl opens on the Mixer
-    app.send(tab("settings"))
-    app.expect("Force sample rate")
-    app.send(tab("devices"))
-    app.expect("GCS-8 · profile HiFi")
-    app.send("\x1bOB")          # DualShock card -> its output row (off cards sit at the bottom)
+def test_mixer_rename_is_enter_down_enter_type_enter(app, tmp_path):
+    app.expect("Playback")      # pwctl opens on the Mixer, cursor on the DualShock output
     app.send("\r")              # Enter: actions
     app.expect("Rename")
-    app.send("\x1bOB\r")        # ↓ Enter: Rename… (Set as system default leads the menu)
+    app.send("\x1bOB" * 3 + "\r")  # default, Mute, Test sound, then Rename…
     app.expect("new name")
     app.send("Pad\r")           # type, Enter
     app.expect("Restart WirePlumber now")
@@ -177,20 +172,15 @@ def test_devices_rename_is_enter_enter_type_enter(app, tmp_path):
     assert '"Pad"' in lua
 
 
-def test_devices_rename_empty_restores_the_default(app, tmp_path):
+def test_mixer_rename_empty_restores_the_default(app, tmp_path):
     ds4 = "alsa_output.usb-Sony_Interactive_Entertainment_Wireless_Controller-00.analog-stereo"
     (tmp_path / "pwctl").mkdir(exist_ok=True)
     (tmp_path / "pwctl" / "devices.json").write_text(json.dumps(
         {"version": 2, "clock_rate": None, "buses": [], "labels": {ds4: "Pad"}, "hidden": []}))
-    app.expect("Playback")  # pwctl opens on the Mixer
-    app.send(tab("settings"))
-    app.expect("Force sample rate")
-    app.send(tab("devices"))
-    app.expect("GCS-8 · profile HiFi")
-    app.send("\x1bOB")
+    app.expect("Playback")  # pwctl opens on the Mixer, cursor on the DualShock output ("Pad")
     app.send("\r")
     app.expect("Rename")
-    app.send("\x1bOB\r")
+    app.send("\x1bOB" * 3 + "\r")
     app.expect("empty restores the default")
     app.send("\r")              # empty
     app.expect("Restart WirePlumber now")

@@ -399,7 +399,7 @@ class UIState:
     dev_monitors: bool = False
     dev_menu: tuple = None       # ("row", node name) | ("card", id) | ("pending", bus name)
     dev_menu_cursor: int = 0
-    dev_focus: str = None        # a node name to select on Devices with its menu open (Mixer → Device settings…)
+    dev_focus: tuple = None      # ("card", id): select that card on Devices with its menu open (Mixer → Card profile…)
     patch_view: str = "cols"     # cols | grid
     patch_side: str = "src"      # src | dst (column view)
     patch_src: int = 0
@@ -542,13 +542,14 @@ def devices_view(inv, config, dirty=False, owned=(), clash=(), pending=()):
 
 
 def _dev_lines(devices, st):
-    """(kind, obj) per list line: card, virtual or off (headings), row, pending (a bus not yet created) or
-    addbus. Cards on profile off carry no devices, so they wait at the bottom under Off."""
+    """(kind, obj) per list line: card, virtual or off (headings), row (a bus), chan (a channel or monitor,
+    listed read-only: channel work is on the Mixer), pending (a bus not yet created) or addbus. Cards on
+    profile off carry no devices, so they wait at the bottom under Off."""
     inv, hidden = devices["inv"], set(devices["config"]["hidden"])
 
     def rows(rs):
         rs = list(rs) + (pi.monitor_rows(rs) if st.dev_monitors else [])
-        return [("row", r) for r in rs if st.dev_show_hidden or r.name not in hidden]
+        return [("row" if r.kind == "virtual" else "chan", r) for r in rs if st.dev_show_hidden or r.name not in hidden]
 
     lines, off = [], []
     for card in inv.cards:
@@ -567,7 +568,7 @@ def _dev_lines(devices, st):
 
 
 def dev_selectable(devices, st):
-    return [line for line in _dev_lines(devices, st) if line[0] not in ("virtual", "off")]
+    return [line for line in _dev_lines(devices, st) if line[0] not in ("virtual", "off", "chan")]
 
 
 def _key_devices(st, key, devices):
@@ -600,7 +601,7 @@ def _key_devices(st, key, devices):
     elif key in ("left", "right", " "):  # pointers for old habits: levels live on the Mixer only
         st.message = "volume and mute are on the Mixer (1)"
     elif key == "d":
-        st.message = "Enter → Set as system default"
+        st.message = "default and rename are on the Mixer (1)"
     elif key == "enter":
         if kind == "addbus":
             return st, [("dev_prompt_bus",)]
@@ -620,8 +621,6 @@ def _key_devices(st, key, devices):
     elif key == "x":
         if kind == "pending" or (kind == "row" and obj.kind == "virtual"):
             st.confirm = ("dev_delete_bus", obj["name"] if kind == "pending" else obj.name)
-        elif kind == "row" and obj.kind == "hardware":
-            st.message = st.failed = "hardware can't be deleted; p switches its card profile"
         else:
             st.message = st.failed = "x deletes a virtual bus"
     elif key == "t":
@@ -713,7 +712,7 @@ LEGENDS = {
 }
 # The status line under the legend: messages, else a short hint (never keys).
 HINTS = {"mixer": "volume and mute act at once · ★ is the default playback or recording device",
-         "devices": "buses act at once · new labels show after a WirePlumber restart",
+         "devices": "cards and buses here · rename, default and test a channel on the Mixer (1)",
          "patch": "links made here are live only; saved patch sets come with scenes"}
 
 
@@ -1078,8 +1077,9 @@ def _render_devices(cv, st, devices, body_h):
     cursor = max(0, min(len(selectable) - 1, st.dev_cursor)) if selectable else -1
     menu_at = None
     for kind, obj in _dev_lines(devices, st):
-        idx = None if kind in ("virtual", "off") else n_sel
-        text, style = _device_line_text(kind, obj, devices, idx == cursor)
+        idx = None if kind in ("virtual", "off", "chan") else n_sel
+        text, style = _device_line_text("row" if kind == "chan" else kind, obj, devices, idx == cursor)
+        style = "dim" if kind == "chan" else style
         menu_open = idx == cursor and _menu_target(devices, st) is not None
         lines.append((text, "anchor" if menu_open else "selected" if idx == cursor else style, idx))
         if idx is not None:
@@ -1191,7 +1191,10 @@ def _mix_items(mx, kind, section, row):
              else ("Set as system default", ("default",))] + mute
     if section == "playback" and row.direction in ("out", "duplex"):
         items.append(("Test sound", ("test",)))
-    return items + [("Device settings…", ("settings",)), ("Back", ("back",))]
+    items.append(("Rename…", ("rename",)))
+    if row.card_id is not None:  # buses have no card
+        items.append(("Card profile…", ("profile",)))
+    return items + [("Back", ("back",))]
 
 
 def mix_menu_items(mx, st):
@@ -1224,8 +1227,10 @@ def _key_mix_menu(st, key, mx):
         return st, []
     if op == "test":
         return st, [("mix_test", row.name)]
-    if op == "settings":
-        st.tab, st.dev_focus, st.dev_menu = "devices", row.name, None
+    if op == "rename":
+        return st, [("dev_rename", row.name, row.label)]
+    if op == "profile":
+        st.tab, st.dev_focus, st.dev_menu = "devices", ("card", row.card_id), None
     return st, []
 
 
@@ -1659,21 +1664,19 @@ def dev_menu_items(devices, st):
     hidden = set(devices["config"]["hidden"])
     if kind == "card":
         items = [(f"{'●' if p.name == obj.active else '○'} {p.name}", ("profile", p.index, p.name)) for p in obj.profiles]
-        return items + [("Unhide card" if obj.name in hidden else "Hide card", ("hide", obj.name)), ("Back", ("back",))]
+        items.append(("Unhide card" if obj.name in hidden else "Hide card", ("hide", obj.name)))
+        # Channels can't be hidden one by one any more; older configs may still hide some.
+        hidden_chans = tuple(r.name for r in obj.rows if r.name in hidden)
+        if hidden_chans:
+            n = len(hidden_chans)
+            items.append((f"Unhide {n} channel{'s' if n > 1 else ''}", ("unhide", hidden_chans)))
+        return items + [("Back", ("back",))]
     if kind == "pending":
         return [("Create now", ("create", obj["name"])), ("Rename…", ("rename", obj["name"], obj["label"])),
                 ("Delete bus", ("delete", obj["name"])), ("Back", ("back",))]
-    hide = ("Unhide" if obj.name in hidden else "Hide", ("hide", obj.name))
-    if obj.kind == "monitor":
-        return [hide, ("Back", ("back",))]
-    items = [("★ System default", ("back",)) if obj.default else ("Set as system default", ("default",)),
-             ("Rename…", ("rename", obj.name, obj.label))]
-    if obj.direction in ("out", "duplex"):
-        items.append(("Test sound", ("test", obj.name)))
-    items.append(hide)
-    if obj.kind == "virtual":
-        items.append(("Delete bus", ("delete", obj.name)))
-    return items + [("Back", ("back",))]
+    # A bus (the only row with a cursor): default, rename and test live on the Mixer.
+    return [("Unhide" if obj.name in hidden else "Hide", ("hide", obj.name)), ("Delete bus", ("delete", obj.name)),
+            ("Back", ("back",))]
 
 
 def _open_menu(st, kind, obj):
@@ -1687,12 +1690,12 @@ def _open_menu(st, kind, obj):
 
 
 def focus_device(st, devices):
-    """Resolve dev_focus once Devices has loaded: put the cursor on that row and open its menu."""
+    """Resolve dev_focus once Devices has loaded: put the cursor on that card and open its menu."""
     if not st.dev_focus or devices is None:
         return st
-    name, st = st.dev_focus, dataclasses.replace(st, dev_focus=None)
+    (_, card_id), st = st.dev_focus, dataclasses.replace(st, dev_focus=None)
     for i, (kind, obj) in enumerate(dev_selectable(devices, st)):
-        if kind == "row" and obj.name == name:
+        if kind == "card" and obj.id == card_id:
             st.dev_cursor = i
             _open_menu(st, kind, obj)
             break
@@ -1726,6 +1729,8 @@ def _key_menu(st, key, devices):
         return st, [("dev_test", op[1])]
     if op[0] == "hide":
         return st, [("dev_hide", op[1])]
+    if op[0] == "unhide":
+        return st, [("dev_hide", name) for name in op[1]]  # each is hidden, so the toggle shows it
     if op[0] == "delete":
         st.confirm = ("dev_delete_bus", op[1])
     elif op[0] == "create":
