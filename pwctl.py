@@ -8,7 +8,7 @@ watch pw-top, and keep labelled presets.
     pwctl reset                stop forcing rate and buffer
     pwctl top                  run pw-top
     pwctl preset list | save NAME [LABEL] | apply NAME | delete NAME
-    pwctl devices list | preview | apply | rollback | check | test PAIR
+    pwctl devices [list] | default | volume | mute | profile | label | hide | bus | apply …
 """
 import array
 import os
@@ -23,7 +23,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pwcore as pc  # noqa: E402
+import pwconfig as pcfg  # noqa: E402
 import pwdevices as pd  # noqa: E402
+import pwinventory as pi  # noqa: E402
 
 SETTERS = {"rate": "clock.force-rate", "buf": "clock.force-quantum", "min": "clock.min-quantum",
            "max": "clock.max-quantum", "log": "log.level"}
@@ -47,7 +49,7 @@ def fixture_runner(fixdir):
         if argv == pc.READ_CMD:
             return 0, (Path(fixdir) / "settings.txt").read_text()
         if argv == pd.DUMP_CMD:
-            return 0, (Path(fixdir) / "pwdump_gcs8.json").read_text()
+            return 0, (Path(fixdir) / "pwdump_inventory.json").read_text()
         return 0, ""
     return run
 
@@ -178,7 +180,6 @@ def _preset(args, runner, out):
     raise CliError("usage: pwctl preset list | save NAME [LABEL] | apply NAME | delete NAME", 2)
 
 
-DEVICES_USAGE = "usage: pwctl devices list | preview | apply | rollback | check | test PAIR"
 
 
 def _dump(runner):
@@ -232,18 +233,6 @@ def _test_pair(runner, m, pid):
     return f"played noise on {p['label']} (AUX{p['aux']}/{p['aux'] + 1})"
 
 
-def _report(m, runner, out, err, settle=False):
-    problems = _problems(m, runner, settle)
-    if problems:
-        for p in problems:
-            err.write(f"  {p}\n")
-        err.write("devices missing; `pwctl devices check` again, or `pwctl devices rollback` to undo\n")
-        return 1
-    pairs = sum(p["enabled"] for p in m["pairs"])
-    out.write(f"all {pairs} pairs and {len(m['buses'])} buses present\n")
-    return 0
-
-
 def write_noise(path, seconds=1.0, rate=48000, peak=4000):
     """A short, quiet stereo noise burst for telling pairs apart by ear."""
     rnd = random.Random(0)
@@ -257,72 +246,249 @@ def write_noise(path, seconds=1.0, rate=48000, peak=4000):
         w.writeframes(samples.tobytes())
 
 
+DEVICES_USAGE = """usage: pwctl devices [list] [--hidden] [--monitors]
+       pwctl devices default DEV | volume DEV STEP | mute DEV | test DEV
+       pwctl devices profile CARD PROFILE
+       pwctl devices label DEV TEXT | label DEV --clear | hide NAME | unhide NAME
+       pwctl devices bus add NAME [LABEL] | bus delete NAME
+       pwctl devices preview | apply | rollback"""
+
+
+def _inventory(runner):
+    return pi.inventory(_dump(runner))
+
+
+def _config():
+    try:
+        return pcfg.load_config(pcfg.config_path())
+    except ValueError as e:
+        raise CliError(f"{pcfg.config_path()}: {e}", 2)
+
+
+def _save(c, out, message):
+    pcfg.save_config(pcfg.config_path(), c)
+    out.write(f"{message}; `pwctl devices apply` to use it\n")
+
+
+def _row(inv, key):
+    try:
+        row = inv.find(key)
+    except LookupError as e:
+        raise CliError(str(e), 2)
+    if row is None:
+        raise CliError(f"no device {key!r}; see `pwctl devices list`", 2)
+    return row
+
+
+def _run(runner, cmd):
+    try:
+        rc, text = runner(cmd)
+    except FileNotFoundError:
+        raise CliError(f"{cmd[0]} not found", 1)
+    if rc != 0:
+        raise CliError(f"{' '.join(cmd)}: {text.strip() or f'exit {rc}'}", 1)
+
+
+def _wp_version(runner):
+    try:
+        return pcfg.wireplumber_version(runner)
+    except FileNotFoundError:
+        raise CliError("wireplumber not found", 1)
+    except pcfg.ConfigError as e:
+        raise CliError(str(e), 1)
+
+
+def _fit(text, width):
+    return text if len(text) <= width else text[:width - 1] + "…"
+
+
+def device_line(row, c, hidden=False, owned=(), clash=()):
+    fmt = " ".join(x for x in (row.format, f"{row.channels}ch" if row.channels else None,
+                               str(row.rate) if row.rate else None) if x)
+    vol = "muted" if row.mute else "" if row.volume is None else f"vol {round(row.volume * 100)}%"
+    pending = c["labels"].get(row.name)
+    tags = [t for t, on in (("pwctl", row.name in owned), ("made outside pwctl; in devices.json too", row.name in clash),
+                            ("hidden", hidden), (f"label → {pending}", bool(pending) and pending != row.label)) if on]
+    return (f"  {'★' if row.default else ' '} {row.direction:<6} {_fit(row.label, 30):<30} {row.state or '?':<9} "
+            f"{fmt:<16} {vol:<9} {row.id:>5}  {row.name}" + (f"  [{', '.join(tags)}]" if tags else ""))
+
+
+def _bus_status(c, inv):
+    """(owned, clash, pending): buses pwctl's drop-in defines, live buses with a devices.json name that
+    pwctl didn't make, and devices.json buses not running yet."""
+    dropin = pcfg.dropin_path()
+    applied = dropin.read_text() if dropin.exists() else ""
+    live = {r.name for r in inv.rows()}
+    owned = {b["name"] for b in c["buses"] if f'node.name = "{b["name"]}"' in applied}
+    clash = set(pcfg.bus_conflicts(c, live, applied))
+    pending = [b for b in c["buses"] if b["name"] not in live]
+    return owned, clash, pending
+
+
+def _generated(runner, c):
+    """(path, text, restart) for the drop-in and the label rules; only files with something to say
+    are created, but an existing file is always kept in step."""
+    version = _wp_version(runner)
+    files = [(pcfg.dropin_path(), pcfg.render_dropin(c), pcfg.RESTART_PIPEWIRE,
+              bool(c["buses"] or c["clock_rate"])),
+             (pcfg.labels_path(version), pcfg.render_labels(c, version), pcfg.RESTART_WIREPLUMBER,
+              bool(c["labels"]))]
+    pending = []
+    for path, text, restart, has_content in files:
+        try:
+            pcfg.check_ours(path)
+        except pcfg.ConfigError as e:
+            raise CliError(str(e), 1)
+        if (path.exists() or has_content) and pcfg.diff_generated(path, text):
+            pending.append((path, text, restart))
+    return pending
+
+
+def _restart_for(paths_and_restarts):
+    restarts = [r for _, r in paths_and_restarts]
+    if pcfg.RESTART_PIPEWIRE in restarts:
+        return pcfg.RESTART_PIPEWIRE, "PipeWire"
+    return pcfg.RESTART_WIREPLUMBER, "WirePlumber"
+
+
+def _settled_problems(c, runner):
+    for _ in range(SETTLE_TRIES):
+        SETTLE()
+        problems = pcfg.check_applied(c, {r.name: r.label for r in _inventory(runner).rows()})
+        if not problems:
+            break
+    return problems
+
+
 def _devices(args, runner, out, err, ask):
     sub, rest = (args[0], args[1:]) if args else ("list", [])
-    m = _model()
-    if sub == "list" and not rest:
-        try:
-            status = pd.pair_status(m, (dump := _dump(runner)))
-            present = {n.get("node.name") for n in pd.nodes(dump)}
-        except CliError as e:
-            err.write(f"pwctl: {e}\n")
-            status, present = None, None
-        if not pd.devices_path().exists():
-            out.write(f"(defaults; no {pd.devices_path()} yet: apply saves one)\n")
-        for d, title in (("in", "Inputs"), ("out", "Outputs")):
-            out.write(f"{title}\n")
-            for p in (p for p in m["pairs"] if p["dir"] == d):
-                name = pd.pair_node_name(p)
-                state = "off" if not p["enabled"] else "?" if status is None else "ok" if status[name] else "missing"
-                aux = f"AUX{p['aux']}/{p['aux'] + 1}"
-                out.write(f"  {state:<8} {p['label']:<28} {aux:<10} {name}\n")
-        out.write("Buses\n")
-        for b in m["buses"]:
-            state = "?" if present is None else "ok" if b["name"] in present else "missing"
-            out.write(f"  {state:<8} {b['label']:<28} {'':<10} {b['name']}\n")
+    c = _config()
+    if sub == "list" and set(rest) <= {"--hidden", "--monitors"}:
+        inv = _inventory(runner)
+        hidden = set(c["hidden"])
+        owned, clash, pending = _bus_status(c, inv)
+        for heading, row in pi.view(inv, hidden=hidden, show_hidden="--hidden" in rest, monitors="--monitors" in rest):
+            out.write(f"{heading}\n" if row is None else device_line(row, c, row.name in hidden, owned, clash) + "\n")
+        for b in pending:
+            out.write(f"  + {'duplex':<6} {_fit(b['label'], 30):<30} pending: in devices.json, "
+                      f"`pwctl devices apply` creates it  {b['name']}\n")
         return 0
-    if sub == "preview" and not rest:
-        diff = pd.diff_dropin(pd.dropin_path(), pd.render_dropin(m))
-        out.write(diff or f"{pd.dropin_path()} is up to date\n")
+    if sub in ("default", "mute", "test") and len(rest) == 1 or sub == "volume" and len(rest) == 2:
+        row = _row(_inventory(runner), rest[0])
+        try:
+            if sub == "test":
+                if row.direction not in ("out", "duplex") or row.kind == "monitor":
+                    raise ValueError(f"{row.label} is not an output")
+            cmd = {"default": pi.default_cmd, "mute": pi.mute_cmd}.get(sub, lambda r: None)(row) \
+                if sub != "volume" else pi.volume_cmd(row, rest[1])
+        except ValueError as e:
+            raise CliError(str(e), 2)
+        if sub == "test":
+            with tempfile.TemporaryDirectory() as tmp:
+                wav = Path(tmp) / "pwctl-test.wav"
+                write_noise(wav)
+                _run(runner, ["pw-cat", "--playback", "--target", row.name, str(wav)])
+            out.write(f"played noise on {row.label}\n")
+        else:
+            _run(runner, cmd)
         return 0
-    if sub == "apply" and not rest:
-        path, text = pd.dropin_path(), pd.render_dropin(m)
+    if sub == "profile" and len(rest) == 2:
+        card = _inventory(runner).find_card(rest[0])
+        if card is None:
+            raise CliError(f"no card {rest[0]!r}; see `pwctl devices list`", 2)
         try:
-            pd.check_ours(path)
-        except pd.DevicesError as e:
-            raise CliError(str(e), 1)
-        diff = pd.diff_dropin(path, text)
-        if not diff:
-            out.write(f"{path} is up to date; nothing to do\n")
-            return 0
-        out.write(diff)
-        if ask("Write the drop-in and restart PipeWire? Audio drops for a moment. [y/N] ").strip().lower() != "y":
-            out.write("nothing written\n")
-            return 1
-        pd.save_model(pd.devices_path(), m)
-        pd.write_dropin(path, text)
-        out.write(f"wrote {path}\n")
-        _restart(runner)
-        return _report(m, runner, out, err, settle=True)
-    if sub == "rollback" and not rest:
-        path = pd.dropin_path()
-        try:
-            pd.check_ours(path)
-        except pd.DevicesError as e:
-            raise CliError(str(e), 1)
-        if not path.exists() and not path.with_name(path.name + ".bak").exists():
-            out.write("nothing to roll back\n")
-            return 0
-        if ask("Roll back the drop-in and restart PipeWire? [y/N] ").strip().lower() != "y":
+            cmd = pi.profile_cmd(card, rest[1])
+        except ValueError as e:
+            raise CliError(str(e), 2)
+        if ask(f"Switch {card.label} to {rest[1]}? Audio on that card drops for a moment. [y/N] ").strip().lower() != "y":
             out.write("nothing changed\n")
             return 1
-        out.write(pd.rollback_dropin(path) + "\n")
-        _restart(runner)
+        _run(runner, cmd)
         return 0
-    if sub == "check" and not rest:
-        return _report(m, runner, out, err)
-    if sub == "test" and len(rest) == 1:
-        out.write(_test_pair(runner, m, rest[0]) + "\n")
+    if sub == "label" and len(rest) == 2:
+        inv = _inventory(runner)
+        name = rest[0] if any(b["name"] == rest[0] for b in c["buses"]) else _row(inv, rest[0]).name
+        try:
+            c = pcfg.set_label(c, name, None if rest[1] == "--clear" else rest[1])
+        except ValueError as e:
+            raise CliError(str(e), 2)
+        _save(c, out, f"label for {name} saved")
+        return 0
+    if sub in ("hide", "unhide") and len(rest) == 1:
+        inv = _inventory(runner)
+        card = inv.find_card(rest[0])
+        name = card.name if card else rest[0] if rest[0] in c["hidden"] else _row(inv, rest[0]).name
+        if (name in c["hidden"]) != (sub == "unhide"):
+            out.write(f"{name} is already {'hidden' if sub == 'hide' else 'shown'}\n")
+            return 0
+        pcfg.save_config(pcfg.config_path(), pcfg.toggle_hidden(c, name))
+        out.write(f"{sub} {name}\n")
+        return 0
+    if sub == "bus" and rest[:1] == ["add"] and len(rest) in (2, 3):
+        try:
+            c = pcfg.add_bus(c, rest[1], rest[2] if len(rest) == 3 else None)
+        except ValueError as e:
+            raise CliError(str(e), 2)
+        _save(c, out, f"bus {rest[1]} saved")
+        return 0
+    if sub == "bus" and rest[:1] == ["delete"] and len(rest) == 2:
+        try:
+            c = pcfg.delete_bus(c, rest[1])
+        except KeyError:
+            raise CliError(f"no bus {rest[1]!r}", 2)
+        _save(c, out, f"bus {rest[1]} deleted")
+        return 0
+    if sub == "preview" and not rest:
+        pending = _generated(runner, c)
+        out.write("".join(pcfg.diff_generated(p, t) for p, t, _ in pending) or "generated files are up to date\n")
+        return 0
+    if sub == "apply" and not rest:
+        pending = _generated(runner, c)
+        if not pending:
+            out.write("generated files are up to date; nothing to do\n")
+            return 0
+        for p, t, _ in pending:
+            out.write(pcfg.diff_generated(p, t))
+        dropin = pcfg.dropin_path()
+        clash = pcfg.bus_conflicts(c, {r.name for r in _inventory(runner).rows()},
+                                   dropin.read_text() if dropin.exists() else "")
+        if clash:
+            err.write(f"warning: bus {', '.join(clash)} already exists outside pwctl (e.g. made by a script); "
+                      "stop that first, or there will be two\n")
+        restart, what = _restart_for([(p, r) for p, _, r in pending])
+        if ask(f"Write {len(pending)} file(s) and restart {what}? Audio drops for a moment. [y/N] ").strip().lower() != "y":
+            out.write("nothing written\n")
+            return 1
+        for p, t, _ in pending:
+            pcfg.write_generated(p, t)
+            out.write(f"wrote {p}\n")
+        _run(runner, restart)
+        problems = _settled_problems(c, runner)
+        if problems:
+            for p in problems:
+                err.write(f"  {p}\n")
+            err.write("not everything showed up; `pwctl devices list` again, or `pwctl devices rollback` to undo\n")
+            return 1
+        out.write("applied\n")
+        return 0
+    if sub == "rollback" and not rest:
+        paths = [(pcfg.dropin_path(), pcfg.RESTART_PIPEWIRE), (pcfg.labels_path(_wp_version(runner)), pcfg.RESTART_WIREPLUMBER)]
+        try:
+            for p, _ in paths:
+                pcfg.check_ours(p)
+        except pcfg.ConfigError as e:
+            raise CliError(str(e), 1)
+        touched = [(p, r) for p, r in paths if p.exists() or p.with_name(p.name + ".bak").exists()]
+        if not touched:
+            out.write("nothing to roll back\n")
+            return 0
+        restart, what = _restart_for(touched)
+        if ask(f"Roll back {len(touched)} file(s) and restart {what}? [y/N] ").strip().lower() != "y":
+            out.write("nothing changed\n")
+            return 1
+        for p, _ in touched:
+            out.write(pcfg.rollback_generated(p) + "\n")
+        _run(runner, restart)
         return 0
     raise CliError(DEVICES_USAGE, 2)
 

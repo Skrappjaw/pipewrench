@@ -189,3 +189,9 @@ def test_diff_shows_changes(xdg):
 def test_restart_commands():
     assert pc.RESTART_PIPEWIRE == ["systemctl", "--user", "restart", "pipewire", "pipewire-pulse", "wireplumber"]
     assert pc.RESTART_WIREPLUMBER == ["systemctl", "--user", "restart", "wireplumber"]
+
+
+def test_check_applied_reports_missing_buses_and_unshown_labels():
+    c = cfg(buses=[{"name": "OBS", "label": "OBS"}], labels={CH2_IN: "Mic", "alsa_gone": "Gone"})
+    assert pc.check_applied(c, {"OBS": "OBS", CH2_IN: "Mic"}) == []
+    assert pc.check_applied(c, {CH2_IN: "GCS-8 CH 2"}) == ["OBS: bus missing", f"{CH2_IN}: shows 'GCS-8 CH 2', expected 'Mic'"]

@@ -263,3 +263,11 @@ def bus_conflicts(c, live_names, applied_text):
     Applying would create a second node with the same name."""
     return [b["name"] for b in c.get("buses", [])
             if b["name"] in live_names and f'node.name = "{b["name"]}"' not in (applied_text or "")]
+
+
+def check_applied(c, live):
+    """Problems after an apply: missing buses, labels not showing. live maps node name -> label."""
+    problems = [f"{b['name']}: bus missing" for b in c.get("buses", []) if b["name"] not in live]
+    problems += [f"{name}: shows {live[name]!r}, expected {label!r}"
+                 for name, label in sorted(c.get("labels", {}).items()) if name in live and live[name] != label]
+    return problems
