@@ -559,7 +559,7 @@ def main(argv, runner=None, out=None, err=None, execvp=None, ask=None):
 
 # --- curses UI ---------------------------------------------------------------
 
-_NUMPAD = {b"kpDIV": "/", b"kpMUL": "*", b"kpSUB": "-", b"kpADD": "+", b"kpDOT": "."}
+_NUMPAD = {b"kpMUL": "*", b"kpSUB": "-", b"kpADD": "+", b"kpDOT": "."}
 
 class Meters:
     """Live peak levels for Mixer rows: one pw-record per target, each read on its own thread.
@@ -869,7 +869,7 @@ class Tui:
             return named[ch]
         if 32 <= ch < 127:
             return chr(ch)
-        try:  # in keypad mode the numpad sends its own codes (\EOo and so on); ncurses names them kpDIV…
+        try:  # in keypad mode the numpad sends its own codes (\EOj and so on); ncurses names them kpMUL…
             return _NUMPAD.get(c.keyname(ch))
         except (ValueError, c.error):
             return None

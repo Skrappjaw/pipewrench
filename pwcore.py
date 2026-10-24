@@ -414,8 +414,9 @@ class UIState:
     peak_hold: float = 1.5       # seconds; 0 is off
 
 
-# The now-playing bar's keys work on every tab; no tab uses these characters. / * - + sit on the numpad.
-MEDIA_KEYS = {"*": ("media", "play/pause"), "/": ("media", "stop"), "<": ("media", "previous"),
+# The now-playing bar's keys work on every tab; no tab uses these characters. * - + sit on the numpad.
+# No stop: Brave ends its media session on Stop, and only the browser can start it again.
+MEDIA_KEYS = {"*": ("media", "play/pause"), "<": ("media", "previous"),
               ">": ("media", "next"), "-": ("media_volume", "-5%"), "+": ("media_volume", "+5%"),
               "=": ("media_volume", "+5%")}
 
@@ -825,7 +826,7 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     return cv.lines, cv.hits
 
 
-_MEDIA_CHIPS = [("/", "stop"), ("*", "play"), ("-", None), ("+", "vol"), ("<", "prev"), (">", "next")]  # numpad order
+_MEDIA_CHIPS = [("*", "play"), ("-", None), ("+", "vol"), ("<", "prev"), (">", "next")]  # numpad order
 _STATUS = {"Playing": ("▶", "ok"), "Paused": ("❚❚", "pending"), "Stopped": ("■", "dim")}
 
 

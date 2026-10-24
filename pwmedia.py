@@ -9,7 +9,7 @@ PATH = "/org/mpris/MediaPlayer2"
 PLAYER = "org.mpris.MediaPlayer2.Player"
 _BUS = ["busctl", "--user", "--json=short", "call"]
 LIST_CMD = _BUS + ["org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "ListNames"]
-METHODS = {"play/pause": "PlayPause", "stop": "Stop", "previous": "Previous", "next": "Next"}
+METHODS = {"play/pause": "PlayPause", "previous": "Previous", "next": "Next"}  # no Stop (see pwcore.MEDIA_KEYS)
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ def pid_cmd(name):
 
 
 def control_cmd(name, op):
-    """op: play/pause, stop, previous or next."""
+    """op: play/pause, previous or next."""
     return ["busctl", "--user", "call", name, PATH, PLAYER, METHODS[op]]
 
 

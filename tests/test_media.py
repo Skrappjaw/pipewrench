@@ -65,7 +65,7 @@ def test_clock():
 
 def test_controls_and_pid_commands():
     assert pm.control_cmd(NAME, "play/pause")[-1] == "PlayPause"
-    assert pm.control_cmd(NAME, "stop")[-1] == "Stop" and pm.control_cmd(NAME, "next")[-1] == "Next"
+    assert pm.control_cmd(NAME, "next")[-1] == "Next" and "stop" not in pm.METHODS
     assert pm.parse_pid(json.dumps({"type": "u", "data": [366124]})) == 366124
 
 
@@ -82,7 +82,7 @@ def test_stream_found_through_a_helper_process():
 
 @pytest.mark.parametrize("tab", pc.TABS)
 def test_media_keys_work_on_every_tab(tab):
-    for k, action in (("*", ("media", "play/pause")), ("/", ("media", "stop")), ("<", ("media", "previous")),
+    for k, action in (("*", ("media", "play/pause")), ("<", ("media", "previous")),
                       (">", ("media", "next")), ("-", ("media_volume", "-5%")), ("+", ("media_volume", "+5%")),
                       ("=", ("media_volume", "+5%"))):
         assert pc.handle_key(pc.UIState(tab=tab), k, CUR, [])[1] == [action], (tab, k)
@@ -96,8 +96,8 @@ def test_bar_sits_above_the_keys_on_every_tab(tab):
     assert "▶ Brave · Morph — Twenty One Pilots" in text and "0:50 / 4:18" in text
     narrow, _ = bar(screen(pc.UIState(tab=tab), {"player": player(), "position": 50898601}, width=100)[0])
     assert "Brave · Morph" in narrow and "0:50 / 4:18" in narrow  # the artist is cut, not the title or time
-    assert " / " in text and " * " in text and " -  + " in text
-    assert text.index(" / ") < text.index(" * ") < text.index(" -  + ") < text.index(" < ")  # numpad order
+    assert " * " in text and " -  + " in text and "stop" not in text
+    assert text.index(" * ") < text.index(" -  + ") < text.index(" < ")  # numpad order
 
 
 def test_nothing_playing_keeps_the_bar():
@@ -123,9 +123,11 @@ def test_bar_chips_are_clickable():
 def test_bar_fits_any_width(width):
     lines, hits = screen(pc.UIState(), {"player": player(title="x" * 200), "position": 0}, width=width)
     text, _ = bar(lines)
-    assert len(text) <= width and " / " in text and "stop" in text
+    assert len(text) <= width and " * " in text and "play" in text
     assert all(c1 <= width for _, _, c1, _ in hits)
 
 
-def test_dot_is_no_longer_a_media_key():
-    assert pc.handle_key(pc.UIState(tab="settings"), ".", CUR, [])[1] == []
+def test_dot_and_slash_are_not_media_keys():
+    """No stop: Brave ends its session on Stop, and only the browser can start it again."""
+    for k in (".", "/"):
+        assert pc.handle_key(pc.UIState(tab="settings"), k, CUR, [])[1] == []
