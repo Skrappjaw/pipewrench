@@ -1077,11 +1077,13 @@ def _key_menu(st, key, devices):
 
 
 def _menu_lines(devices, st, title):
+    """A box under the selected row. Every line shares one interior width, so the edges line up."""
     items = dev_menu_items(devices, st)
-    inner = max(24, max((len(label) for label, _ in items), default=0) + 4, len(title) + 4)
-    lines = [(f"    ┌─ {title} " + "─" * max(0, inner - len(title) - 3) + "┐", "title", None)]
+    width = max(26, len(title) + 4, max((len(label) for label, _ in items), default=0) + 5)
+    lines = [("    ┌" + f"─ {title} ".ljust(width, "─") + "┐", "title", None)]
     for k, (label, _) in enumerate(items):
         sel = k == st.dev_menu_cursor
-        lines.append((f"    │ {'> ' if sel else '  '}{label:<{inner - 4}} │", "selected" if sel else "normal", ("menu", k)))
-    lines.append(("    └" + "─" * (inner + 1) + "┘", "title", None))
+        lines.append(("    │" + f" {'> ' if sel else '  '}{label}".ljust(width) + "│",
+                      "selected" if sel else "normal", ("menu", k)))
+    lines.append(("    └" + "─" * width + "┘", "title", None))
     return lines

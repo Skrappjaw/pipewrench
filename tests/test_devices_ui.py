@@ -347,3 +347,13 @@ def test_rename_restart_question_warns_about_apps():
     text = body(screen(st)[0])
     assert "Restart WirePlumber now" in text and "Discord" in text
     assert key(st, "y")[1] == [("restart_wireplumber",)]
+
+
+@pytest.mark.parametrize("target", [CH3_OUT, "GCS-8", "VOIP"])
+def test_menu_box_lines_are_all_the_same_width(target):
+    st, d = open_menu(target)
+    box = [t.rstrip() for t, _ in screen(st, d, height=60)[0] if t.lstrip().startswith(("┌", "│", "└"))]
+    assert len(box) >= 3
+    assert len({len(line) for line in box}) == 1, box
+    assert len({line.index(line.lstrip()[0]) for line in box}) == 1          # left edges line up
+    assert {line[-1] for line in box} == {"┐", "│", "┘"}                       # right edges line up
