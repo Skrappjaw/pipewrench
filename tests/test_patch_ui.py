@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -209,7 +210,7 @@ def test_click_port_cell():
 @pytest.mark.parametrize("view", ["cols", "grid"])
 def test_legend_fits_80(view):
     lines, _ = screen(pc.UIState(tab="patch", patch_view=view), width=80)
-    text = body(lines)
+    text = re.sub(r"[ │]+", " ", body(lines))  # chips pad keys with spaces
     for k in ("Enter connect/disconnect", "p ports", "m monitors", "q quit", "g "):
         assert k in text, k
     assert all(len(t.rstrip()) <= 80 for t, _ in lines)

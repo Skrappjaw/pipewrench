@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -55,7 +56,7 @@ def hit_for(hits, target):
 # --- render ----------------------------------------------------------------------
 
 def test_render_cards_rows_and_virtual():
-    text = body(screen(pc.UIState(tab="devices"))[0])
+    text = body(screen(pc.UIState(tab="devices"), height=50)[0])
     assert text.index("GCS-8 · profile HiFi") < text.index("GCS-8 CH 2 ") < text.index("Virtual") < text.index("VOIP_MIC")
     mic = next(line for line in text.splitlines() if "GCS-8 CH 2 " in line)
     assert "★" in mic and "running" in mic and "100%" in mic and " in " in mic
@@ -206,7 +207,7 @@ def test_rows_show_connections():
 
 def test_legend_leads_with_enter_and_fits_80():
     lines, _ = screen(pc.UIState(tab="devices", message="hello"), width=80)
-    text = body(lines)
+    text = re.sub(r"[ │]+", " ", body(lines))  # chips pad keys with spaces
     for k in ("↑↓ select", "Enter actions", "←→ volume", "m monitors", "H show hidden", "q quit"):
         assert k in text, k
     assert all(len(t.rstrip()) <= 80 for t, _ in lines)
@@ -352,7 +353,7 @@ def test_rename_restart_question_warns_about_apps():
 @pytest.mark.parametrize("target", [CH3_OUT, "GCS-8", "VOIP"])
 def test_menu_box_lines_are_all_the_same_width(target):
     st, d = open_menu(target)
-    box = [t.rstrip() for t, _ in screen(st, d, height=60)[0] if t.lstrip().startswith(("┌", "│", "└"))]
+    box = [t.rstrip() for t, _ in screen(st, d, height=60)[0] if t.startswith(("    ┌", "    │", "    └"))]
     assert len(box) >= 3
     assert len({len(line) for line in box}) == 1, box
     assert len({line.index(line.lstrip()[0]) for line in box}) == 1          # left edges line up

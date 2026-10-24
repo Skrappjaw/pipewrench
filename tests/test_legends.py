@@ -1,6 +1,7 @@
-"""Every tab shows its keys the same way: a legend just above the status line, at most two lines, each
-fitting 80 columns, listed once. The status line carries messages, not keys."""
+"""Every tab shows its keys the same way: a box just above the status line, each key a bold inverted chip
+with its slug beside it, fitting the screen width. The status line carries messages, not keys."""
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -27,57 +28,82 @@ STATES = {
     "patch grid": pc.UIState(tab="patch", patch_view="grid"),
     "patch ports": pc.UIState(tab="patch", patch_ports=True, patch_side="dst"),
 }
-ENTER = {"settings": "Enter apply", "presets": "Enter apply", "devices": "Enter actions",
-         "devices menu": "Enter pick", "patch columns": "Enter connect", "patch grid": "Enter connect",
-         "patch ports": "Enter link"}
+ENTER = {"settings": "apply", "presets": "apply", "devices": "actions", "devices menu": "pick",
+         "patch columns": "connect/disconnect", "patch grid": "connect/disconnect", "patch ports": "link/unlink"}
 
 
 def render(st, width=80, height=30):
     return pc.render_screen(st, CUR, [], PRESETS, width, height, devices=DEV, patch=PATCH)[0]
 
 
-def legend_lines(lines):
-    return [i for i, (t, _) in enumerate(lines) if t.startswith("  Keys: ") or (t.startswith("        ") and "quit" in t)]
+def box(lines):
+    """(top index, bottom index) of the key box."""
+    top = next(i for i, (t, _) in enumerate(lines) if t.startswith("┌─ Keys"))
+    bottom = next(i for i in range(top + 1, len(lines)) if lines[i][0].startswith("└"))
+    return top, bottom
+
+
+def chips(lines):
+    """[(key, slug)] read off the box: each chip's text, and the words after it up to the next chip."""
+    top, bottom = box(lines)
+    out = []
+    for text, style in lines[top + 1:bottom]:
+        assert isinstance(style, tuple) and style[0] == "keys", style
+        spans = style[1]
+        for n, (c0, c1) in enumerate(spans):
+            end = spans[n + 1][0] if n + 1 < len(spans) else len(text) - 1
+            out.append((text[c0:c1].strip(), text[c1:end].strip(" │")))
+    return out
 
 
 @pytest.mark.parametrize("name", list(STATES))
-def test_legend_sits_just_above_the_status_line(name):
+def test_key_box_sits_just_above_the_status_line(name):
     lines = render(STATES[name])
-    rows = legend_lines(lines)
-    assert rows and rows[-1] == len(lines) - 2, (name, [t for t, _ in lines[-4:]])
-    assert lines[rows[0]][0].startswith("  Keys: ")
-    assert len(rows) <= 2
+    top, bottom = box(lines)
+    assert bottom == len(lines) - 2
+    assert all(t.startswith("│") and t.rstrip().endswith("│") for t, _ in lines[top + 1:bottom])
+
+
+@pytest.mark.parametrize("width", [80, 120])
+@pytest.mark.parametrize("name", list(STATES))
+def test_box_fits_the_width_and_edges_line_up(name, width):
+    lines = render(STATES[name], width=width)
+    top, bottom = box(lines)
+    widths = {len(t) for t, _ in lines[top:bottom + 1]}
+    assert widths == {width}, widths
 
 
 @pytest.mark.parametrize("name", list(STATES))
-def test_legend_fits_80_and_says_what_enter_does(name):
-    lines = render(STATES[name])
-    text = "\n".join(lines[i][0] for i in legend_lines(lines))
-    assert all(len(lines[i][0].rstrip()) <= 80 for i in legend_lines(lines))
-    if name in ENTER:
-        assert ENTER[name] in text, (name, text)
+def test_keys_are_chips_with_their_slug(name):
+    pairs = chips(render(STATES[name]))
+    assert ("Enter", ENTER[name]) in pairs if name in ENTER else pairs
+    assert all(k and s for k, s in pairs), pairs
 
 
 @pytest.mark.parametrize("name", [n for n in STATES if n != "devices menu"])
-def test_legend_ends_with_tabs_and_quit(name):
-    lines = render(STATES[name])
-    assert lines[legend_lines(lines)[-1]][0].rstrip().endswith("Tab/1-5 tabs  q quit")
+def test_every_box_ends_with_tabs_and_quit(name):
+    pairs = chips(render(STATES[name]))
+    assert pairs[-2:] == [("Tab/1-5", "tabs"), ("q", "quit")]
+
+
+def test_enter_comes_first_where_it_acts():
+    for name in ENTER:
+        assert chips(render(STATES[name]))[0][0] == "Enter", name
 
 
 @pytest.mark.parametrize("name", list(STATES))
-def test_keys_are_listed_once(name):
-    lines = render(STATES[name], height=60)
-    assert sum("Keys:" in t for t, _ in lines) == 1
-    assert sum("q quit" in t for t, _ in lines) <= 1
-
-
-@pytest.mark.parametrize("name", list(STATES))
-def test_status_line_is_for_messages(name):
+def test_one_box_and_a_status_line_for_messages(name):
     st = STATES[name]
+    lines = render(st, height=60)
+    assert sum(t.startswith("┌─ Keys") for t, _ in lines) == 1
     assert render(pc.dataclasses.replace(st, message="saved"))[-1][0].strip() == "saved"
-    assert "Keys" not in render(st)[-1][0] and "q quit" not in render(st)[-1][0]
+    assert "quit" not in render(st)[-1][0]
 
 
 def test_legend_survives_a_message():
-    lines = render(pc.UIState(tab="settings", message="applied"))
-    assert any("Enter apply" in t for t, _ in lines)
+    assert ("Enter", "apply") in chips(render(pc.UIState(tab="settings", message="applied")))
+
+
+def flat(lines):
+    """Box text with chip padding collapsed, for 'Enter actions'-style checks in other test files."""
+    return re.sub(r"\s+", " ", "\n".join(t for t, _ in lines))

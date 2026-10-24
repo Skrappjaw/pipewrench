@@ -566,23 +566,49 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
 
 # --- rendering (view model) --------------------------------------------------
 
-TABS_QUIT = "        Tab/1-5 tabs  q quit"
+TAB_KEYS = [("Tab/1-5", "tabs"), ("q", "quit")]
+# (key, slug) pairs; Enter first wherever it acts. Drawn as a box of chips by _key_box.
 LEGENDS = {
-    "settings": ["  Keys: ↑↓ select  ←→ change  Enter apply  Esc revert  R restart WirePlumber", TABS_QUIT],
-    "top": ["  Keys: ↑↓ PgUp PgDn scroll", TABS_QUIT],
-    "presets": ["  Keys: ↑↓ select  Enter apply  s save current  e edit label  d delete", TABS_QUIT],
-    "devices": ["  Keys: ↑↓ select  Enter actions  ←→ volume  Space mute  d default",
-                "        m monitors  H show hidden  R restart WirePlumber  Tab/1-5 tabs  q quit"],
-    "devices menu": ["  Keys: ↑↓ choose  Enter pick  Esc back"],
-    "patch cols": ["  Keys: ↑↓ select  ←→ column  Enter connect/disconnect  p ports",
-                   "        g grid view  m monitors  Tab/1-5 tabs  q quit"],
-    "patch grid": ["  Keys: ↑↓ source  ←→ destination  Enter connect/disconnect  p ports",
-                   "        g column view  m monitors  Tab/1-5 tabs  q quit"],
-    "patch ports": ["  Keys: ↑↓ source port  ←→ destination port  Enter link/unlink  p or Esc back", TABS_QUIT],
+    "settings": [("Enter", "apply"), ("↑↓", "select"), ("←→", "change"), ("Esc", "revert"),
+                 ("R", "restart WirePlumber")] + TAB_KEYS,
+    "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
+    "presets": [("Enter", "apply"), ("↑↓", "select"), ("s", "save current"), ("e", "edit label"),
+                ("d", "delete")] + TAB_KEYS,
+    "devices": [("Enter", "actions"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"), ("d", "default"),
+                ("m", "monitors"), ("H", "show hidden"), ("R", "restart WirePlumber")] + TAB_KEYS,
+    "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
+    "patch cols": [("Enter", "connect/disconnect"), ("↑↓", "select"), ("←→", "column"), ("p", "ports"),
+                   ("g", "grid view"), ("m", "monitors")] + TAB_KEYS,
+    "patch grid": [("Enter", "connect/disconnect"), ("↑↓", "source"), ("←→", "destination"), ("p", "ports"),
+                   ("g", "column view"), ("m", "monitors")] + TAB_KEYS,
+    "patch ports": [("Enter", "link/unlink"), ("↑↓", "source port"), ("←→", "destination port"),
+                    ("p Esc", "back")] + TAB_KEYS,
 }
 # The status line under the legend: messages, else a short hint (never keys).
 HINTS = {"devices": "buses and volume act at once · new labels show after a WirePlumber restart",
          "patch": "links made here are live only; saved patch sets come with scenes"}
+
+
+def _key_box(items, width):
+    """The key legend as a box: each key a chip (drawn bold and inverted) with its slug beside it, flowed
+    onto as many lines as the width needs. Item lines carry ("keys", [(col0, col1), ...]) for the chips."""
+    inner = max(10, width - 4)
+    rows, cur, spans = [], "", []
+    for key, slug in items:
+        gap = "   " if cur else ""
+        if cur and len(cur) + len(gap) + len(key) + 3 + len(slug) > inner:
+            rows.append((cur, spans))
+            cur, spans, gap = "", [], ""
+        c0 = len(cur) + len(gap)
+        cur += f"{gap} {key}  {slug}"
+        spans.append((c0, c0 + len(key) + 2))
+    if cur:
+        rows.append((cur, spans))
+    lines = [("┌─ Keys " + "─" * max(0, width - 9) + "┐", "dim")]
+    for text, sp in rows:
+        lines.append(("│ " + text.ljust(inner) + " │", ("keys", [(c0 + 2, c1 + 2) for c0, c1 in sp])))
+    lines.append(("└" + "─" * max(0, width - 2) + "┘", "dim"))
+    return lines
 
 
 def legend(st):
@@ -640,7 +666,7 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     for c0, c1, tab in spans:
         cv.hit(row, c0, c1, ("tab", tab))
     cv.add("─" * width, "dim")
-    footer = legend(st)
+    footer = _key_box(legend(st), width)
     body_h = height - len(cv.lines) - 1 - len(footer)
     if st.tab == "devices":
         _render_devices(cv, st, devices, body_h)
@@ -654,8 +680,8 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     cv.hits = [h for h in cv.hits if h[0] < body_end]
     while len(cv.lines) < body_end:
         cv.add("")
-    for line in footer:
-        cv.add(line, "dim")
+    for text, style in footer:
+        cv.add(text, style)
     if st.confirm:
         cv.add(f" {_confirm_question(st.confirm, devices)} y/n", "alert")
     else:
