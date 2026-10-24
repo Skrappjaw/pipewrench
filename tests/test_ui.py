@@ -371,3 +371,10 @@ def test_failed_messages_are_red_and_others_green():
     assert screen(st)[0][-1][1] == "alert"
     st.message = "linked"  # a later message is not tarred by the old failure
     assert screen(st)[0][-1][1] == "ok"
+
+
+def test_black_text_is_never_bold():
+    """Bold black renders grey in most terminals."""
+    for theme in pc.THEMES.values():
+        for fg, _, attr in theme.values():
+            assert not (fg == "black" and "bold" in attr)

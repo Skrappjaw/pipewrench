@@ -19,16 +19,17 @@ RESTART_CMD = ["systemctl", "--user", "restart", "wireplumber"]
 
 # Colour roles (docs/ui-conventions.md) as (fg, bg, attr) per theme; None is the screen's own colour.
 # One bar on screen is ever "selected": that's where the keys go. "anchor" is selected but not active.
+# Never bold on black text: terminals draw bold black as grey.
 THEMES = {
     "dark": {"screen": (None, None, ""),
              "normal": (None, None, ""), "dim": (None, None, "dim"),
-             "selected": ("black", "cyan", "bold"), "anchor": ("white", "blue", ""),
+             "selected": ("black", "cyan", ""), "anchor": ("white", "blue", ""),
              "title": ("cyan", None, "bold"), "button": ("green", None, "bold"),
              "ok": ("green", None, "bold"), "pending": ("yellow", None, "bold"), "alert": ("red", None, "bold"),
-             "chip": ("black", "white", "bold")},
+             "chip": ("black", "white", "")},
     "light": {"screen": ("black", "brightwhite", ""),
               "normal": (None, None, ""), "dim": (None, None, "dim"),
-              "selected": ("black", "cyan", "bold"), "anchor": ("white", "blue", ""),
+              "selected": ("black", "cyan", ""), "anchor": ("white", "blue", ""),
               "title": ("blue", None, "bold"), "button": ("green", None, "bold"),
               "ok": ("green", None, "bold"), "pending": ("magenta", None, "bold"), "alert": ("red", None, "bold"),
               "chip": ("white", "black", "bold")},
