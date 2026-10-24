@@ -6,6 +6,7 @@ settings keys from src/pw/qpipewiresettings.cpp, choice lists from resources/Set
 """
 import dataclasses
 import json
+import math
 import os
 import re
 from dataclasses import dataclass, field
@@ -371,6 +372,7 @@ TAB_TITLES = {t: f"{n} {t.capitalize()}" for n, t in enumerate(TABS, start=1)}
 class UIState:
     tab: str = "mixer"
     mix_cursor: int = 0
+    meters: bool = True          # live levels on the Mixer (v toggles)
     cursor: int = 0
     pending: dict = field(default_factory=dict)
     top_scroll: int = 0
@@ -646,7 +648,8 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
 TAB_KEYS = [(f"Tab/1-{len(TABS)}", "tabs"), ("q", "quit")]
 # (key, slug) pairs; Enter first wherever it acts. Drawn as a box of chips by _key_box.
 LEGENDS = {
-    "mixer": [("Enter", "make default"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute")] + TAB_KEYS,
+    "mixer": [("Enter", "make default"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"),
+              ("v", "meters")] + TAB_KEYS,
     "settings": [("Enter", "apply"), ("↑↓", "select"), ("←→", "change"), ("Esc", "revert"),
                  ("s", "save as preset"), ("R", "restart WirePlumber")] + TAB_KEYS,
     "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
@@ -986,9 +989,43 @@ def _key_mixer(st, key, mx):
             return st, [("mix_cmd", pi.default_cmd(row))]
         elif key == "d":
             st.message = st.failed = "only a device can be the default; apps follow it"
+        elif key == "v":
+            st.meters = not st.meters
+            st.message = "meters on" if st.meters else "meters off"
     except ValueError as e:
         st.message = st.failed = str(e)
     return st, []
+
+
+METER_CAP = 12     # live meters at once; each costs the PipeWire daemon about 1% CPU
+_METER = 16        # cells for -48…0 dBFS, 3 dB each
+_METER_DB = 48
+
+
+def meter_targets(mx, cursor):
+    """{(section, node id): (serial, read a sink's monitor)} for the rows to meter: the selected row and
+    every running one, up to METER_CAP. A suspended device carries no audio, and metering would wake it.
+    Recording apps have nothing to read (their source has its own meter)."""
+    picks = []
+    for n, (kind, section, row) in enumerate(mixer_selectable(mx)):
+        if not row.serial or (kind == "app" and section == "recording"):
+            continue
+        if n == cursor or row.state == "running":
+            picks.append((n != cursor, n, (section, row.id), (row.serial, kind == "dev" and section == "playback")))
+    return {k: target for _, _, k, target in sorted(picks)[:METER_CAP]}
+
+
+def meter_level(prev, peak, dt):
+    """A peak meter's falling level: jumps up at once, falls 20 dB a second."""
+    return max(peak, prev * 10 ** (-dt))
+
+
+def _meter_cells(level):
+    """(text, spans): lit cells green to -18 dB, yellow to -6 dB, red above; unlit cells dim."""
+    db = 20 * math.log10(level) if level and level > 0 else -_METER_DB
+    n = max(0, min(_METER, round((db + _METER_DB) / (_METER_DB / _METER))))
+    spans = [(c, c + 1, "ok" if c < 10 else "pending" if c < 14 else "alert") for c in range(n)]
+    return "█" * n + "·" * (_METER - n), spans + [(n, _METER, "dim")]
 
 
 _BAR = 24          # cells for 0–150%
@@ -1015,7 +1052,9 @@ def _render_mixer(cv, st, mx, body_h):
         return
     items = mixer_selectable(mx)
     st.mix_cursor = max(0, min(len(items) - 1, st.mix_cursor)) if items else 0
-    label_w = max(20, min(44, cv.width - _BAR - 14))
+    metered = mx.get("metered", {}) if st.meters else {}
+    levels = mx.get("levels", {})
+    label_w = max(20, min(44, cv.width - _BAR - 14 - (_METER + 2 if metered else 0)))
     out, n_sel = [], 0
     for kind, section, row in _mixer_lines(mx):
         if kind == "head":
@@ -1038,6 +1077,11 @@ def _render_mixer(cv, st, mx, body_h):
         bar, spans = _volume_bar(row)
         c0 = len(head)
         spans = [(c0 + a, c0 + b, r) for a, b, r in spans]
+        if (section, row.id) in metered:
+            cells, cell_spans = _meter_cells(levels.get((section, row.id), 0.0))
+            m0 = c0 + len(bar) + 2
+            bar += "  " + cells
+            spans += [(m0 + a, m0 + b, r) for a, b, r in cell_spans]
         if sel:
             spans = [(0, c0 - 1, "selected")] + spans  # the cursor bar covers the name; the volume keeps its colours
         out.append((head + bar, ("normal", spans), n_sel))

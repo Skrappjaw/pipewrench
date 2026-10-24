@@ -158,3 +158,74 @@ def test_bars_line_up_for_devices_and_apps():
     lines, _ = screen(pc.UIState())
     starts = {t.index("█") for t, _ in lines if "█" in t}
     assert len(starts) == 1
+
+
+# --- live meters -------------------------------------------------------------------------------
+
+def live_mx(states=None):
+    """MX with serials, and the given labels running (everything else suspended)."""
+    states = states or {}
+    def fix(rows):
+        return [dataclasses.replace(r, serial=1000 + r.id, state=states.get(r.label, "suspended")) for r in rows]
+    return {**MX, "playback": tuple(fix(x) for x in MX["playback"]), "recording": tuple(fix(x) for x in MX["recording"])}
+
+
+def test_meters_follow_running_rows_and_the_cursor():
+    m = live_mx({"GCS-8 CH 4-AUX": "running", "Discord": "running", "GCS-8 CH 2": "running"})
+    targets = pc.meter_targets(m, 0)
+    labels = {(sec, r.label) for _, sec, r in pc.mixer_selectable(m) if (sec, r.id) in targets}
+    first = pc.mixer_selectable(m)[0]
+    assert (first[1], first[2].label) in labels                        # the selected row, though suspended
+    assert {("playback", "GCS-8 CH 4-AUX"), ("playback", "Discord"), ("recording", "GCS-8 CH 2")} <= labels
+    assert ("recording", "Discord") not in labels                        # a recording app has nothing to read
+    sink = next(r for _, sec, r in pc.mixer_selectable(m) if r.label == "GCS-8 CH 4-AUX")
+    assert targets[("playback", sink.id)] == (sink.serial, True)       # outputs are read from their monitor
+
+
+def test_meters_are_capped():
+    every = {r.label: "running" for _, _, r in pc.mixer_selectable(MX)}
+    assert len(pc.meter_targets(live_mx(every), 0)) == pc.METER_CAP
+
+
+def test_meter_level_jumps_up_and_falls_20_db_a_second():
+    assert pc.meter_level(0.1, 0.5, 0.05) == 0.5
+    assert abs(pc.meter_level(1.0, 0.0, 1.0) - 0.1) < 1e-9
+
+
+def test_meter_cells_colour_by_level():
+    text, spans = pc._meter_cells(1.0)
+    assert text == "█" * 16 and {"ok", "pending", "alert"} <= {r for *_, r in spans}
+    text, spans = pc._meter_cells(0.0)
+    assert text == "·" * 16
+    text, _ = pc._meter_cells(10 ** (-12 / 20))  # -12 dBFS
+    assert text.count("█") == 12
+
+
+def test_meter_cmd_reads_a_monitor_for_outputs():
+    cmd = pi.meter_cmd(42, True)
+    assert cmd[:3] == ["pw-record", "--target", "42"] and cmd[-1] == "-"
+    assert "stream.capture.sink = true" in cmd[cmd.index("-P") + 1] and pi.METER_NAME in cmd[cmd.index("-P") + 1]
+    assert "stream.capture.sink" not in pi.meter_cmd(42, False)[pi.meter_cmd(42, False).index("-P") + 1]
+
+
+def test_metered_rows_draw_cells_and_v_turns_them_off():
+    m = live_mx({"Discord": "running"})
+    disc = next(r for _, sec, r in pc.mixer_selectable(m) if r.label == "Discord" and sec == "playback")
+    m = {**m, "metered": {("playback", disc.id): (disc.serial, False)}, "levels": {("playback", disc.id): 0.5}}
+    lines, _ = screen(pc.UIState(), m=m)
+    row = next(t for t, _ in lines if "Discord →" in t)
+    assert row.rstrip().endswith("·") and "█" in row.split("%", 1)[1]
+    st, _ = key(pc.UIState(), "v", m=m)
+    assert not st.meters and st.message == "meters off"
+    assert "·" not in next(t for t, _ in screen(st, m=m)[0] if "Discord →" in t)
+
+
+def test_meter_streams_stay_out_of_patch_and_devices():
+    import pwpatch as pp
+    meter = {"id": 950, "type": "PipeWire:Interface:Node", "info": {"props": {
+        "media.class": "Stream/Input/Audio", "node.name": pi.METER_NAME, "application.name": "pw-record"}, "params": {}}}
+    link = {"id": 951, "type": "PipeWire:Interface:Link", "info": {"output-node-id": 50, "input-node-id": 950,
+                                                                  "output-port-id": 1, "input-port-id": 2}}
+    d = DUMP + [meter, link]
+    assert all(e.node != 950 for e in pp.graph(d).sources + pp.graph(d).dests)
+    assert not any("pw-record" in r.outputs for r in pi.inventory(d).rows())

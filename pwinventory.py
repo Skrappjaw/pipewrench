@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass, field, replace
 
 HW_APIS = ("alsa", "bluez5")
+METER_NAME = "pwctl-meter"  # pwctl's own level-meter streams; never listed anywhere
+METER_RATE = 3000  # Hz: peaks within ~3% of full rate in the spike (docs/mixer-plan.md); 1 kHz blunts them
 DUMP_CMD = ["pw-dump"]
 
 
@@ -67,6 +69,7 @@ class Row:
     default: bool = False
     inputs: tuple = ()        # who plays into it (apps or devices)
     outputs: tuple = ()       # who reads from it: recorders, or an output's monitor
+    serial: int = None        # object.serial, what pw-record --target takes
 
 
 @dataclass
@@ -152,7 +155,18 @@ def _row(obj, defaults):
                card_id=p.get("device.id") if hardware else None, state=info.get("state"),
                format=fmt.get("format"), rate=fmt.get("rate") or p.get("audio.rate"),
                channels=fmt.get("channels") or p.get("audio.channels"),
-               volume=volume, mute=mute, default=is_default)
+               volume=volume, mute=mute, default=is_default, serial=p.get("object.serial"))
+
+
+def is_meter(props):
+    return str(props.get("node.name", "")).startswith(METER_NAME)
+
+
+def meter_cmd(serial, monitor):
+    """A pw-record that streams a node's audio as raw stereo f32 on stdout; monitor reads a sink's output."""
+    props = "{ node.name = " + METER_NAME + ", node.dont-reconnect = true" + (", stream.capture.sink = true" if monitor else "") + " }"
+    return ["pw-record", "--target", str(serial), "--rate", str(METER_RATE), "--channels", "2", "--format", "f32",
+            "-P", props, "-"]
 
 
 def _volume(info):
@@ -164,7 +178,6 @@ def _volume(info):
 
 
 _STREAM_DIRECTION = {"Stream/Output/Audio": "out", "Stream/Input/Audio": "in"}
-METER_NAME = "pwctl-meter"  # pwctl's own level-meter streams; never listed
 
 
 def streams(dump):
@@ -177,7 +190,7 @@ def streams(dump):
             continue
         info = _info(o)
         p = info.get("props") or {}
-        if p.get("stream.monitor") in (True, "true") or str(p.get("node.name", "")).startswith(METER_NAME):
+        if p.get("stream.monitor") in (True, "true") or is_meter(p):
             continue
         cls = p.get("media.class", "")
         ins, outs = peers.get(o["id"], ((), ()))
@@ -189,7 +202,8 @@ def streams(dump):
             continue
         volume, mute = _volume(info)
         rows += [Row(id=o["id"], name=p.get("node.name", str(o["id"])), label=display_name(p), direction=d,
-                     kind="app", state=info.get("state"), volume=volume, mute=mute, inputs=ins, outputs=outs)
+                     kind="app", state=info.get("state"), volume=volume, mute=mute, inputs=ins, outputs=outs,
+                     serial=p.get("object.serial"))
                  for d in directions]
     return sorted(rows, key=lambda r: natural_key(r.label))
 
@@ -228,7 +242,7 @@ _peer_name = display_name
 def _peers(dump):
     """{node id: (inputs, outputs)} from the link objects, one name per peer, error links skipped."""
     names = {o["id"]: _peer_name(_info(o).get("props") or {}) for o in dump
-             if o.get("type") == "PipeWire:Interface:Node" and "id" in o}
+             if o.get("type") == "PipeWire:Interface:Node" and "id" in o and not is_meter(_info(o).get("props") or {})}
     ins, outs = {}, {}
     for o in dump:
         info = _info(o)

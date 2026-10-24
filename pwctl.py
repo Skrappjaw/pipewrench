@@ -558,6 +558,51 @@ def main(argv, runner=None, out=None, err=None, execvp=None, ask=None):
 
 # --- curses UI ---------------------------------------------------------------
 
+class Meters:
+    """Live peak levels for Mixer rows: one pw-record per target, each read on its own thread.
+    Started only while the Mixer is open; stop() ends every one (docs/mixer-plan.md)."""
+
+    def __init__(self):
+        self.procs, self.levels, self.lock = {}, {}, threading.Lock()  # levels: key -> (level, when)
+
+    def sync(self, targets):
+        for key in set(self.procs) - set(targets):
+            self._stop(key)
+        for key, (serial, monitor) in targets.items():
+            if key not in self.procs:
+                try:
+                    p = subprocess.Popen(pi.meter_cmd(serial, monitor), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                except OSError:
+                    continue
+                self.procs[key] = p
+                threading.Thread(target=self._read, args=(key, p), daemon=True).start()
+
+    def _read(self, key, p):
+        chunk = pi.METER_RATE * 8 // 20  # 50 ms of stereo f32
+        while data := p.stdout.read(chunk):
+            peak = max(map(abs, array.array("f", data[:len(data) // 4 * 4])), default=0.0)
+            now = time.monotonic()
+            with self.lock:
+                level, when = self.levels.get(key, (0.0, now))
+                self.levels[key] = (pc.meter_level(level, peak, now - when), now)
+
+    def _stop(self, key):
+        p = self.procs.pop(key)
+        p.terminate()
+        with self.lock:
+            self.levels.pop(key, None)
+
+    def stop(self):
+        for key in list(self.procs):
+            self._stop(key)
+
+    def snapshot(self):
+        """Levels now, falling since their last chunk (a suspended node sends none)."""
+        now = time.monotonic()
+        with self.lock:
+            return {k: pc.meter_level(level, 0.0, now - when) for k, (level, when) in self.levels.items()}
+
+
 class Tui:
     def __init__(self, runner):
         self.runner = runner
@@ -569,6 +614,7 @@ class Tui:
         self.wp_version = None
         self.patch = None
         self.mixer = None
+        self.meters = Meters()
         self.lock = threading.Lock()
         self.proc = None
         self.hits = []
@@ -580,6 +626,7 @@ class Tui:
         try:
             curses.wrapper(self._main)
         finally:
+            self.meters.stop()
             if self.proc:
                 self.proc.terminate()
         return 0
@@ -671,6 +718,7 @@ class Tui:
         last_refresh = time.monotonic()
         while True:
             self._draw(scr)
+            scr.timeout(100 if self.meters.procs else 250)  # meters move at 10 fps; elsewhere stay idle
             ch = scr.getch()
             if time.monotonic() - last_refresh > 1.0:
                 self._refresh()
@@ -769,8 +817,16 @@ class Tui:
             return chr(ch)
         return None
 
+    def _sync_meters(self):
+        metering = self.st.tab == "mixer" and self.st.meters and self.mixer and not os.environ.get("PWCTL_FIXTURES")
+        targets = pc.meter_targets(self.mixer, self.st.mix_cursor) if metering else {}
+        self.meters.sync(targets)
+        if self.mixer:
+            self.mixer["metered"], self.mixer["levels"] = targets, self.meters.snapshot()
+
     def _draw(self, scr):
         h, w = scr.getmaxyx()
+        self._sync_meters()
         with self.lock:
             block = self.block
         lines, self.hits = pc.render_screen(self.st, self.current, block, self.presets, w, h, self.devices,

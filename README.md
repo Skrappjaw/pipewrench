@@ -41,8 +41,11 @@ muted. ★ marks the default playback and recording device. Apps show what they'
 | ← → | the wheel over a row | volume −5% / +5% |
 | Space | its chip | mute or unmute |
 | Enter, d | double-click a device | make it the default |
+| v | its chip | live meters on or off |
 
-Volume, mute and the default act at once (`wpctl`). Design notes: `docs/mixer-plan.md`.
+Volume, mute and the default act at once (`wpctl`). Running rows and the selected one show a live peak
+meter (green, yellow past −18 dB, red past −6 dB); a suspended device has no audio and isn't woken just
+to meter it. Design notes and CPU figures: `docs/mixer-plan.md`.
 
 ### 2 Devices
 

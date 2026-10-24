@@ -125,7 +125,7 @@ def graph(dump):
     nodes = {}
     for o in dump:
         p = ((o.get("info") or {}).get("props")) or {}
-        if o.get("type") == "PipeWire:Interface:Node" and "id" in o and _is_audio_node(p):
+        if o.get("type") == "PipeWire:Interface:Node" and "id" in o and _is_audio_node(p) and not pi.is_meter(p):
             nodes[o["id"]] = p
     ports = []
     for o in dump:
