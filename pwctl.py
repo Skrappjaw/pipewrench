@@ -628,6 +628,7 @@ class Tui:
         self.wp_version = None
         self.patch = None
         self.mixer = None
+        self.about = None  # versions for the About tab; read when it first shows
         self.meters = Meters()
         self.media, self.media_at = None, 0.0  # the player the bar shows, and when it was read
         self.lock = threading.Lock()
@@ -888,8 +889,10 @@ class Tui:
         self._sync_meters()
         with self.lock:
             block = self.block
+        if self.st.tab == "about" and self.about is None:
+            self.about = pc.about_info(self.runner)
         lines, self.hits = pc.render_screen(self.st, self.current, block, self.presets, w, h, self.devices,
-                                            self.patch, self.mixer, self._media_view())
+                                            self.patch, self.mixer, self._media_view(), self.about)
         scr.erase()
         for y, (text, style) in enumerate(lines):
             try:

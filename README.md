@@ -18,17 +18,17 @@ On this machine, `pwctl` → `projects/pwctl/pwctl.py` (branch `main`).
 
 Needs PipeWire's command-line tools: `pw-metadata`, `pw-top`, `pw-dump`, `pw-cat`, plus `systemctl --user`.
 
-## The five views
+## The six views
 
 **Basic** (everyday audio): Mixer, Devices. **Advanced** (engineering): Patch, Settings (clock and
-presets), Top. pwctl opens on the Mixer.
+presets), Top. Then About. pwctl opens on the Mixer.
 
 A **now-playing bar** sits above the keys on every tab. It shows the media player that's playing (MPRIS,
 via `busctl`): `*` play/pause, `-` `+` its volume (numpad keys), `<` `>` previous/next. There's no stop: Brave
 can't be restarted from outside once stopped. Notes:
 `docs/media-bar-plan.md`.
 
-Switch views with `Tab`, the number keys `1`–`5`, or a click on the tab bar. `q` quits from any view.
+Switch views with `Tab`, the number keys `1`–`6`, or a click on the tab bar. `q` quits from any view.
 Every view lists its keys the same way: a boxed legend at the bottom, each key a bold inverted chip with
 what it does beside it, starting with Enter wherever Enter acts. The line under the box carries
 messages and y/n questions.
@@ -224,6 +224,13 @@ Followers are shown with a `+` under their driver. Rows with errors show in red,
 | Key | Mouse | Action |
 |---|---|---|
 | ↑ ↓, PgUp PgDn | wheel | scroll |
+
+### 6 About
+
+The PipeWrench wordmark over the PipeWire and WirePlumber versions, the config folder and the repo
+link. The wordmark follows the width: ANSI Compact (62 columns) where it fits, Pagga (40) where it's
+narrower, a letterspaced `P I P E W R E N C H` below that. Art and sources: `docs/about-art.md`. The
+versions are read once, the first time the tab shows. No keys of its own.
 
 ## Command line
 
@@ -447,6 +454,7 @@ PWCTL_LIVE=1 python3 -m pytest tests/test_live.py # read-only checks against the
 | `test_devices_cli.py` | `pwctl devices …` with a fake runner; restarts are recorded, never run |
 | `test_patch.py`, `test_patch_cli.py`, `test_patch_ui.py` | patch graph, pairing, commands, CLI, both views, ports, mouse (fixture: a live `pw-dump` with ports and links) |
 | `test_devices_ui.py` | Devices tab keys, mouse, rendering, scrolling, key legend |
+| `test_about.py` | About tab: wordmark by width, colours, info block, version reads |
 | `test_tui_smoke.py` | the real curses UI in a pty against fixtures |
 | `test_live.py` | opt-in; writes back only the values already set |
 

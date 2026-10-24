@@ -377,8 +377,8 @@ def summarize_preset(p):
 
 # --- TUI state machine -------------------------------------------------------
 
-# Basic first (everyday audio), then the engineering tools. Presets live inside Settings.
-TABS = ["mixer", "devices", "patch", "settings", "top"]
+# Basic first (everyday audio), then the engineering tools. Presets live inside Settings. About is last.
+TABS = ["mixer", "devices", "patch", "settings", "top", "about"]
 TAB_TITLES = {t: f"{n} {t.capitalize()}" for n, t in enumerate(TABS, start=1)}
 
 
@@ -456,6 +456,8 @@ def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
         return _key_devices(st, key, devices)
     if st.tab == "patch":
         return _key_patch(st, key, patch)
+    if st.tab == "about":
+        return st, []
     return {"settings": _key_settings, "top": _key_top}[st.tab](st, key, current, presets)
 
 
@@ -693,6 +695,7 @@ LEGENDS = {
     "settings": [("Enter", "apply"), ("↑↓", "select"), ("←→", "change"), ("Esc", "revert"),
                  ("s", "save as preset"), ("R", "restart WirePlumber")] + TAB_KEYS,
     "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
+    "about": TAB_KEYS,
     "presets": [("Enter", "apply"), ("↑↓", "select"), ("s", "save current"), ("e", "edit label"),
                 ("d", "delete")] + TAB_KEYS,
     "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("H", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
@@ -789,7 +792,8 @@ def _confirm_question(confirm, devices=None):
             "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now."}[kind]
 
 
-def render_screen(st, current, block, presets, width, height, devices=None, patch=None, mixer=None, media=None):
+def render_screen(st, current, block, presets, width, height, devices=None, patch=None, mixer=None, media=None,
+                  about=None):
     cv = _Canvas(width)
     text, spans = " ", []
     for tab in TABS:
@@ -809,6 +813,8 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
         _render_devices(cv, st, devices, body_h)
     elif st.tab == "patch":
         _render_patch(cv, dataclasses.replace(st), patch, body_h)
+    elif st.tab == "about":
+        _render_about(cv, about)
     else:
         {"settings": _render_settings, "top": _render_top}[st.tab](
             cv, st, current, block, presets, body_h)
@@ -914,6 +920,60 @@ def _display_row(cv, st, idx, label, value, note):
     cv.hit(row, arrow_l, arrow_l + 1, ("arrow", idx, -1))
     cv.hit(row, arrow_l + 1, arrow_r, ("setting", idx))
     cv.hit(row, arrow_r, arrow_r + 1, ("arrow", idx, +1))
+
+
+# --- About ---------------------------------------------------------------------
+
+# The wordmarks from docs/about-art.md (TAAG: ANSI Compact, Pagga). The widest that fits is drawn.
+LOGO_ANSI = [
+    "█████▄ ▄▄ ▄▄▄▄  ▄▄▄▄▄ ██     ██ ▄▄▄▄  ▄▄▄▄▄ ▄▄  ▄▄  ▄▄▄▄ ▄▄ ▄▄",
+    "██▄▄█▀ ██ ██▄█▀ ██▄▄  ██ ▄█▄ ██ ██▄█▄ ██▄▄  ███▄██ ██▀▀▀ ██▄██",
+    "██     ██ ██    ██▄▄▄  ▀██▀██▀  ██ ██ ██▄▄▄ ██ ▀██ ▀████ ██ ██",
+]
+LOGO_PAGGA = [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀",
+]
+LOGO_PLAIN = ["P I P E W R E N C H"]
+ABOUT_LINK = "github.com/Skrappjaw/pwctl"
+ABOUT_CMDS = {"pipewire": ["pipewire", "--version"], "wireplumber": ["wireplumber", "--version"]}
+
+
+def about_info(run):
+    """Versions and paths for the About tab; "?" for anything that can't be read."""
+    info = {}
+    for name, argv in ABOUT_CMDS.items():
+        try:
+            rc, out = run(argv)
+        except (OSError, ValueError):
+            rc, out = 1, ""
+        m = re.search(rf"lib{name} (\d+\.\d+\.\d+)", out or "")
+        info[name] = m.group(1) if rc == 0 and m else "?"
+    folder = str(ui_path().parent)
+    home = str(Path.home())
+    info["config"] = "~" + folder[len(home):] if folder.startswith(home + "/") else folder
+    return info
+
+
+def _render_about(cv, about):
+    about = about or {}
+    logo = next((lg for lg in (LOGO_ANSI, LOGO_PAGGA) if len(lg[0]) + 4 <= cv.width), LOGO_PLAIN)
+    pad = max(0, (cv.width - len(logo[0])) // 2)
+    cv.add("")
+    for row in logo:
+        plate = [(pad + n, pad + n + 1, "dim") for n, ch in enumerate(row) if ch == "░"]
+        cv.add(" " * pad + row, ("title", plate) if plate else "title")
+    cv.add("")
+    tagline = "terminal control for PipeWire"
+    cv.add(" " * max(0, (cv.width - len(tagline)) // 2) + tagline, "dim")
+    cv.add("")
+    rows = [("PipeWire", about.get("pipewire", "?")), ("WirePlumber", about.get("wireplumber", "?")),
+            ("Config", about.get("config", "?")), ("Source", ABOUT_LINK)]
+    width = max(13 + len(v) for _, v in rows)
+    left = max(2, (cv.width - width) // 2)
+    for label, value in rows:
+        cv.add(" " * left + f"{label:<13}{value}", ("normal", [(left, left + len(label), "title")]))
 
 
 _TOP_HDR = f"{'S':<2}{'ID':>5}{'QUANT':>7}{'RATE':>7}{'WAIT':>9}{'BUSY':>9}{'W/Q':>6}{'B/Q':>6}{'ERR':>5}  {'FORMAT':<16} NAME"
