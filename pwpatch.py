@@ -89,9 +89,16 @@ class Graph:
         return self._find(self.dests, key)
 
 
+def _is_audio_node(props):
+    """Devices, buses and app streams carry a media.class; JACK clients (pw-jack) only a media.type."""
+    cls = props.get("media.class", "")
+    return cls.startswith("Audio/") or (cls.startswith("Stream/") and "Audio" in cls) \
+        or (not cls and props.get("media.type") == "Audio")
+
+
 def _kind(props):
     cls = props.get("media.class", "")
-    if cls.startswith("Stream/"):
+    if cls.startswith("Stream/") or not cls:
         return "app"
     return "device" if props.get("device.api") in pi.HW_APIS else "bus"
 
@@ -100,9 +107,7 @@ def graph(dump):
     nodes = {}
     for o in dump:
         p = ((o.get("info") or {}).get("props")) or {}
-        cls = p.get("media.class", "")
-        if o.get("type") == "PipeWire:Interface:Node" and "id" in o and \
-                (cls.startswith("Audio/") or (cls.startswith("Stream/") and "Audio" in cls)):
+        if o.get("type") == "PipeWire:Interface:Node" and "id" in o and _is_audio_node(p):
             nodes[o["id"]] = p
     ports = []
     for o in dump:
@@ -110,6 +115,8 @@ def graph(dump):
         p = info.get("props") or {}
         if o.get("type") != "PipeWire:Interface:Port" or p.get("node.id") not in nodes:
             continue
+        if "audio" not in str(p.get("format.dsp", "audio")).lower():
+            continue  # a JACK client's MIDI port
         name = p.get("port.name", "")
         channel = p.get("audio.channel") or name.rsplit("_", 1)[-1]
         ports.append(Port(o["id"], p["node.id"], name, channel, info.get("direction"),

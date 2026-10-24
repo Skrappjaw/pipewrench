@@ -140,3 +140,40 @@ def test_graph_tolerates_junk():
     g = pp.graph([{"type": "PipeWire:Interface:Port", "id": 1, "info": None},
                   {"type": "PipeWire:Interface:Link", "id": 2, "info": {"output-port-id": 99, "input-port-id": 98}}])
     assert g.sources == [] and g.dests == []
+
+
+# --- JACK clients (e.g. REAPER via pw-jack): no media.class, ports without channel names -----
+
+def with_reaper(d):
+    """REAPER as pipewire-jack shows it on desktop: media.type Audio, client.api jack, mono ports."""
+    d = list(d)
+    d.append({"id": 700, "type": "PipeWire:Interface:Node", "info": {"state": "running", "props": {
+        "media.type": "Audio", "node.name": "REAPER", "node.description": "REAPER", "client.api": "jack",
+        "media.category": "Duplex"}, "params": {}}})
+    for pid, direction, name in [(701, "output", "out1"), (702, "output", "out2")] + \
+            [(710 + n, "input", f"in{n}") for n in range(1, 9)] + [(720, "output", "midi_out")]:
+        dsp = "8 bit raw midi" if "midi" in name else "32 bit float mono audio"
+        d.append({"id": pid, "type": "PipeWire:Interface:Port", "info": {"direction": direction, "props": {
+            "node.id": 700, "port.name": name, "format.dsp": dsp, "port.alias": f"REAPER:{name}"}}})
+    return d
+
+
+def test_jack_client_is_a_source_and_destination():
+    g = pp.graph(with_reaper(dump()))
+    s, d = g.find_source("REAPER"), g.find_dest("REAPER")
+    assert s.kind == "app" and d.kind == "app"
+    assert [p.name for p in s.ports] == ["out1", "out2"]           # MIDI port left out
+    assert [p.name for p in d.ports] == [f"in{n}" for n in range(1, 9)]  # natural order, not in1, in10…
+
+
+def test_jack_ports_pair_by_position():
+    g = pp.graph(with_reaper(dump()))
+    out = pp.pair_ports(g.find_source("REAPER").ports, g.find_dest("GCS-8 CH 3-AUX").ports)
+    assert [(a.name, b.channel) for a, b in out] == [("out1", "FL"), ("out2", "FR")]
+    rec = pp.pair_ports(g.find_source("GCS-8 CH 2").ports, g.find_dest("REAPER").ports)
+    assert [(a.channel, b.name) for a, b in rec] == [("FL", "in1"), ("FR", "in2")]
+
+
+def test_jack_client_does_not_become_a_device():
+    inv = pi.inventory(with_reaper(dump()))
+    assert inv.find("REAPER") is None

@@ -153,6 +153,8 @@ How it works:
 - **Connecting** links matching channels (FL→FL, FR→FR); a mono source feeds both channels.
 - **Ports:** `p` shows every port pair for fine patches, e.g. mono to left only.
 - **Monitors:** outputs' monitors are hidden until `m`.
+- **JACK apps** (e.g. REAPER via `pw-jack`) appear as apps. Their ports are named `out1`, `in1`…, so
+  they pair by position (out1/out2 → FL/FR, FL/FR → in1/in2); `p` reaches the other inputs.
 
 | Key | Action |
 |---|---|
