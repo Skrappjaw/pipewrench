@@ -151,7 +151,8 @@ How it works:
 - **Sources:** app playback, device inputs and buses.
 - **Destinations:** app recording, device outputs and buses.
 - **Connecting** links matching channels (FL→FL, FR→FR); a mono source feeds both channels.
-- **Ports:** `p` shows every port pair for fine patches, e.g. mono to left only.
+- **Ports:** `p` opens a port matrix for the selected pair: source ports down the side,
+  destination ports across the top. Use it for fine patches, e.g. CH 2's FL into REAPER in3.
 - **Monitors:** outputs' monitors are hidden until `m`.
 - **JACK apps** (e.g. REAPER via `pw-jack`) appear as apps. Their ports are named `out1`, `in1`…, so
   they pair by position (out1/out2 → FL/FR, FL/FR → in1/in2); `p` reaches the other inputs.
@@ -160,7 +161,7 @@ How it works:
 |---|---|
 | ↑ ↓ / ← → | columns: select / switch column. Grid: source / destination |
 | Enter | connect or disconnect the selected pair (on a source in columns: move to the destinations) |
-| p | port pairs for the selected pair; Enter toggles one; `p`/Esc back |
+| p | port matrix for the selected pair: ↑↓ source port, ←→ destination port, Enter links/unlinks; `p`/Esc back |
 | g | switch between columns and grid |
 | m | show or hide output monitors |
 

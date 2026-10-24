@@ -316,7 +316,8 @@ class UIState:
     patch_dst: int = 0
     patch_monitors: bool = False
     patch_ports: bool = False
-    patch_port: int = 0
+    patch_port_row: int = 0      # source port in the port matrix
+    patch_port_col: int = 0      # destination port
     confirm: tuple = None
     message: str = ""
 
@@ -545,8 +546,8 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
     elif kind == "patch_cell":
         st = dataclasses.replace(st, patch_src=target[1], patch_dst=target[2])
         keys = ["enter"] if event == "double" else []
-    elif kind == "patch_port":
-        st = dataclasses.replace(st, patch_port=target[1])
+    elif kind == "patch_pcell":
+        st = dataclasses.replace(st, patch_port_row=target[1], patch_port_col=target[2])
         keys = ["enter"] if event == "double" else []
     actions = []
     for k in keys:
@@ -759,7 +760,7 @@ PATCH_KEYS = {
              "        g grid view  m monitors  Tab/1-5 tabs  q quit"],
     "grid": ["  Keys: ↑↓ source  ←→ destination  Enter connect/disconnect  p ports",
              "        g column view  m monitors  Tab/1-5 tabs  q quit"],
-    "ports": ["  Keys: ↑↓ select  Enter link/unlink this port pair  p or Esc back",
+    "ports": ["  Keys: ↑↓ source port  ←→ destination port  Enter link/unlink  p or Esc back",
               "        Tab/1-5 tabs  q quit"],
 }
 _STATE_MARK = {"full": "●", "partial": "◐", "none": "·"}
@@ -801,18 +802,20 @@ def _key_patch(st, key, g):
     if s is None:
         return st, []
     if st.patch_ports:
-        rows = pp.port_pairs(g, s, d)
-        st.patch_port = max(0, min(len(rows) - 1, st.patch_port))
+        st.patch_port_row = max(0, min(len(s.ports) - 1, st.patch_port_row))
+        st.patch_port_col = max(0, min(len(d.ports) - 1, st.patch_port_col))
         if key in ("up", "down"):
-            st.patch_port = max(0, min(len(rows) - 1, st.patch_port + (1 if key == "down" else -1)))
-        elif key == "enter" and rows:
-            a, b, _ = rows[st.patch_port]
+            st.patch_port_row = max(0, min(len(s.ports) - 1, st.patch_port_row + (1 if key == "down" else -1)))
+        elif key in ("left", "right"):
+            st.patch_port_col = max(0, min(len(d.ports) - 1, st.patch_port_col + (1 if key == "right" else -1)))
+        elif key == "enter" and s.ports and d.ports:
+            a, b = s.ports[st.patch_port_row], d.ports[st.patch_port_col]
             return st, [("patch_cmds", [pp.port_toggle_cmd(g, a, b)])]
         elif key in ("p", "esc"):
             st.patch_ports = False
         return st, []
     if key == "p":
-        st.patch_ports, st.patch_port = True, 0
+        st.patch_ports, st.patch_port_row, st.patch_port_col = True, 0, 0
         return st, []
     step = {"up": -1, "down": 1}.get(key)
     if st.patch_view == "grid":
@@ -860,15 +863,7 @@ def _render_patch(cv, st, g, body_h):
         return
     room = max(1, body_h - 3 - 2)  # blank, status, blank-free legend (2 lines)
     if st.patch_ports:
-        cv.add(f"  Ports: {s.label} → {d.label}", "title")
-        rows = pp.port_pairs(g, s, d)
-        st.patch_port = max(0, min(len(rows) - 1, st.patch_port))
-        for i in _window(len(rows), st.patch_port, room - 1):
-            a, b, on = rows[i]
-            sel = i == st.patch_port
-            row = cv.add(f"{'> ' if sel else '  '}{'●' if on else '·'} {a.name:<20} → {b.name}",
-                         "selected" if sel else "normal")
-            cv.hit(row, 0, cv.width, ("patch_port", i))
+        _render_port_matrix(cv, st, g, s, d, room)
         legend = PATCH_KEYS["ports"]
     elif st.patch_view == "grid":
         _render_patch_grid(cv, st, g, srcs, room)
@@ -932,3 +927,25 @@ def _render_patch_grid(cv, st, g, srcs, room):
     cv.add("")
     for start in range(0, len(cols), 3):
         cv.add("  " + "".join(f"{j + 1:>3} {_fit(g.dests[j].label, 30):<31}" for j in cols[start:start + 3]), "dim")
+
+
+def _render_port_matrix(cv, st, g, s, d, room):
+    """Source ports down the side, destination ports across the top; one cell per possible link."""
+    cv.add(f"  Ports: {s.label} → {d.label}", "title")
+    st.patch_port_row = max(0, min(len(s.ports) - 1, st.patch_port_row))
+    st.patch_port_col = max(0, min(len(d.ports) - 1, st.patch_port_col))
+    row_w = max(4, max((len(p.channel) for p in s.ports), default=0)) + 2
+    cell_w = max(5, max((len(p.channel) for p in d.ports), default=0) + 2)
+    cols = list(_window(len(d.ports), st.patch_port_col, max(1, (cv.width - 2 - row_w) // cell_w)))
+    cv.add(" " * (2 + row_w) + "".join(d.ports[j].channel.center(cell_w) for j in cols), "title")
+    for i in _window(len(s.ports), st.patch_port_row, max(1, room - 2)):
+        cells = ""
+        for j in cols:
+            mark = "●" if (s.ports[i].id, d.ports[j].id) in g.links else "·"
+            cursor = (i, j) == (st.patch_port_row, st.patch_port_col)
+            cells += (f"[{mark}]" if cursor else f" {mark} ").center(cell_w)
+        sel = i == st.patch_port_row
+        row = cv.add(f"{'> ' if sel else '  '}{s.ports[i].channel:<{row_w}}{cells}", "selected" if sel else "normal")
+        for k, j in enumerate(cols):
+            c0 = 2 + row_w + cell_w * k
+            cv.hit(row, c0, c0 + cell_w, ("patch_pcell", i, j))

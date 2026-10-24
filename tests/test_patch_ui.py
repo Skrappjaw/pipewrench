@@ -140,23 +140,68 @@ def test_grid_cursor_cell_is_bracketed():
 
 # --- ports -------------------------------------------------------------------------------
 
-def test_p_opens_ports_for_the_pair_and_toggles_one_link():
-    st, _ = key(at("GCS-8 CH 1", "GCS-8 CH 3-AUX", patch_side="dst"), "p")
-    assert st.patch_ports
-    text = body(screen(st)[0])
-    assert "capture_FL" in text and "playback_FR" in text
-    st, _ = key(st, "down")
-    _, actions = key(st, "enter")
-    s, d = SRCS[si("GCS-8 CH 1")], G.dests[di("GCS-8 CH 3-AUX")]
-    a, b, _ = pp.port_pairs(G, s, d)[1]
-    assert actions == [("patch_cmds", [pp.port_toggle_cmd(G, a, b)])]
-    st, _ = key(st, "esc")
+from test_patch import with_reaper  # noqa: E402
+
+GR = pp.graph(with_reaper(json.loads((FIX / "pwdump_patch.json").read_text())))
+
+
+def reaper_ports_state():
+    srcs = [s for s in GR.sources if not s.monitor]
+    i = next(n for n, s in enumerate(srcs) if s.label == "GCS-8 CH 2")
+    j = next(n for n, d in enumerate(GR.dests) if d.label == "REAPER")
+    st, _ = key(pc.UIState(tab="patch", patch_src=i, patch_dst=j, patch_side="dst"), "p", g=GR)
+    return st, srcs[i], GR.dests[j]
+
+
+def test_p_opens_a_port_matrix():
+    st, s, d = reaper_ports_state()
+    assert st.patch_ports and (st.patch_port_row, st.patch_port_col) == (0, 0)
+    text = body(screen(st, g=GR)[0])
+    header = next(line for line in text.splitlines() if "in1" in line and "in8" in line)
+    assert header.index("in1") < header.index("in8")
+    rows = [line for line in text.splitlines() if line.lstrip("> ").startswith(("FL", "FR")) and ("·" in line or "●" in line)]
+    assert len(rows) == 2                      # one row per source port, not 16 lines
+    assert "[·]" in rows[0]                    # cursor on FL × in1
+
+
+def test_port_matrix_arrows_and_enter_toggle_one_link():
+    st, s, d = reaper_ports_state()
+    st, _ = key(st, "down", "right", "right", g=GR)
+    assert (st.patch_port_row, st.patch_port_col) == (1, 2)
+    _, actions = key(st, "enter", g=GR)
+    assert actions == [("patch_cmds", [pp.port_toggle_cmd(GR, s.ports[1], d.ports[2])])]
+    st, _ = key(st, "esc", g=GR)
     assert not st.patch_ports
+
+
+def test_port_matrix_shows_existing_links():
+    st, _ = key(at("Discord", "GCS-8 CH 4-AUX", patch_side="dst"), "p")
+    text = body(screen(st)[0])
+    rows = [line for line in text.splitlines() if line.lstrip("> ").startswith(("FL", "FR")) and ("·" in line or "●" in line)]
+    assert "●" in rows[0] and "●" in rows[1]   # FL→FL and FR→FR linked
+    assert "Ports: Discord → GCS-8 CH 4-AUX" in text
 
 
 def test_ports_mode_works_from_grid_too():
     st, _ = key(at("Discord", "GCS-8 CH 4-AUX", patch_view="grid"), "p")
     assert st.patch_ports and "●" in body(screen(st)[0])
+
+
+def test_port_matrix_scrolls_sideways_on_narrow_screens():
+    st, _, _ = reaper_ports_state()
+    st, _ = key(st, *["right"] * 7, g=GR)
+    text = body(screen(st, width=40, g=GR)[0])
+    assert "in8" in text and "[·]" in text
+
+
+def test_click_port_cell():
+    st, s, d = reaper_ports_state()
+    lines, hits = screen(st, g=GR)
+    row, c0, _ = hit_for(hits, ("patch_pcell", 1, 3))
+    st2, _ = pc.handle_mouse(st, hits, row, c0, "click", CUR, [], patch=GR)
+    assert (st2.patch_port_row, st2.patch_port_col) == (1, 3)
+    _, actions = pc.handle_mouse(st, hits, row, c0, "double", CUR, [], patch=GR)
+    assert actions == [("patch_cmds", [pp.port_toggle_cmd(GR, s.ports[1], d.ports[3])])]
 
 
 # --- legend and width ------------------------------------------------------------------------
