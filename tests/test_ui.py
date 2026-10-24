@@ -114,7 +114,7 @@ def test_up_down_moves_cursor_and_clamps():
     st, _ = key(pc.UIState(), "up")
     assert st.cursor == 0
     st, _ = key(st, *["down"] * 10)
-    assert st.cursor == len(pc.SETTINGS) - 1
+    assert st.cursor == pc.THEME_ROW
 
 
 def test_left_right_sets_pending_without_action():
@@ -329,3 +329,45 @@ def test_click_while_confirming_cancels_without_acting():
     _, hits = screen(st)
     st2, actions = click(st, hits, ("tab", "top"))
     assert st2.tab == "settings" and actions == [] and st2.confirm is None and "y confirms" in st2.message
+
+
+# --- theme ------------------------------------------------------------------------------
+
+def test_theme_row_switches_at_once_and_reports_it():
+    st, _ = key(pc.UIState(), *["down"] * 10)
+    st, actions = key(st, "right")
+    assert st.theme == "light" and actions == [("set_theme", "light")]
+    assert "light" in "\n".join(t for t, _ in screen(st)[0])
+    st, actions = key(st, "right")
+    assert st.theme == "dark"
+
+
+def test_enter_on_the_theme_row_does_not_switch_it():
+    st, _ = key(pc.UIState(), *["down"] * 10)
+    st, actions = key(st, "enter")
+    assert st.theme == "dark" and actions == []
+
+
+def test_every_theme_defines_every_role():
+    roles = set(pc.THEMES["dark"])
+    assert all(set(t) == roles for t in pc.THEMES.values())
+
+
+def test_ui_file_round_trips_and_tolerates_junk(tmp_path):
+    p = tmp_path / "pwctl" / "ui.json"
+    assert pc.load_ui(p) == {"theme": "dark"}
+    pc.save_ui(p, {"theme": "light"})
+    assert pc.load_ui(p) == {"theme": "light"}
+    p.write_text("{not json")
+    assert pc.load_ui(p) == {"theme": "dark"}
+    p.write_text('{"theme": "neon"}')
+    assert pc.load_ui(p) == {"theme": "dark"}
+
+
+def test_failed_messages_are_red_and_others_green():
+    st = pc.UIState(message="linked")
+    assert screen(st)[0][-1][1] == "ok"
+    st = pc.UIState(message="boom", failed="boom")
+    assert screen(st)[0][-1][1] == "alert"
+    st.message = "linked"  # a later message is not tarred by the old failure
+    assert screen(st)[0][-1][1] == "ok"

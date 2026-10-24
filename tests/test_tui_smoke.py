@@ -17,8 +17,8 @@ APP = HERE.parent / "pwctl.py"
 
 
 class Pty:
-    def __init__(self, tmp_path):
-        env = {**os.environ, "TERM": "xterm-256color", "PWCTL_FIXTURES": str(HERE / "fixtures"),
+    def __init__(self, tmp_path, term="xterm-256color"):
+        env = {**os.environ, "TERM": term, "PWCTL_FIXTURES": str(HERE / "fixtures"),
                "PWCTL_PRESETS": str(tmp_path / "presets.json"), "XDG_CONFIG_HOME": str(tmp_path)}
         env.pop("PWCTL_DEVICES", None)
         self.pid, self.fd = pty.fork()
@@ -171,3 +171,25 @@ def test_devices_rename_empty_restores_the_default(app, tmp_path):
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pwctl" / "devices.json").read_text())
     assert saved["labels"] == {}
+
+
+@pytest.mark.parametrize("term", ["xterm-256color", "xterm", "vt100"])  # 16+ colours, 8 colours, none
+def test_theme_switches_live_and_is_saved(tmp_path, term):
+    (tmp_path / "pwctl").mkdir()
+    (tmp_path / "pwctl" / "ui.json").write_text('{"theme": "light"}')
+    app = Pty(tmp_path, term)
+    try:
+        app.expect("light")
+        app.send("\x1bOB" * 10 + "\x1bOC")  # down to the theme row, then right
+        app.expect("theme: dark")
+        assert json.loads((tmp_path / "pwctl" / "ui.json").read_text()) == {"theme": "dark"}
+        app.send("5")
+        app.expect("Destinations")
+        app.send("q")
+        assert app.wait_exit() == 0
+    finally:
+        try:
+            os.kill(app.pid, 9)
+            os.waitpid(app.pid, 0)
+        except (ProcessLookupError, ChildProcessError):
+            pass

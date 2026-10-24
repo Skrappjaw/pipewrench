@@ -48,8 +48,8 @@ def chips(lines):
     top, bottom = box(lines)
     out = []
     for text, style in lines[top + 1:bottom]:
-        assert isinstance(style, tuple) and style[0] == "keys", style
-        spans = style[1]
+        assert isinstance(style, tuple) and all(r == "chip" for *_, r in style[1]), style
+        spans = [(c0, c1) for c0, c1, _ in style[1]]
         for n, (c0, c1) in enumerate(spans):
             end = spans[n + 1][0] if n + 1 < len(spans) else len(text) - 1
             out.append((text[c0:c1].strip(), text[c1:end].strip(" │")))

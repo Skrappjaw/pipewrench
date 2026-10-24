@@ -43,6 +43,8 @@ PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata 
   `clock.allowed-rates`, applies with a warning.
 - Below the rows: the allowed rates and the defaults (`clock.rate`, `clock.quantum`).
 - These settings are runtime only. A PipeWire restart clears them.
+- **Theme** (the last row) is pwctl's own: dark or light. ←→ switches it at once, and it's kept in
+  `~/.config/pwctl/ui.json`. The colour roles are described in `docs/ui-conventions.md`.
 
 | Key | Mouse | Action |
 |---|---|---|
@@ -221,6 +223,7 @@ Exit codes: 0 ok; 1 a PipeWire command failed, a check found problems or you ans
 | Path | Written by | What |
 |---|---|---|
 | `~/.config/pwctl/presets.json` | Presets view, `preset save/delete` | presets |
+| `~/.config/pwctl/ui.json` | Settings → Theme | display preferences (theme) |
 | `~/.config/pwctl/devices.json` | Devices view, `devices label/hide/bus` | buses, labels, hidden rows, clock: the source of truth |
 | `~/.config/pipewire/pipewire.conf.d/50-pwctl-devices.conf` | `devices apply` | the buses and clock, as a PipeWire drop-in |
 | `~/.config/wireplumber/main.lua.d/51-pwctl-labels.lua` | `devices apply` | labels as WirePlumber 0.4 rules |
@@ -272,6 +275,7 @@ github.com/Skrappjaw/gcs-8-linux.
 |---|---|
 | `PWCTL_PRESETS` | use this presets file instead of the default |
 | `PWCTL_DEVICES` | use this devices file instead of the default |
+| `PWCTL_UI` | use this display-preferences file instead of the default |
 | `XDG_CONFIG_HOME` | base for both config files and the generated files |
 | `PWCTL_FIXTURES` | read from recorded output in that folder and drop all writes (demo and tests) |
 | `PAGER` | pager for the Devices preview |

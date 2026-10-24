@@ -561,7 +561,7 @@ def main(argv, runner=None, out=None, err=None, execvp=None, ask=None):
 class Tui:
     def __init__(self, runner):
         self.runner = runner
-        self.st = pc.UIState()
+        self.st = pc.UIState(theme=pc.load_ui(pc.ui_path())["theme"])
         self.current = {}
         self.presets = []
         self.block = None
@@ -589,7 +589,7 @@ class Tui:
         try:
             self.proc = pwtop_proc()
         except FileNotFoundError:
-            self.st.message = "pw-top not found"
+            self.st.message = self.st.failed = "pw-top not found"
             return
         for line in self.proc.stdout:
             done = parser.feed(line.rstrip("\n"))
@@ -605,11 +605,11 @@ class Tui:
         try:
             self.current = pc.read_settings(self.runner)
         except (pc.MetadataError, FileNotFoundError) as e:
-            self.st.message = f"cannot read settings: {e}"
+            self.st.message = self.st.failed = f"cannot read settings: {e}"
         try:
             self.presets = pc.load_presets(pc.presets_path())
         except (ValueError, OSError) as e:
-            self.st.message = f"presets file problem: {e}"
+            self.st.message = self.st.failed = f"presets file problem: {e}"
         if self.st.tab == "devices":
             self._refresh_devices()
         if self.st.tab == "patch":
@@ -619,14 +619,14 @@ class Tui:
         try:
             self.patch = _graph(self.runner)
         except CliError as e:
-            self.st.message = str(e)
+            self.st.message = self.st.failed = str(e)
 
     def _refresh_devices(self):
         """Inventory, devices.json, bus status and whether the generated files are behind."""
         try:
             c = pcfg.load_config(pcfg.config_path())
         except (ValueError, OSError) as e:
-            self.st.message = f"devices.json problem: {e}"
+            self.st.message = self.st.failed = f"devices.json problem: {e}"
             return
         try:
             inv = _inventory(self.runner)
@@ -634,26 +634,22 @@ class Tui:
                 self.wp_version = _wp_version(self.runner)
             dirty = bool(_generated(self.runner, c, self.wp_version))
         except CliError as e:
-            self.st.message = str(e)
+            self.st.message = self.st.failed = str(e)
             return
         owned, clash, pending = _bus_status(c, inv)
         self.devices = pc.devices_view(inv, c, dirty=dirty, owned=owned, clash=clash, pending=pending)
 
     def _main(self, scr):
         c = self.curses
-        c.curs_set(0)
+        try:
+            c.curs_set(0)
+        except c.error:
+            pass  # some terminals (vt100) can't hide the cursor
         scr.keypad(True)
         scr.timeout(250)
         c.mousemask(c.ALL_MOUSE_EVENTS)
         c.mouseinterval(150)
-        self.styles = {"normal": c.A_NORMAL, "dim": c.A_DIM, "selected": c.A_REVERSE,
-                       "title": c.A_BOLD, "button": c.A_BOLD, "alert": c.A_BOLD}
-        if c.has_colors():
-            c.use_default_colors()
-            for i, (name, fg) in enumerate((("title", c.COLOR_CYAN), ("button", c.COLOR_GREEN),
-                                            ("alert", c.COLOR_RED)), start=1):
-                c.init_pair(i, fg, -1)
-                self.styles[name] = c.color_pair(i) | c.A_BOLD
+        self._apply_theme(scr)
         threading.Thread(target=self._pwtop, daemon=True).start()
         self._refresh()
         last_refresh = time.monotonic()
@@ -689,6 +685,36 @@ class Tui:
             if self.st.tab == "patch" and self.patch is None:
                 self._refresh_patch()
 
+    # Without colour the roles fall back to attributes; the > and * markers carry the rest.
+    _PLAIN = {"selected": "reverse bold", "anchor": "underline", "chip": "reverse", "title": "bold",
+              "button": "bold", "alert": "bold", "pending": "bold", "dim": "dim"}
+
+    def _apply_theme(self, scr):
+        """Curses attributes for each colour role of the current theme (pc.THEMES)."""
+        c = self.curses
+        attr = lambda names: sum(getattr(c, f"A_{n.upper()}") for n in names.split())  # noqa: E731
+        if not c.has_colors():
+            self.styles = {role: attr(self._PLAIN.get(role, "")) for role in pc.THEMES["dark"]}
+            return
+        c.use_default_colors()
+        bright = c.COLORS >= 16
+
+        def colour(name, default):
+            if name is None:
+                return default
+            if name.startswith("bright"):
+                return getattr(c, f"COLOR_{name[6:].upper()}") + (8 if bright else 0)
+            return getattr(c, f"COLOR_{name.upper()}")
+
+        roles = pc.THEMES[self.st.theme]
+        sfg, sbg, _ = roles["screen"]
+        sfg, sbg = colour(sfg, -1), colour(sbg, -1)
+        self.styles = {}
+        for i, (role, (fg, bg, names)) in enumerate(roles.items(), start=1):
+            c.init_pair(i, colour(fg, sfg), colour(bg, sbg))
+            self.styles[role] = c.color_pair(i) | attr(names)
+        scr.bkgd(" ", self.styles["screen"])
+
     def _mouse_event(self, b):
         c = self.curses
         if b & c.BUTTON1_DOUBLE_CLICKED:
@@ -721,11 +747,10 @@ class Tui:
         scr.erase()
         for y, (text, style) in enumerate(lines):
             try:
-                if isinstance(style, tuple):  # (kind, spans): key chips bold-inverted, a "selected" span inverted
-                    scr.addstr(y, 0, text, self.styles["normal"])
-                    attr = self.styles["selected"] if style[0] == "selected" else self.curses.A_REVERSE | self.curses.A_BOLD
-                    for c0, c1 in style[1]:
-                        scr.addstr(y, c0, text[c0:c1], attr)
+                if isinstance(style, tuple):  # (base role, [(c0, c1, role), ...]) drawn in order
+                    scr.addstr(y, 0, text[:w - 1] if y == h - 1 else text, self.styles[style[0]])
+                    for c0, c1, role in style[1]:
+                        scr.addstr(y, c0, text[c0:min(c1, w - 1 if y == h - 1 else w)], self.styles[role])
                 else:
                     scr.addstr(y, 0, text[:w - 1] if y == h - 1 else text, self.styles.get(style, 0))
             except self.curses.error:
@@ -783,6 +808,11 @@ class Tui:
             elif kind == "restart_wireplumber":
                 rc, out = self.runner(pc.RESTART_CMD)
                 self.st.message = "WirePlumber restarted" if rc == 0 else f"restart failed: {out.strip()}"
+                self.st.failed = "" if rc == 0 else self.st.message
+            elif kind == "set_theme":
+                pc.save_ui(pc.ui_path(), {"theme": action[1]})
+                self._apply_theme(scr)
+                self.st.message = f"theme: {action[1]}"
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
             elif kind == "patch_cmds":
@@ -790,7 +820,7 @@ class Tui:
                     _run(self.runner, cmd)
                 self.st.message = "unlinked" if action[1][0][1] == "-d" else "linked"
         except (CliError, ValueError, KeyError, LookupError, OSError, pcfg.ConfigError) as e:
-            self.st.message = str(e)
+            self.st.message = self.st.failed = str(e)
         self._refresh()
 
     def _save_config(self, c, message):

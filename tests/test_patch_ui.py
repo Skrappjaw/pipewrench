@@ -79,14 +79,18 @@ def test_columns_mark_targets_of_selected_source():
     assert "Discord → GCS-8 CH 4-AUX" in text  # the status line for the selected pair
 
 
+def bars(st, g=G):
+    """Every highlight bar in the body as (c0, c1, role); the tab bar's own is left out."""
+    return [sp for _, style in screen(st, g=g)[0][1:] if isinstance(style, tuple)
+            for sp in style[1] if sp[2] in ("selected", "anchor")]
+
+
 def test_highlight_covers_only_the_active_column():
-    def spans(st):
-        return [style[1] for _, style in screen(st)[0] if isinstance(style, tuple) and style[0] == "selected"]
-    (src,), = spans(at("Discord"))
-    assert src[0] == 0 and src[1] < 60  # left column only
-    (src,), (dst,) = spans(at("Discord", "GCS-8 CH 4-AUX", patch_side="dst"))
-    assert src[0] == 0 and src[1] < 60  # the source stays lit on the left
-    assert dst[0] > 40 and dst[1] == 100  # right column only
+    (src,) = bars(at("Discord"))
+    assert src == (0, src[1], "selected") and src[1] < 60  # left column only
+    src, dst = bars(at("Discord", "GCS-8 CH 4-AUX", patch_side="dst"))
+    assert src[0] == 0 and src[1] < 60 and src[2] == "anchor"  # the source stays lit, as the anchor
+    assert dst[0] > 40 and dst[1] == 100 and dst[2] == "selected"  # the cursor, right column only
 
 
 def test_monitors_hidden_until_m():
@@ -334,3 +338,14 @@ def test_clicking_a_slot_picks_it():
     row, c0, _, t = next(h for h in hits if h[3] == ("patch_slot", 1))
     st, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, [], patch=GR)
     assert not st.patch_menu and actions[0][0] == "patch_cmds"
+
+
+def test_grid_marks_the_row_as_anchor_and_the_cell_as_cursor():
+    roles = [b[2] for b in bars(at("Discord", patch_view="grid"))]
+    assert roles == ["anchor", "selected"]
+
+
+def test_link_marks_are_tinted():
+    lines, _ = screen(at("Discord"))
+    row = next(style for text, style in lines if "●1" in text)
+    assert any(r == "ok" for *_, r in row[1])

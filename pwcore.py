@@ -17,6 +17,47 @@ import pwpatch as pp
 READ_CMD = ["pw-metadata", "-n", "settings", "0"]
 RESTART_CMD = ["systemctl", "--user", "restart", "wireplumber"]
 
+# Colour roles (docs/ui-conventions.md) as (fg, bg, attr) per theme; None is the screen's own colour.
+# One bar on screen is ever "selected": that's where the keys go. "anchor" is selected but not active.
+THEMES = {
+    "dark": {"screen": (None, None, ""),
+             "normal": (None, None, ""), "dim": (None, None, "dim"),
+             "selected": ("black", "cyan", "bold"), "anchor": ("white", "blue", ""),
+             "title": ("cyan", None, "bold"), "button": ("green", None, "bold"),
+             "ok": ("green", None, "bold"), "pending": ("yellow", None, "bold"), "alert": ("red", None, "bold"),
+             "chip": ("black", "white", "bold")},
+    "light": {"screen": ("black", "brightwhite", ""),
+              "normal": (None, None, ""), "dim": (None, None, "dim"),
+              "selected": ("black", "cyan", "bold"), "anchor": ("white", "blue", ""),
+              "title": ("blue", None, "bold"), "button": ("green", None, "bold"),
+              "ok": ("green", None, "bold"), "pending": ("magenta", None, "bold"), "alert": ("red", None, "bold"),
+              "chip": ("white", "black", "bold")},
+}
+THEME_NAMES = list(THEMES)
+
+
+def ui_path():
+    if os.environ.get("PWCTL_UI"):
+        return Path(os.environ["PWCTL_UI"])
+    base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
+    return Path(base) / "pwctl" / "ui.json"
+
+
+def load_ui(path):
+    """pwctl's own display preferences; a missing or broken file gives the defaults."""
+    try:
+        ui = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        ui = {}
+    theme = ui.get("theme") if isinstance(ui, dict) else None
+    return {"theme": theme if theme in THEMES else "dark"}
+
+
+def save_ui(path, ui):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(ui, indent=2) + "\n")
+
 
 class MetadataError(Exception):
     pass
@@ -324,6 +365,8 @@ class UIState:
     patch_menu_cursor: int = 0
     confirm: tuple = None
     message: str = ""
+    failed: str = ""             # the message is drawn red while it still equals this
+    theme: str = "dark"
 
 
 def handle_key(st, key, current, presets, devices=None, patch=None):
@@ -357,9 +400,15 @@ def handle_key(st, key, current, presets, devices=None, patch=None):
     return {"settings": _key_settings, "top": _key_top, "presets": _key_presets}[st.tab](st, key, current, presets)
 
 
+THEME_ROW = len(SETTINGS)  # pwctl's own row under the PipeWire settings; it applies at once
+
+
 def _key_settings(st, key, current, presets):
     if key in ("up", "down"):
-        st.cursor = max(0, min(len(SETTINGS) - 1, st.cursor + (1 if key == "down" else -1)))
+        st.cursor = max(0, min(THEME_ROW, st.cursor + (1 if key == "down" else -1)))
+    elif key in ("left", "right") and st.cursor == THEME_ROW:
+        st.theme = THEME_NAMES[(THEME_NAMES.index(st.theme) + (1 if key == "right" else -1)) % len(THEME_NAMES)]
+        return st, [("set_theme", st.theme)]
     elif key in ("left", "right"):
         s = SETTINGS[st.cursor]
         base = st.pending.get(s.key, current.get(s.key))
@@ -376,7 +425,7 @@ def _key_settings(st, key, current, presets):
             warnings = validate(current, st.pending)
             changes = ordered_changes(current, st.pending)
         except ValueError as e:
-            st.message = str(e)
+            st.message = st.failed = str(e)
             return st, []
         st.pending, st.message = {}, "; ".join(warnings)
         return st, [("set_many", changes)]
@@ -474,7 +523,7 @@ def _key_devices(st, key, devices):
         st.dev_cursor = max(0, min(len(items) - 1, st.dev_cursor + (1 if key == "down" else -1)))
     elif key in ("d", "left", "right", " "):
         if kind != "row":
-            st.message = "select a device row first"
+            st.message = st.failed = "select a device row first"
             return st, []
         try:
             cmd = {"d": pi.default_cmd, " ": pi.mute_cmd,
@@ -491,25 +540,25 @@ def _key_devices(st, key, devices):
         card_id = obj.id if kind == "card" else obj.card_id if kind == "row" else None
         card = next((c for c in devices["inv"].cards if c.id == card_id), None)
         if card is None:
-            st.message = "virtual devices have no card profile"
+            st.message = st.failed = "virtual devices have no card profile"
             return st, []
         _open_menu(st, "card", card)
     elif key == "h":
         if kind in ("pending", "addbus"):
-            st.message = "a pending bus isn't running yet; x deletes it"
+            st.message = st.failed = "a pending bus isn't running yet; x deletes it"
             return st, []
         return st, [("dev_hide", obj.name)]
     elif key == "x":
         if kind == "pending" or (kind == "row" and obj.kind == "virtual"):
             st.confirm = ("dev_delete_bus", obj["name"] if kind == "pending" else obj.name)
         elif kind == "row" and obj.kind == "hardware":
-            st.message = "hardware can't be deleted; p switches its card profile"
+            st.message = st.failed = "hardware can't be deleted; p switches its card profile"
         else:
-            st.message = "x deletes a virtual bus"
+            st.message = st.failed = "x deletes a virtual bus"
     elif key == "t":
         if kind == "row" and obj.kind != "monitor" and obj.direction in ("out", "duplex"):
             return st, [("dev_test", obj.name)]
-        st.message = "t plays a test noise on an output"
+        st.message = st.failed = "t plays a test noise on an output"
     return st, []
 
 
@@ -612,7 +661,7 @@ def _key_box(items, width):
         rows.append((cur, spans))
     lines = [("┌─ Keys " + "─" * max(0, width - 9) + "┐", "dim")]
     for text, sp in rows:
-        lines.append(("│ " + text.ljust(inner) + " │", ("keys", [(c0 + 2, c1 + 2) for c0, c1 in sp])))
+        lines.append(("│ " + text.ljust(inner) + " │", ("normal", [(c0 + 2, c1 + 2, "chip") for c0, c1 in sp])))
     lines.append(("└" + "─" * max(0, width - 2) + "┘", "dim"))
     return lines
 
@@ -627,6 +676,9 @@ def legend(st):
     return LEGENDS[st.tab]
 
 
+_MARK_ROLE = {"●": "ok", "◐": "pending"}
+
+
 class _Canvas:
     def __init__(self, width):
         self.width = width
@@ -634,7 +686,13 @@ class _Canvas:
         self.hits = []
 
     def add(self, text, style="normal"):
-        self.lines.append((text[:self.width], style))
+        """style is a role, or (base role, [(c0, c1, role), ...]) drawn in order over the base."""
+        text = text[:self.width]
+        marks = [(n, n + 1, _MARK_ROLE[ch]) for n, ch in enumerate(text) if ch in _MARK_ROLE]
+        if marks and style != "selected":
+            base, spans = style if isinstance(style, tuple) else (style, [])
+            style = (base, marks + list(spans))  # explicit spans last, so a cursor bar stays one colour
+        self.lines.append((text, style))
         return len(self.lines) - 1
 
     def hit(self, row, c0, c1, target):
@@ -670,7 +728,8 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
         label = f"[{TAB_TITLES[tab]}]" if tab == st.tab else f" {TAB_TITLES[tab]} "
         spans.append((len(text), len(text) + len(label), tab))
         text += label + " "
-    row = cv.add(text, "title")
+    active = next((c0, c1, "anchor") for c0, c1, tab in spans if tab == st.tab)
+    row = cv.add(text, ("title", [active]))
     for c0, c1, tab in spans:
         cv.hit(row, c0, c1, ("tab", tab))
     cv.add("─" * width, "dim")
@@ -693,7 +752,8 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     if st.confirm:
         cv.add(f" {_confirm_question(st.confirm, devices)} y/n", "alert")
     else:
-        cv.add(f" {st.message}" if st.message else f" {HINTS.get(st.tab, '')}", "alert" if st.message else "dim")
+        style = ("alert" if st.message == st.failed else "ok") if st.message else "dim"
+        cv.add(f" {st.message}" if st.message else f" {HINTS.get(st.tab, '')}", style)
     return cv.lines, cv.hits
 
 
@@ -704,12 +764,20 @@ def _render_settings(cv, st, current, block, presets, body_h):
         prefix = "> " if i == st.cursor else "  "
         head = f"{prefix}{s.label:<20} "
         line = f"{head}◀ {display_value(s, value):^14} ▶ {mark}"
-        row = cv.add(line, "selected" if i == st.cursor else "normal")
+        row = cv.add(line, "selected" if i == st.cursor else ("normal", [(len(line) - 1, len(line), "pending")]))
         arrow_l, arrow_r = len(head), len(head) + 17
         cv.hit(row, 0, arrow_l, ("setting", i))
         cv.hit(row, arrow_l, arrow_l + 1, ("arrow", i, -1))
         cv.hit(row, arrow_l + 1, arrow_r, ("setting", i))
         cv.hit(row, arrow_r, arrow_r + 1, ("arrow", i, +1))
+    cv.add("")
+    head = f"{'> ' if st.cursor == THEME_ROW else '  '}{'Theme':<20} "
+    row = cv.add(f"{head}◀ {st.theme:^14} ▶   applies at once", "selected" if st.cursor == THEME_ROW else "normal")
+    arrow_l, arrow_r = len(head), len(head) + 17
+    cv.hit(row, 0, arrow_l, ("setting", THEME_ROW))
+    cv.hit(row, arrow_l, arrow_l + 1, ("arrow", THEME_ROW, -1))
+    cv.hit(row, arrow_l + 1, arrow_r, ("setting", THEME_ROW))
+    cv.hit(row, arrow_r, arrow_r + 1, ("arrow", THEME_ROW, +1))
     cv.add("")
     _buttons(cv, [("apply", "Apply"), ("revert", "Revert"), ("restart", "Restart WirePlumber")])
     cv.add("")
@@ -774,7 +842,7 @@ def _device_line_text(kind, obj, devices, selected):
     if kind == "addbus":
         return f"{prefix}+ Add bus…", "dim"
     if kind == "pending":
-        return f"{prefix}+ duplex {_fit(obj['label'], 30):<30} pending: A creates it  {obj['name']}", "dim"
+        return f"{prefix}+ duplex {_fit(obj['label'], 30):<30} pending: A creates it  {obj['name']}", "pending"
     c = devices["config"]
     vol = "muted" if obj.mute else "" if obj.volume is None else f"{round(obj.volume * 100)}%"
     pending = c["labels"].get(obj.name)
@@ -784,7 +852,18 @@ def _device_line_text(kind, obj, devices, selected):
     text = (f"{prefix}{'★' if obj.default else ' '} {obj.direction:<6} {_fit(obj.label, 30):<30} "
             f"{obj.state or '?':<9} {vol:<6} {obj.id:>5}" + (f"  [{', '.join(tags)}]" if tags else "")
             + (f"  {pi.connections(obj)}" if obj.inputs or obj.outputs else ""))  # tags first: they're rare, and matter
-    return text, "dim" if hidden else "normal"
+    return text, ("dim" if hidden else "normal", _tag_spans(text))
+
+
+def _tag_spans(text):
+    """Tags in their roles: a clash reads as danger, a label not yet written as pending."""
+    spans = []
+    for tag, role in (("made outside pwctl", "alert"), ("label → ", "pending")):
+        a = text.find(tag)
+        if a >= 0:
+            b = min((n for n in (text.find(",", a), text.find("]", a)) if n >= 0), default=len(text))
+            spans.append((a, b, role))
+    return spans
 
 
 def _render_devices(cv, st, devices, body_h):
@@ -798,7 +877,8 @@ def _render_devices(cv, st, devices, body_h):
     for kind, obj in _dev_lines(devices, st):
         idx = None if kind == "virtual" else n_sel
         text, style = _device_line_text(kind, obj, devices, idx == cursor)
-        lines.append((text, "selected" if idx == cursor else style, idx))
+        menu_open = idx == cursor and _menu_target(devices, st) is not None
+        lines.append((text, "anchor" if menu_open else "selected" if idx == cursor else style, idx))
         if idx is not None:
             n_sel += 1
         if idx == cursor and _menu_target(devices, st) is not None:
@@ -818,7 +898,7 @@ def _render_devices(cv, st, devices, body_h):
     _buttons(cv, [("dev_default", "Default"), ("dev_mute", "Mute"), ("dev_label", "Actions"),
                   ("dev_profile", "Profile"), ("dev_add_bus", "Add bus"), ("dev_apply", "Apply")])
     if devices["dirty"]:
-        cv.add("  * label or clock changes not written yet; A writes them (no restart)", "alert")
+        cv.add("  * label or clock changes not written yet; A writes them (no restart)", "pending")
     else:
         cv.add("  generated files match devices.json", "dim")
 
@@ -845,7 +925,7 @@ def _patch_pair(g, st):
 def _toggle(g, st, s, d):
     cmds = pp.toggle_cmds(g, s, d)
     if not cmds:
-        st.message = f"nothing to link between {s.label} and {d.label}"
+        st.message = st.failed = f"nothing to link between {s.label} and {d.label}"
         return st, []
     return st, [("patch_cmds", cmds)]
 
@@ -982,7 +1062,7 @@ def _render_patch(cv, st, g, body_h):
 
 
 def _slot_menu(g, st, s, d, avail):
-    """The slot menu as box lines (text, selected, hit target): each run of inputs and who feeds it."""
+    """The slot menu as box lines (text, role or None, hit target): each run of inputs and who feeds it."""
     runs = (pp.slots(s, d) or []) if st.patch_menu else []
     if not runs:
         return []
@@ -994,11 +1074,12 @@ def _slot_menu(g, st, s, d, avail):
         on = g.slot_sources(r)
         items.append(f"{'●' if s in on else ' '} {name:<8} {', '.join(x.label for x in on) or 'free'}")
     w = max(10, min(avail - 2, max([len(s.label) + 4] + [len(t) + 3 for t in items])))
-    out = [("┌" + f"─ {_fit(s.label, w - 3)} ".ljust(w, "─") + "┐", False, None)]
+    out = [("┌" + f"─ {_fit(s.label, w - 3)} ".ljust(w, "─") + "┐", None, None)]
     for k, text in enumerate(items):
         sel = k == st.patch_menu_cursor
-        out.append(("│" + f"{'>' if sel else ' '} {_fit(text, w - 2)}".ljust(w) + "│", sel, ("patch_slot", k)))
-    out.append(("└" + "─" * w + "┘", False, None))
+        out.append(("│" + f"{'>' if sel else ' '} {_fit(text, w - 2)}".ljust(w) + "│", "selected" if sel else None,
+                    ("patch_slot", k)))
+    out.append(("└" + "─" * w + "┘", None, None))
     return out
 
 
@@ -1012,7 +1093,8 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
     for j in _window(len(g.dests), st.patch_dst, max(1, room - 1 - len(menu))):
         mark = "> " if j == st.patch_dst and on_dst else "  "
         rt = f"{mark}{_STATE_MARK[g.state(s, g.dests[j])].replace('·', ' ')} {_fit(g.dests[j].label, half - 4)}"
-        right.append((rt, j == st.patch_dst and on_dst and not menu, ("patch_dst", j)))
+        lit = ("anchor" if menu else "selected") if j == st.patch_dst and on_dst else None
+        right.append((rt, lit, ("patch_dst", j)))
         if j == st.patch_dst:
             right += menu
     for n in range(max(len(left), len(right))):
@@ -1022,12 +1104,12 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
             count = len(g.targets(srcs[i]))
             mark = "> " if i == st.patch_src and not on_dst else "* " if i == st.patch_src else "  "
             lt = f"{mark}{_fit(srcs[i].label, half - 7):<{half - 7}} {('●' + str(count)) if count else '':>3}"
-            if i == st.patch_src:
-                spans.append((0, half))  # each highlight covers only its own column; the source's stays lit
-        rt, lit, target = right[n] if n < len(right) else ("", False, None)
+            if i == st.patch_src:  # each bar covers only its own column; the source's stays as the anchor
+                spans.append((0, half, "anchor" if on_dst else "selected"))
+        rt, lit, target = right[n] if n < len(right) else ("", None, None)
         if lit:
-            spans.append((half + 2, cv.width if target[0] == "patch_dst" else half + 2 + len(rt)))
-        row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), ("selected", spans) if spans else "normal")
+            spans.append((half + 2, cv.width if target[0] == "patch_dst" else half + 2 + len(rt), lit))
+        row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), ("normal", spans))
         if n < len(left):
             cv.hit(row, 0, half, ("patch_src", left[n]))
         if target:
@@ -1048,13 +1130,16 @@ def _render_patch_grid(cv, st, g, srcs, s, d, room):
             mark = _STATE_MARK[g.state(srcs[i], g.dests[j])]
             cells += f"[{mark}]" if (i, j) == (st.patch_src, st.patch_dst) else f" {mark} "
         sel = i == st.patch_src
-        row = cv.add(f"{'> ' if sel else '  '}{_fit(srcs[i].label, label_w):<{label_w}}{cells}",
-                     "selected" if sel else "normal")
+        spans = []
+        if sel:
+            c0 = 2 + label_w + 3 * cols.index(st.patch_dst) if st.patch_dst in cols else None
+            spans = [(0, 2 + label_w, "anchor")] + ([(c0, c0 + 3, "selected")] if c0 is not None else [])
+        row = cv.add(f"{'> ' if sel else '  '}{_fit(srcs[i].label, label_w):<{label_w}}{cells}", ("normal", spans))
         for k, j in enumerate(cols):
             c0 = 2 + label_w + 3 * k
             cv.hit(row, c0, c0 + 3, ("patch_cell", i, j))
-    for text, sel, target in menu:
-        row = cv.add("    " + text, ("selected", [(4, 4 + len(text))]) if sel else "normal")
+    for text, lit, target in menu:
+        row = cv.add("    " + text, ("normal", [(4, 4 + len(text), lit)] if lit else []))
         if target:
             cv.hit(row, 4, 4 + len(text), target)
     cv.add("")
@@ -1079,7 +1164,11 @@ def _render_port_matrix(cv, st, g, s, d, room):
             cursor = (i, j) == (st.patch_port_row, st.patch_port_col)
             cells += (f"[{mark}]" if cursor else f" {mark} ").center(cell_w)
         sel = i == st.patch_port_row
-        row = cv.add(f"{'> ' if sel else '  '}{s.ports[i].channel:<{row_w}}{cells}", "selected" if sel else "normal")
+        spans = []
+        if sel:
+            c0 = 2 + row_w + cell_w * cols.index(st.patch_port_col) if st.patch_port_col in cols else None
+            spans = [(0, 2 + row_w, "anchor")] + ([(c0, c0 + cell_w, "selected")] if c0 is not None else [])
+        row = cv.add(f"{'> ' if sel else '  '}{s.ports[i].channel:<{row_w}}{cells}", ("normal", spans))
         for k, j in enumerate(cols):
             c0 = 2 + row_w + cell_w * k
             cv.hit(row, c0, c0 + cell_w, ("patch_pcell", i, j))

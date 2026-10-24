@@ -78,7 +78,7 @@ def test_hidden_rows_vanish_until_H():
     st, _ = key(pc.UIState(tab="devices"), "H", devices=d)
     assert st.dev_show_hidden
     lines, _ = screen(st, d)
-    assert any("GCS-8 CH 2 " in t and s == "dim" for t, s in lines)
+    assert any("GCS-8 CH 2 " in t and (s[0] if isinstance(s, tuple) else s) == "dim" for t, s in lines)
 
 
 def test_m_shows_monitors():
