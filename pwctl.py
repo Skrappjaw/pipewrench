@@ -210,7 +210,7 @@ DEVICES_USAGE = """usage: pwctl devices [list] [--hidden] [--monitors]
        pwctl devices profile CARD PROFILE
        pwctl devices label DEV TEXT | label DEV --clear | hide NAME | unhide NAME
        pwctl devices bus add NAME [LABEL] | bus delete NAME
-       pwctl devices preview | apply | rollback"""
+       pwctl devices preview | apply [--restart] | rollback | restart"""
 
 
 def _play_noise(runner, row):
@@ -329,6 +329,53 @@ def _settled_problems(c, runner):
     return problems
 
 
+RESTART_WARNING = "Apps like Discord may lose their audio connection and not reconnect."
+
+
+def _write_dropin(c):
+    try:
+        pcfg.write_generated(pcfg.dropin_path(), pcfg.render_dropin(c))
+    except pcfg.ConfigError as e:
+        raise CliError(str(e), 1)
+
+
+def _bus_add(runner, c, inv, name, label=None):
+    """Create a bus live (no restart) and keep it in devices.json and the drop-in for every login."""
+    live = next((r for r in inv.rows() if r.name == name), None)
+    if live:
+        raise CliError(f"{name} already exists (id {live.id}); delete it first or pick another name", 2)
+    saved = next((b for b in c["buses"] if b["name"] == name), None)
+    if saved:
+        label = saved["label"]
+    else:
+        try:
+            c = pcfg.add_bus(c, name, label)
+        except ValueError as e:
+            raise CliError(str(e), 2)
+        label = label or name
+        pcfg.save_config(pcfg.config_path(), c)
+    _write_dropin(c)
+    _run(runner, pi.bus_create_cmd(name, label))
+    return f"bus {name} created; it comes back at every login"
+
+
+def _bus_delete(runner, c, inv, name):
+    """Destroy a virtual bus live and forget it, whether or not pwctl made it."""
+    live = next((r for r in inv.rows() if r.name == name), None)
+    saved = any(b["name"] == name for b in c["buses"])
+    if live is None and not saved:
+        raise CliError(f"no bus {name!r}", 2)
+    if live is not None and live.kind != "virtual":
+        raise CliError(f"{live.label} is hardware; switch its card profile instead", 2)
+    if saved:
+        c = pcfg.delete_bus(c, name)
+        pcfg.save_config(pcfg.config_path(), c)
+        _write_dropin(c)
+    if live is not None:
+        _run(runner, pi.destroy_cmd(live))
+    return f"bus {name} removed"
+
+
 def _devices(args, runner, out, err, ask):
     sub, rest = (args[0], args[1:]) if args else ("list", [])
     c = _config()
@@ -387,43 +434,33 @@ def _devices(args, runner, out, err, ask):
         out.write(f"{sub} {name}\n")
         return 0
     if sub == "bus" and rest[:1] == ["add"] and len(rest) in (2, 3):
-        try:
-            c = pcfg.add_bus(c, rest[1], rest[2] if len(rest) == 3 else None)
-        except ValueError as e:
-            raise CliError(str(e), 2)
-        _save(c, out, f"bus {rest[1]} saved")
+        out.write(_bus_add(runner, c, _inventory(runner), rest[1], rest[2] if len(rest) == 3 else None) + "\n")
         return 0
     if sub == "bus" and rest[:1] == ["delete"] and len(rest) == 2:
-        try:
-            c = pcfg.delete_bus(c, rest[1])
-        except KeyError:
-            raise CliError(f"no bus {rest[1]!r}", 2)
-        _save(c, out, f"bus {rest[1]} deleted")
+        out.write(_bus_delete(runner, c, _inventory(runner), rest[1]) + "\n")
         return 0
     if sub == "preview" and not rest:
         pending = _generated(runner, c)
         out.write("".join(pcfg.diff_generated(p, t) for p, t, _ in pending) or "generated files are up to date\n")
         return 0
-    if sub == "apply" and not rest:
+    if sub == "apply" and rest in ([], ["--restart"]):
         pending = _generated(runner, c)
         if not pending:
             out.write("generated files are up to date; nothing to do\n")
             return 0
         for p, t, _ in pending:
             out.write(pcfg.diff_generated(p, t))
-        dropin = pcfg.dropin_path()
-        clash = pcfg.bus_conflicts(c, {r.name for r in _inventory(runner).rows()},
-                                   dropin.read_text() if dropin.exists() else "")
-        if clash:
-            err.write(f"warning: bus {', '.join(clash)} already exists outside pwctl (e.g. made by a script); "
-                      "stop that first, or there will be two\n")
-        restart, what = _restart_for([(p, r) for p, _, r in pending])
-        if ask(f"Write {len(pending)} file(s) and restart {what}? Audio drops for a moment. [y/N] ").strip().lower() != "y":
-            out.write("nothing written\n")
-            return 1
-        for p, t, _ in pending:
             pcfg.write_generated(p, t)
             out.write(f"wrote {p}\n")
+        restart, what = _restart_for([(p, r) for p, _, r in pending])
+        later = (f"labels and clock changes show after {what} restarts: at next login, or now with "
+                 "`pwctl devices apply --restart`\n")
+        if "--restart" not in rest:
+            out.write(later)
+            return 0
+        if ask(f"Restart {what} now? {RESTART_WARNING} [y/N] ").strip().lower() != "y":
+            out.write(later)
+            return 0
         _run(runner, restart)
         problems = _settled_problems(c, runner)
         if problems:
@@ -434,23 +471,25 @@ def _devices(args, runner, out, err, ask):
         out.write("applied\n")
         return 0
     if sub == "rollback" and not rest:
-        paths = [(pcfg.dropin_path(), pcfg.RESTART_PIPEWIRE), (pcfg.labels_path(_wp_version(runner)), pcfg.RESTART_WIREPLUMBER)]
+        paths = [pcfg.dropin_path(), pcfg.labels_path(_wp_version(runner))]
         try:
-            for p, _ in paths:
+            for p in paths:
                 pcfg.check_ours(p)
         except pcfg.ConfigError as e:
             raise CliError(str(e), 1)
-        touched = [(p, r) for p, r in paths if p.exists() or p.with_name(p.name + ".bak").exists()]
+        touched = [p for p in paths if p.exists() or p.with_name(p.name + ".bak").exists()]
         if not touched:
             out.write("nothing to roll back\n")
             return 0
-        restart, what = _restart_for(touched)
-        if ask(f"Roll back {len(touched)} file(s) and restart {what}? [y/N] ").strip().lower() != "y":
-            out.write("nothing changed\n")
-            return 1
-        for p, _ in touched:
+        for p in touched:
             out.write(pcfg.rollback_generated(p) + "\n")
-        _run(runner, restart)
+        out.write("takes effect at the next restart: next login, or `pwctl devices restart`\n")
+        return 0
+    if sub == "restart" and not rest:
+        if ask(f"Restart WirePlumber now? {RESTART_WARNING} [y/N] ").strip().lower() != "y":
+            out.write("nothing restarted\n")
+            return 1
+        _run(runner, pcfg.RESTART_WIREPLUMBER)
         return 0
     raise CliError(DEVICES_USAGE, 2)
 
@@ -716,9 +755,9 @@ class Tui:
         elif kind == "dev_prompt_bus":
             name = self._prompt(scr, "bus name (letters, digits, - _; empty cancels):")
             if name:
-                self._save_config(pcfg.add_bus(c, name), f"bus {name} saved; A creates it")
+                self.st.message = _bus_add(self.runner, c, inv, name)
         elif kind == "dev_delete_bus":
-            self._save_config(pcfg.delete_bus(c, action[1]), f"bus {action[1]} deleted; A applies it")
+            self.st.message = _bus_delete(self.runner, c, inv, action[1])
         elif kind == "dev_preview":
             diff = "".join(pcfg.diff_generated(p, t) for p, t, _ in _generated(self.runner, c, self.wp_version))
             if not diff:
@@ -736,21 +775,15 @@ class Tui:
             self._apply_devices(scr, c)
 
     def _apply_devices(self, scr, c):
+        """Write the generated files; never restart here. R restarts WirePlumber, after a y/n."""
         pending = _generated(self.runner, c, self.wp_version)
         if not pending:
             self.st.message = "generated files are up to date"
             return
-        restart, what = _restart_for([(p, r) for p, _, r in pending])
         for p, t, _ in pending:
             pcfg.write_generated(p, t)
-        self.st.message = f"restarting {what}…"
-        self._draw(scr)
-        _run(self.runner, restart)
-        problems = _settled_problems(c, self.runner)
-        if restart == pcfg.RESTART_PIPEWIRE:
-            threading.Thread(target=self._pwtop, daemon=True).start()  # the old pw-top died with PipeWire
-        self.st.message = (f"{len(problems)} problem(s): {problems[0]}; see `pwctl devices list`" if problems
-                           else f"applied; {what} restarted")
+        _, what = _restart_for([(p, r) for p, _, r in pending])
+        self.st.message = f"written; shows after {what} restarts: R now, or next login"
 
 
 if __name__ == "__main__":

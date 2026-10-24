@@ -136,3 +136,24 @@ def test_inventory_tolerates_junk():
             {"type": "PipeWire:Interface:Metadata", "props": {"metadata.name": "default"}, "metadata": []}]
     inv = pi.inventory(junk)
     assert inv.cards == [] and inv.virtual == [] and inv.defaults == {"sink": None, "source": None}
+
+
+def test_read_dump_merges_update_documents():
+    # pw-dump can print an update after the first array when the graph changes mid-read
+    first = [{"id": 1, "type": "PipeWire:Interface:Node", "info": {"props": {"node.name": "A"}}},
+             {"id": 2, "type": "PipeWire:Interface:Node", "info": {"props": {"node.name": "B"}}}]
+    update = [{"id": 2, "info": None},
+              {"id": 1, "type": "PipeWire:Interface:Node", "info": {"props": {"node.name": "A2"}}},
+              {"id": 3, "type": "PipeWire:Interface:Node", "info": {"props": {"node.name": "C"}}}]
+    text = json.dumps(first, indent=1) + "\n" + json.dumps(update, indent=1) + "\n"
+    dump = pi.read_dump(lambda argv: (0, text))
+    assert [(o["id"], o["info"]["props"]["node.name"]) for o in dump] == [(1, "A2"), (3, "C")]
+
+
+def test_read_dump_single_document_unchanged():
+    assert pi.read_dump(lambda argv: (0, json.dumps(dump()))) == dump()
+
+
+def test_read_dump_garbage_raises():
+    with pytest.raises(ValueError):
+        pi.read_dump(lambda argv: (0, "[ not json"))

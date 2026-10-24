@@ -207,12 +207,46 @@ def test_hide_unhide_rows_and_cards():
     assert run("hide", "nope")[0] == 2
 
 
-def test_bus_add_delete():
-    assert run("bus", "add", "OBS", "OBS feed")[0] == 0
+def test_bus_add_creates_live_and_persists_without_restart():
+    rc, out, err, r, asked = run("bus", "add", "OBS", "OBS feed")
+    assert rc == 0, err
+    assert r.ran(["pw-cli", "create-node"]) and 'node.name="OBS"' in r.ran(["pw-cli"])[0][3]
+    assert r.ran(["systemctl"]) == [] and asked == []
     assert config()["buses"] == [{"name": "OBS", "label": "OBS feed"}]
-    assert run("bus", "add", "OBS")[0] == 2
-    assert run("bus", "delete", "OBS")[0] == 0 and config()["buses"] == []
-    assert run("bus", "delete", "OBS")[0] == 2
+    assert 'node.name = "OBS"' in pcfg.dropin_path().read_text()
+    assert "created" in out
+
+
+def test_bus_add_refuses_a_name_already_live():
+    rc, _, err, r, _ = run("bus", "add", "SYSTEM")  # start_audio.sh's SYSTEM is in the fixture
+    assert rc == 2 and "already exists" in err and r.ran(["pw-cli"]) == []
+    assert config()["buses"] == []
+
+
+def test_bus_add_recreates_a_saved_bus_that_is_not_running():
+    pcfg.save_config(pcfg.config_path(), pcfg.add_bus(pcfg.default_config(), "OBS", "OBS feed"))
+    rc, _, _, r, _ = run("bus", "add", "OBS")
+    assert rc == 0 and 'node.description="OBS feed"' in r.ran(["pw-cli"])[0][3]
+    assert config()["buses"] == [{"name": "OBS", "label": "OBS feed"}]
+
+
+def test_bus_delete_destroys_live_and_forgets_it():
+    pcfg.save_config(pcfg.config_path(), pcfg.add_bus(pcfg.default_config(), "OBS"))
+    dump = add_bus_node(base_dump(), "OBS", "OBS")
+    obs_id = dump[-1]["id"]
+    rc, out, _, r, _ = run("bus", "delete", "OBS", runner=Runner(dump=dump))
+    assert rc == 0 and r.ran(["pw-cli", "destroy"]) == [["pw-cli", "destroy", str(obs_id)]]
+    assert config()["buses"] == [] and r.ran(["systemctl"]) == []
+
+
+def test_bus_delete_works_on_buses_pwctl_did_not_make():
+    rc, _, _, r, _ = run("bus", "delete", "VOIP")  # made by start_audio.sh, not in devices.json
+    assert rc == 0 and r.ran(["pw-cli", "destroy"]) == [["pw-cli", "destroy", "68"]]
+
+
+def test_bus_delete_refuses_hardware_and_unknown():
+    assert run("bus", "delete", "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_6_7__source")[0] == 2
+    assert run("bus", "delete", "NOPE")[0] == 2
 
 
 def test_label_on_a_pwctl_bus_relabels_it():
@@ -225,42 +259,39 @@ def test_label_on_a_pwctl_bus_relabels_it():
 
 def test_preview_and_apply_with_nothing_to_do():
     assert "up to date" in run("preview")[1]
-    rc, out, _, r, asked = run("apply", answer="y")
+    rc, out, _, r, asked = run("apply")
     assert rc == 0 and "up to date" in out and asked == [] and r.ran(["systemctl"]) == []
 
 
-def test_apply_labels_only_restarts_wireplumber_and_checks():
+def test_apply_writes_labels_without_restarting():
+    run("label", "96", "GCS-8 CH 2 (Mic)")
+    rc, out, err, r, asked = run("apply")
+    assert rc == 0, err
+    assert r.ran(["systemctl"]) == [] and asked == []
+    assert "GCS-8 CH 2 (Mic)" in pcfg.labels_path((0, 4, 17)).read_text()
+    assert "--restart" in out and "next login" in out
+
+
+def test_apply_restart_asks_warns_then_restarts_and_checks():
     run("label", "96", "GCS-8 CH 2 (Mic)")
     after = relabel(base_dump(), CH2_IN, "GCS-8 CH 2 (Mic)")
-    rc, out, err, r, asked = run("apply", answer="y", runner=Runner(after_restart=after))
+    rc, out, err, r, asked = run("apply", "--restart", answer="y", runner=Runner(after_restart=after))
     assert rc == 0, err
-    assert "WirePlumber" in asked[0] and r.ran(["systemctl"]) == [pcfg.RESTART_WIREPLUMBER]
-    lua = pcfg.labels_path((0, 4, 17)).read_text()
-    assert CH2_IN in lua and "GCS-8 CH 2 (Mic)" in lua
-    assert not pcfg.dropin_path().exists()
+    assert "Discord" in asked[0] and r.ran(["systemctl"]) == [pcfg.RESTART_WIREPLUMBER]
     assert "applied" in out
 
 
-def test_apply_buses_restarts_pipewire_and_reports_missing():
-    run("bus", "add", "OBS")
-    rc, _, err, r, asked = run("apply", answer="y")  # the dump never gains OBS
-    assert r.ran(["systemctl"]) == [pcfg.RESTART_PIPEWIRE] and "PipeWire" in asked[0]
-    assert rc == 1 and "OBS" in err and "rollback" in err
-    rc, _, err, r, _ = run("apply", answer="y", runner=Runner(after_restart=add_bus_node(base_dump(), "OBS", "OBS")))
-    assert "up to date" in run("preview")[1]
-
-
-def test_apply_declined_writes_nothing():
+def test_apply_restart_declined_still_writes_files():
     run("label", "96", "Mic")
-    rc, out, _, r, _ = run("apply", answer="n")
-    assert rc == 1 and "nothing written" in out and r.ran(["systemctl"]) == []
-    assert not pcfg.labels_path((0, 4, 17)).exists()
+    rc, out, _, r, _ = run("apply", "--restart", answer="n")
+    assert rc == 0 and r.ran(["systemctl"]) == [] and pcfg.labels_path((0, 4, 17)).exists()
+    assert "next login" in out
 
 
-def test_apply_warns_about_bus_already_made_outside_pwctl():
-    run("bus", "add", "SYSTEM")  # start_audio.sh's SYSTEM is in the fixture
-    rc, _, err, _, asked = run("apply", answer="n")
-    assert "SYSTEM" in err and "already exists" in err
+def test_apply_clock_change_restarts_pipewire_when_asked():
+    pcfg.save_config(pcfg.config_path(), {**pcfg.default_config(), "clock_rate": 48000})
+    rc, _, _, r, asked = run("apply", "--restart", answer="y")
+    assert r.ran(["systemctl"]) == [pcfg.RESTART_PIPEWIRE] and "PipeWire" in asked[0]
 
 
 def test_apply_refuses_foreign_file():
@@ -268,18 +299,25 @@ def test_apply_refuses_foreign_file():
     path.parent.mkdir(parents=True)
     path.write_text("-- someone else's rules\n")
     run("label", "96", "Mic")
-    rc, _, err, r, _ = run("apply", answer="y")
+    rc, _, err, r, _ = run("apply")
     assert rc == 1 and "not generated by pwctl" in err and r.ran(["systemctl"]) == []
 
 
-def test_rollback_restores_and_restarts():
+def test_rollback_restores_files_and_restarts_only_when_asked():
     run("label", "96", "Mic")
-    run("apply", answer="y")
-    rc, out, _, r, _ = run("rollback", answer="y")
-    assert rc == 0 and "removed" in out and r.ran(["systemctl"]) == [pcfg.RESTART_WIREPLUMBER]
+    run("apply")
+    rc, out, _, r, asked = run("rollback")
+    assert rc == 0 and "removed" in out and r.ran(["systemctl"]) == [] and asked == []
     assert not pcfg.labels_path((0, 4, 17)).exists()
-    rc, out, _, r, asked = run("rollback", answer="y")
-    assert rc == 0 and "nothing" in out and asked == []
+    rc, out, _, r, asked = run("rollback")
+    assert rc == 0 and "nothing" in out
+
+
+def test_restart_subcommand_asks_first():
+    rc, _, _, r, asked = run("restart", answer="n")
+    assert rc == 1 and r.ran(["systemctl"]) == [] and "Discord" in asked[0]
+    rc, _, _, r, _ = run("restart", answer="y")
+    assert rc == 0 and r.ran(["systemctl"]) == [pcfg.RESTART_WIREPLUMBER]
 
 
 def test_unknown_subcommand_exit_2():

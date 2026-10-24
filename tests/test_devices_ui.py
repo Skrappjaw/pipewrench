@@ -88,8 +88,8 @@ def test_m_shows_monitors():
 def test_pending_buses_and_dirty_note():
     c = pcfg.add_bus(pcfg.default_config(), "OBS")
     text = body(screen(pc.UIState(tab="devices"), dv(c, dirty=True, pending=c["buses"]), height=60)[0])
-    assert "OBS" in text and "pending" in text and "not applied" in text
-    assert "not applied" not in body(screen(pc.UIState(tab="devices"))[0])
+    assert "OBS" in text and "pending" in text and "not written" in text
+    assert "not written" not in body(screen(pc.UIState(tab="devices"))[0])
 
 
 def test_clash_tag_on_bus_made_outside_pwctl():
@@ -101,7 +101,8 @@ def test_legend_fits_80_and_lists_every_key():
     lines, _ = screen(pc.UIState(tab="devices", message="hello"), width=80)
     text = body(lines)
     for k in ("↑↓", "d default", "←→ volume", "Space mute", "Enter label", "p profile", "t test",
-              "h hide", "H show hidden", "m monitors", "a add bus", "x delete bus", "v preview", "A apply", "q quit"):
+              "h hide", "H show hidden", "m monitors", "a add bus", "x delete bus", "v preview", "A apply",
+              "R restart", "q quit"):
         assert k in text, k
     assert all(len(t.rstrip()) <= 80 for t, _ in lines)
 
@@ -168,24 +169,23 @@ def test_hide_rows_and_cards():
     assert key(at("GCS-8"), "h")[1] == [("dev_hide", INV.find_card("GCS-8").name)]
 
 
-def test_bus_add_and_delete_with_confirm():
+def test_bus_add_and_live_delete_with_confirm():
     assert key(pc.UIState(tab="devices"), "a")[1] == [("dev_prompt_bus",)]
-    c = pcfg.add_bus(pcfg.default_config(), "SYSTEM")
-    d = dv(c)
-    st, actions = key(at("SYSTEM", d), "x", devices=d)
-    assert actions == [] and st.confirm == ("dev_delete_bus", "SYSTEM")
-    assert "Delete bus 'SYSTEM'" in body(screen(st, d)[0])
-    assert key(st, "y", devices=d)[1] == [("dev_delete_bus", "SYSTEM")]
-    st, actions = key(at("VOIP"), "x")  # not in devices.json
-    assert actions == [] and "devices.json" in st.message
+    st, actions = key(at("VOIP"), "x")  # any virtual bus, even one pwctl didn't make
+    assert actions == [] and st.confirm == ("dev_delete_bus", "VOIP")
+    assert "Delete bus 'VOIP'" in body(screen(st)[0])
+    assert key(st, "y")[1] == [("dev_delete_bus", "VOIP")]
+    st, actions = key(at(CH2_IN), "x")
+    assert actions == [] and "hardware" in st.message
 
 
-def test_preview_and_apply_with_confirm():
+def test_apply_writes_without_confirm_and_R_restarts_with_warning():
     assert key(pc.UIState(tab="devices"), "v")[1] == [("dev_preview",)]
     st, actions = key(pc.UIState(tab="devices"), "A")
-    assert actions == [] and st.confirm == ("dev_apply",)
-    assert "restarts" in body(screen(st)[0])
-    assert key(st, "y")[1] == [("dev_apply",)]
+    assert actions == [("dev_apply",)] and st.confirm is None
+    st, actions = key(pc.UIState(tab="devices"), "R")
+    assert actions == [] and st.confirm == ("restart",)
+    assert key(st, "y")[1] == [("restart_wireplumber",)]
 
 
 def test_nothing_happens_until_devices_load():
@@ -218,5 +218,5 @@ def test_buttons_land_on_labels():
                           ("dev_profile", "[Profile]"), ("dev_add_bus", "[Add bus]"), ("dev_apply", "[Apply]")):
         r, c0, c1 = hit_for(hits, ("button", target))
         assert lines[r][0][c0:c1] == label
-    st, _ = click(pc.UIState(tab="devices"), ("button", "dev_apply"))
-    assert st.confirm == ("dev_apply",)
+    _, actions = click(pc.UIState(tab="devices"), ("button", "dev_apply"))
+    assert actions == [("dev_apply",)]

@@ -436,7 +436,9 @@ def _key_devices(st, key, devices):
     if key == "v":
         return st, [("dev_preview",)]
     if key == "A":
-        st.confirm = ("dev_apply",)
+        return st, [("dev_apply",)]
+    if key == "R":
+        st.confirm = ("restart",)
         return st, []
     if key == "H":
         st.dev_show_hidden = not st.dev_show_hidden
@@ -449,7 +451,6 @@ def _key_devices(st, key, devices):
         return st, []
     st.dev_cursor = max(0, min(len(items) - 1, st.dev_cursor))
     kind, obj = items[st.dev_cursor]
-    bus_names = {b["name"] for b in devices["config"]["buses"]}
     if key in ("up", "down"):
         st.dev_cursor = max(0, min(len(items) - 1, st.dev_cursor + (1 if key == "down" else -1)))
     elif key in ("d", "left", "right", " "):
@@ -481,11 +482,12 @@ def _key_devices(st, key, devices):
             return st, []
         return st, [("dev_hide", obj.name)]
     elif key == "x":
-        name = obj["name"] if kind == "pending" else obj.name if kind == "row" else None
-        if name in bus_names:
-            st.confirm = ("dev_delete_bus", name)
+        if kind == "pending" or (kind == "row" and obj.kind == "virtual"):
+            st.confirm = ("dev_delete_bus", obj["name"] if kind == "pending" else obj.name)
+        elif kind == "row" and obj.kind == "hardware":
+            st.message = "hardware can't be deleted; p switches its card profile"
         else:
-            st.message = "only buses in devices.json can be deleted"
+            st.message = "x deletes a virtual bus"
     elif key == "t":
         if kind == "row" and obj.kind != "monitor" and obj.direction in ("out", "duplex"):
             return st, [("dev_test", obj.name)]
@@ -539,7 +541,7 @@ HELP = {
     "settings": "↑↓ select  ←→ change  Enter apply  Esc revert  R restart WP  Tab switch  q quit",
     "top": "↑↓ PgUp/PgDn scroll  Tab switch  q quit",
     "presets": "↑↓ select  Enter apply  s save current  e edit label  d delete  Tab switch  q quit",
-    "devices": "d ←→ Space p t act at once · Enter h a x edit devices.json · A applies it",
+    "devices": "buses and d ←→ Space p act now · labels show after R or next login",
 }
 
 
@@ -572,8 +574,7 @@ def _confirm_question(confirm):
     kind, arg = confirm[0], (confirm[1] if len(confirm) > 1 else None)
     return {"restart": "Restart WirePlumber?",
             "delete": f"Delete preset {arg!r}?",
-            "dev_apply": "Apply devices.json? This writes the generated files and restarts PipeWire or WirePlumber.",
-            "dev_delete_bus": f"Delete bus {arg!r}? (applies on A)"}[kind]
+            "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now."}[kind]
 
 
 def render_screen(st, current, block, presets, width, height, devices=None):
@@ -669,7 +670,7 @@ def _render_presets(cv, st, current, block, presets, body_h):
 DEVICE_KEYS = [
     "  Keys: ↑↓ select  d default  ←→ volume  Space mute  Enter label  p profile",
     "        t test  h hide  H show hidden  m monitors  a add bus  x delete bus",
-    "        v preview  A apply  Tab/1-4 tabs  q quit",
+    "        v preview  A apply  R restart WirePlumber  Tab/1-4 tabs  q quit",
 ]
 
 
@@ -720,7 +721,7 @@ def _render_devices(cv, st, devices, body_h):
     _buttons(cv, [("dev_default", "Default"), ("dev_mute", "Mute"), ("dev_label", "Label"),
                   ("dev_profile", "Profile"), ("dev_add_bus", "Add bus"), ("dev_apply", "Apply")])
     if devices["dirty"]:
-        cv.add("  * devices.json has changes not applied; A applies (restarts PipeWire or WirePlumber)", "alert")
+        cv.add("  * label or clock changes not written yet; A writes them (no restart)", "alert")
     else:
         cv.add("  generated files match devices.json", "dim")
     for line in DEVICE_KEYS:

@@ -17,7 +17,27 @@ def read_dump(run):
     rc, out = run(DUMP_CMD)
     if rc != 0:
         raise InventoryError(out.strip() or f"pw-dump exited {rc}")
-    return json.loads(out)
+    return merge_dump(out)
+
+
+def merge_dump(text):
+    """pw-dump prints a JSON array, plus update arrays if the graph changes while it runs. Apply them
+    in order: a later copy of an object replaces the earlier one, and "info": null means removed."""
+    decoder, pos, objects = json.JSONDecoder(), 0, {}
+    while True:
+        while pos < len(text) and text[pos].isspace():
+            pos += 1
+        if pos >= len(text):
+            break
+        doc, pos = decoder.raw_decode(text, pos)
+        for o in doc if isinstance(doc, list) else [doc]:
+            if not isinstance(o, dict) or "id" not in o:
+                continue
+            if "info" in o and o["info"] is None:
+                objects.pop(o["id"], None)
+            else:
+                objects[o["id"]] = o
+    return list(objects.values())
 
 _DIRECTION = {"Audio/Sink": "out", "Audio/Source": "in", "Audio/Duplex": "duplex"}
 _DIR_ORDER = {"out": 0, "in": 1, "duplex": 2}
@@ -241,3 +261,16 @@ def profile_cmd(card, profile):
         names = ", ".join(p.name for p in card.profiles)
         raise ValueError(f"{card.label} has no profile {profile!r}; choose one of: {names}")
     return ["wpctl", "set-profile", str(card.id), str(p.index)]
+
+
+def bus_create_cmd(name, label):
+    """A stereo bus made live: it lingers after pw-cli exits and lasts until destroyed or PipeWire restarts."""
+    props = (f'factory.name=support.null-audio-sink node.name="{name}" node.description="{label}" '
+             "media.class=Audio/Duplex object.linger=true audio.position=[FL FR] monitor.channel-volumes=true")
+    return ["pw-cli", "create-node", "adapter", "{ " + props + " }"]
+
+
+def destroy_cmd(row):
+    if row.kind != "virtual":
+        raise ValueError(f"{row.label} is hardware; switch its card profile instead")
+    return ["pw-cli", "destroy", str(row.id)]

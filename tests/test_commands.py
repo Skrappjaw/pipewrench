@@ -61,3 +61,14 @@ def test_bus_conflicts_flag_live_buses_pwctl_does_not_own(inv):
     # once pwctl's own drop-in defines SYSTEM, the live SYSTEM is ours
     applied = pc.render_dropin({**pc.default_config(), "buses": [{"name": "SYSTEM", "label": "SYSTEM"}]})
     assert pc.bus_conflicts(c, live, applied_text=applied) == []
+
+
+def test_bus_create_and_destroy_commands(inv):
+    cmd = pi.bus_create_cmd("OBS", "OBS feed")
+    assert cmd[:3] == ["pw-cli", "create-node", "adapter"]
+    for part in ("factory.name=support.null-audio-sink", 'node.name="OBS"', 'node.description="OBS feed"',
+                 "media.class=Audio/Duplex", "object.linger=true", "audio.position=[FL FR]"):
+        assert part in cmd[3]
+    assert pi.destroy_cmd(inv.find("VOIP")) == ["pw-cli", "destroy", "68"]
+    with pytest.raises(ValueError, match="hardware"):
+        pi.destroy_cmd(inv.find(CH2_IN))

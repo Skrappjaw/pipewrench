@@ -107,9 +107,10 @@ def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
     app.send("a")
     app.expect("bus name")
     app.send("OBS\r")
-    app.expect("OBS saved")  # curses redraws only what changed; "bus " was already on screen
+    app.expect("OBS created")  # curses redraws only what changed; "bus " was already on screen
     app.send("q")
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pwctl" / "devices.json").read_text())
     assert saved["buses"] == [{"name": "OBS", "label": "OBS"}]
-    assert not (tmp_path / "pipewire").exists() and not (tmp_path / "wireplumber").exists()
+    assert 'node.name = "OBS"' in (tmp_path / "pipewire" / "pipewire.conf.d" / "50-pwctl-devices.conf").read_text()
+    assert not (tmp_path / "wireplumber").exists()

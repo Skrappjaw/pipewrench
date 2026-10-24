@@ -106,23 +106,27 @@ Two kinds of keys:
 | Space | mute toggle |
 | p | switch the card's profile (prompts with the list; on a card heading or any of its rows) |
 | t | play a 1-second quiet noise burst on an output |
+| a | add a bus: created live, and kept in `devices.json` and the drop-in so it returns at every login |
+| x | delete a virtual bus, after y/n: removed live and forgotten, even one pwctl didn't make |
 
-| Edit `devices.json` (applied with A) | |
+| Labels and view (no restart) | |
 |---|---|
 | Enter | label the device (empty clears). Apps show the label; the node name never changes, so they keep their picks |
 | h | hide or unhide the row or card (pwctl only, saved at once) |
-| a / x | add a bus / delete a bus that's in `devices.json` |
 | v | preview the generated files in `$PAGER` |
-| A | write the generated files and restart, after y/n |
+| A | write the generated files; nothing restarts |
+| R | restart WirePlumber now, after y/n, to show new labels |
 
 View toggles: **H** shows hidden rows (dimmed), **m** adds a "(monitor)" input per output, as
 capture apps such as OBS see them.
 
-**Apply restarts only what it must:**
-- **WirePlumber**, when only labels changed
-- **PipeWire**, when buses or the clock changed
-
-After the restart it checks that every bus exists and every label shows.
+**Nothing restarts unless you ask.** A restart drops app connections, and some apps (Discord,
+for one) don't reconnect. So:
+- **Buses** are created and removed live, with no restart.
+- **Labels and the clock setting** are written by A and show after the next restart: at login, with
+  R (WirePlumber), or with `pwctl devices apply --restart`.
+- Relabelling a running bus also waits for a restart, because changing it live would mean
+  re-creating it.
 
 Mouse:
 - click selects; double-click edits the label; the wheel moves the selection
@@ -151,10 +155,12 @@ pwctl devices profile CARD PROFILE   by index or name, e.g. `profile GCS-8 HiFi`
 pwctl devices test DEV               noise burst on an output, to find it by ear
 pwctl devices label DEV TEXT | label DEV --clear
 pwctl devices hide NAME | unhide NAME   a device or a whole card, in pwctl only
-pwctl devices bus add NAME [LABEL] | bus delete NAME
+pwctl devices bus add NAME [LABEL]   create a bus live, and keep it for every login
+pwctl devices bus delete NAME       remove a virtual bus live, and forget it
 pwctl devices preview                diff of the generated files against what's on disk
-pwctl devices apply                  show the diff, ask, write, restart what's needed, check
-pwctl devices rollback               ask, restore the previous files (or remove them), restart
+pwctl devices apply [--restart]      write the generated files; --restart asks, restarts, then checks
+pwctl devices rollback               restore the previous files (or remove them); no restart
+pwctl devices restart                restart WirePlumber, after y/n
 ```
 
 DEV is a node id, an exact `node.name`, or a label that matches exactly one device. CARD is a card id,
@@ -200,7 +206,9 @@ Exit codes: 0 ok; 1 a PipeWire command failed, a check found problems or you ans
 ## How the generated files work
 
 - **Buses:** each one is a `support.null-audio-sink` with `media.class = Audio/Duplex` and
-  `object.linger`, created by PipeWire at start-up from the drop-in. Its node name is the bus name.
+  `object.linger`. Its node name is the bus name.
+  - pwctl creates it live with `pw-cli create-node`, and removes it with `pw-cli destroy`.
+  - The drop-in recreates it at every PipeWire start.
 - **Labels:** WirePlumber rules that set `node.description` for a matching `node.name` when the
   device appears.
   - ALSA devices use `alsa_monitor.rules` (0.4) or `monitor.alsa.rules` (0.5+).
@@ -272,6 +280,8 @@ the tests replace PipeWire.
   - `default_cmd(row)`, `mute_cmd(row)`
   - `volume_cmd(row, step)`: `+5%`, `-5%`, `50%` or `0.5`, up to 150%
   - `profile_cmd(card, profile)`: by index or name
+  - `bus_create_cmd(name, label)`, `destroy_cmd(row)`: live buses via `pw-cli`
+- `merge_dump(text)`: applies the update arrays `pw-dump` prints when the graph changes mid-read
 
 ### pwconfig.py
 
@@ -299,6 +309,7 @@ the tests replace PipeWire.
 - `main(argv, runner, out, err, execvp, ask)`: no arguments starts the UI; otherwise runs a command.
   `ask` is the y/n prompt, which tests replace.
 - `_devices(...)`: the `devices` subcommands.
+- `_bus_add(...)`, `_bus_delete(...)`: live bus changes, shared by the CLI and the tab.
 - `_generated(runner, c, version)`: the generated files that differ from disk, each with the
   restart it needs.
 - `_settled_problems(c, runner)`: re-checks while PipeWire or WirePlumber comes back.
