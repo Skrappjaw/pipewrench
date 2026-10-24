@@ -11,6 +11,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import pwdevices as pd
+
 READ_CMD = ["pw-metadata", "-n", "settings", "0"]
 RESTART_CMD = ["systemctl", "--user", "restart", "wireplumber"]
 
@@ -293,8 +295,8 @@ def summarize_preset(p):
 
 # --- TUI state machine -------------------------------------------------------
 
-TABS = ["settings", "top", "presets"]
-TAB_TITLES = {"settings": "1 Settings", "top": "2 Top", "presets": "3 Presets"}
+TABS = ["settings", "top", "presets", "devices"]
+TAB_TITLES = {"settings": "1 Settings", "top": "2 Top", "presets": "3 Presets", "devices": "4 Devices"}
 
 
 @dataclass
@@ -304,18 +306,23 @@ class UIState:
     pending: dict = field(default_factory=dict)
     preset_cursor: int = 0
     top_scroll: int = 0
+    dev_cursor: int = 0
     confirm: tuple = None
     message: str = ""
 
 
-def handle_key(st, key, current, presets):
-    """Return (new_state, actions). Nothing touches PipeWire until an action is executed."""
+def handle_key(st, key, current, presets, devices=None):
+    """Return (new_state, actions). Nothing touches PipeWire until an action is executed.
+
+    devices is the Devices tab's view: {"model", "status", "buses", "dirty"}, or None until loaded.
+    """
     st = dataclasses.replace(st, pending=dict(st.pending))
     if st.confirm:
         if key == "y":
             kind = st.confirm
             st.confirm = None
-            return st, [("restart_wireplumber",) if kind[0] == "restart" else ("delete_preset", kind[1])]
+            # confirm tuples name their action, except the two v1 ones
+            return st, [{"restart": ("restart_wireplumber",), "delete": ("delete_preset", *kind[1:])}.get(kind[0], kind)]
         if key in ("n", "esc"):
             st.confirm, st.message = None, "cancelled"
         return st, []
@@ -324,9 +331,11 @@ def handle_key(st, key, current, presets):
     if key == "tab":
         st.tab = TABS[(TABS.index(st.tab) + 1) % len(TABS)]
         return st, []
-    if key in ("1", "2", "3"):
+    if key in ("1", "2", "3", "4"):
         st.tab = TABS[int(key) - 1]
         return st, []
+    if st.tab == "devices":
+        return _key_devices(st, key, devices)
     return {"settings": _key_settings, "top": _key_top, "presets": _key_presets}[st.tab](st, key, current, presets)
 
 
@@ -386,11 +395,47 @@ def _key_presets(st, key, current, presets):
     return st, []
 
 
+def _key_devices(st, key, devices):
+    if devices is None:
+        return st, []
+    if key == "a":
+        return st, [("dev_prompt_bus",)]
+    if key == "p":
+        return st, [("dev_preview",)]
+    if key == "A":
+        st.confirm = ("dev_apply",)
+        return st, []
+    items = pd.dev_items(devices["model"])
+    if not items:
+        return st, []
+    st.dev_cursor = max(0, min(len(items) - 1, st.dev_cursor))
+    item = items[st.dev_cursor]
+    if key in ("up", "down"):
+        st.dev_cursor = max(0, min(len(items) - 1, st.dev_cursor + (1 if key == "down" else -1)))
+    elif key == "enter":
+        return st, [("dev_prompt_label", item)]
+    elif key == " ":
+        if item[0] == "pair":
+            return st, [("dev_toggle", item[1], item[2])]
+        st.message = "buses are always on; d deletes one"
+    elif key == "d":
+        if item[0] == "bus":
+            st.confirm = ("dev_delete_bus", item[1])
+        else:
+            st.message = "pairs can't be deleted; space turns one off"
+    elif key == "t":
+        if item[0] == "pair" and item[1] == "out":
+            return st, [("dev_test", item[2])]
+        st.message = "t plays a test noise on an output pair"
+    return st, []
+
+
 _MOUSE_BUTTONS = {"apply": "enter", "revert": "esc", "restart": "R", "preset_apply": "enter",
-                  "preset_save": "s", "preset_edit": "e", "preset_delete": "d"}
+                  "preset_save": "s", "preset_edit": "e", "preset_delete": "d",
+                  "dev_apply": "A", "dev_preview": "p", "dev_add_bus": "a", "dev_test": "t"}
 
 
-def handle_mouse(st, hits, y, x, event, current, presets):
+def handle_mouse(st, hits, y, x, event, current, presets, devices=None):
     """Map a mouse event onto the same keys the keyboard uses."""
     if st.confirm:
         return st, []
@@ -414,9 +459,12 @@ def handle_mouse(st, hits, y, x, event, current, presets):
         keys = ["enter"] if event == "double" else []
     elif kind == "toplist":
         keys = {"wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
+    elif kind == "device":
+        st = dataclasses.replace(st, dev_cursor=target[1])
+        keys = {"double": ["enter"], "wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
     actions = []
     for k in keys:
-        st, a = handle_key(st, k, current, presets)
+        st, a = handle_key(st, k, current, presets, devices)
         actions += a
     return st, actions
 
@@ -427,6 +475,7 @@ HELP = {
     "settings": "↑↓ select  ←→ change  Enter apply  Esc revert  R restart WP  Tab switch  q quit",
     "top": "↑↓ PgUp/PgDn scroll  Tab switch  q quit",
     "presets": "↑↓ select  Enter apply  s save current  e edit label  d delete  Tab switch  q quit",
+    "devices": "↑↓ select  Enter label  Space on/off  a add bus  d delete bus  p preview  A apply  t test  q quit",
 }
 
 
@@ -455,7 +504,15 @@ def _buttons(cv, labels):
         cv.hit(row, c0, c1, ("button", target))
 
 
-def render_screen(st, current, block, presets, width, height):
+def _confirm_question(confirm):
+    kind, arg = confirm[0], (confirm[1] if len(confirm) > 1 else None)
+    return {"restart": "Restart WirePlumber?",
+            "delete": f"Delete preset {arg!r}?",
+            "dev_apply": "Write the devices drop-in and restart PipeWire? Audio drops for a moment.",
+            "dev_delete_bus": f"Delete bus {arg!r}? (applies on A)"}[kind]
+
+
+def render_screen(st, current, block, presets, width, height, devices=None):
     cv = _Canvas(width)
     text, spans = " ", []
     for tab in TABS:
@@ -467,15 +524,17 @@ def render_screen(st, current, block, presets, width, height):
         cv.hit(row, c0, c1, ("tab", tab))
     cv.add("─" * width, "dim")
     body_h = height - len(cv.lines) - 1
-    {"settings": _render_settings, "top": _render_top, "presets": _render_presets}[st.tab](
-        cv, st, current, block, presets, body_h)
+    if st.tab == "devices":
+        _render_devices(cv, st, devices, body_h)
+    else:
+        {"settings": _render_settings, "top": _render_top, "presets": _render_presets}[st.tab](
+            cv, st, current, block, presets, body_h)
     cv.lines = cv.lines[:height - 1]
     cv.hits = [h for h in cv.hits if h[0] < height - 1]
     while len(cv.lines) < height - 1:
         cv.add("")
     if st.confirm:
-        q = "Restart WirePlumber?" if st.confirm[0] == "restart" else f"Delete preset {st.confirm[1]!r}?"
-        cv.add(f" {q} y/n", "alert")
+        cv.add(f" {_confirm_question(st.confirm)} y/n", "alert")
     else:
         cv.add(f" {st.message}" if st.message else f" {HELP[st.tab]}", "alert" if st.message else "dim")
     return cv.lines, cv.hits
@@ -540,3 +599,52 @@ def _render_presets(cv, st, current, block, presets, body_h):
     cv.add("")
     _buttons(cv, [("preset_apply", "Apply"), ("preset_save", "Save current"),
                   ("preset_edit", "Edit label"), ("preset_delete", "Delete")])
+
+
+def _device_rows(st, devices):
+    """(text, style, item index or None) for every list row, group headings included."""
+    m, status, buses = devices["model"], devices["status"], devices["buses"]
+    items = pd.dev_items(m)
+    cursor = max(0, min(len(items) - 1, st.dev_cursor))
+    pairs = {(p["dir"], p["id"]): p for p in m["pairs"]}
+    bus_labels = {b["name"]: b["label"] for b in m["buses"]}
+    rows, heading = [], None
+    for i, item in enumerate(items):
+        title = {"in": "Inputs", "out": "Outputs"}.get(item[1]) if item[0] == "pair" else "Buses"
+        if title != heading:
+            rows.append((f"  {title}", "title", None))
+            heading = title
+        prefix = "> " if i == cursor else "  "
+        if item[0] == "pair":
+            p = pairs[item[1:]]
+            name = pd.pair_node_name(p)
+            state = ("off" if not p["enabled"] else "?" if status is None
+                     else "ok" if status.get(name) else "missing")
+            aux = f"AUX{p['aux']}/{p['aux'] + 1}"
+            text = f"{prefix}{state:<8} {p['label']:<28} {aux:<10} {name}"
+        else:
+            state = "?" if buses is None else "ok" if item[1] in buses else "missing"
+            text = f"{prefix}{state:<8} {bus_labels[item[1]]:<28} {'bus':<10} {item[1]}"
+        rows.append((text, "selected" if i == cursor else "alert" if state == "missing" else "normal", i))
+    return rows
+
+
+def _render_devices(cv, st, devices, body_h):
+    if devices is None:
+        cv.add("  loading devices…", "dim")
+        return
+    rows = _device_rows(st, devices)
+    room = max(1, body_h - 3)  # blank line, buttons and note sit below the list
+    at = next((n for n, r in enumerate(rows) if r[1] == "selected"), 0)
+    start = 0 if at < room else at - room + 1
+    for text, style, idx in rows[start:start + room]:
+        row = cv.add(text, style)
+        if idx is not None:
+            cv.hit(row, 0, cv.width, ("device", idx))
+    cv.add("")
+    _buttons(cv, [("dev_apply", "Apply"), ("dev_preview", "Preview"), ("dev_add_bus", "Add bus"),
+                  ("dev_test", "Test")])
+    if devices["dirty"]:
+        cv.add("  * saved to devices.json but not applied; A applies (restarts PipeWire)", "alert")
+    else:
+        cv.add("  drop-in matches devices.json", "dim")

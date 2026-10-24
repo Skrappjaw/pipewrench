@@ -1,5 +1,6 @@
 """Drive the real curses UI in a pty against recorded fixtures (no PipeWire calls)."""
 import fcntl
+import json
 import os
 import pty
 import select
@@ -18,7 +19,8 @@ APP = HERE.parent / "pwctl.py"
 class Pty:
     def __init__(self, tmp_path):
         env = {**os.environ, "TERM": "xterm-256color", "PWCTL_FIXTURES": str(HERE / "fixtures"),
-               "PWCTL_PRESETS": str(tmp_path / "presets.json")}
+               "PWCTL_PRESETS": str(tmp_path / "presets.json"), "XDG_CONFIG_HOME": str(tmp_path)}
+        env.pop("PWCTL_DEVICES", None)
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             os.execve(sys.executable, [sys.executable, "-I", str(APP)], env)
@@ -96,3 +98,18 @@ def test_save_preset_via_prompt(app, tmp_path):
     app.send("q")
     assert app.wait_exit() == 0
     assert "Low latency" in (tmp_path / "presets.json").read_text()
+
+
+def test_devices_tab_toggle_saves_and_marks_unapplied(app, tmp_path):
+    app.expect("Force sample rate")
+    app.send("4")
+    app.expect("GCS-8 CH 2 (Mic)")
+    app.expect("missing")  # fixture dump has no pwctl nodes
+    app.send("\x1bOB")  # down to MONITOR (keypad mode: application cursor keys)
+    app.send(" ")
+    app.expect("not applied")
+    app.send("q")
+    assert app.wait_exit() == 0
+    saved = json.loads((tmp_path / "pwctl" / "devices.json").read_text())
+    assert [p["enabled"] for p in saved["pairs"] if p["id"] == "monitor"] == [False]
+    assert not (tmp_path / "pipewire").exists()  # nothing written to PipeWire config

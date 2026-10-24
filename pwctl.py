@@ -204,13 +204,36 @@ def _restart(runner):
                        "the drop-in is written; `pwctl devices rollback` undoes it", 1)
 
 
-def _report(m, runner, out, err, settle=False):
-    for attempt in range(SETTLE_TRIES if settle else 1):
+def _problems(m, runner, settle=False):
+    """check_applied, retried while PipeWire comes back from a restart."""
+    for _ in range(SETTLE_TRIES if settle else 1):
         if settle:
             SETTLE()
         problems = pd.check_applied(m, _dump(runner))
         if not problems:
             break
+    return problems
+
+
+def _test_pair(runner, m, pid):
+    p = next((p for p in m["pairs"] if p["dir"] == "out" and p["id"] == pid and p["enabled"]), None)
+    if not p:
+        ids = ", ".join(p["id"] for p in m["pairs"] if p["dir"] == "out" and p["enabled"])
+        raise CliError(f"no enabled output pair {pid!r}; choose one of: {ids}", 2)
+    name = pd.pair_node_name(p)
+    if not pd.pair_status(m, _dump(runner))[name]:
+        raise CliError(f"{name} is not running; `pwctl devices apply` first", 1)
+    with tempfile.TemporaryDirectory() as tmp:
+        wav = Path(tmp) / "pwctl-test.wav"
+        write_noise(wav)
+        rc, text = runner(["pw-cat", "--playback", "--target", name, str(wav)])
+    if rc != 0:
+        raise CliError(f"pw-cat failed: {text.strip() or f'exit {rc}'}", 1)
+    return f"played noise on {p['label']} (AUX{p['aux']}/{p['aux'] + 1})"
+
+
+def _report(m, runner, out, err, settle=False):
+    problems = _problems(m, runner, settle)
     if problems:
         for p in problems:
             err.write(f"  {p}\n")
@@ -299,20 +322,7 @@ def _devices(args, runner, out, err, ask):
     if sub == "check" and not rest:
         return _report(m, runner, out, err)
     if sub == "test" and len(rest) == 1:
-        p = next((p for p in m["pairs"] if p["dir"] == "out" and p["id"] == rest[0] and p["enabled"]), None)
-        if not p:
-            ids = ", ".join(p["id"] for p in m["pairs"] if p["dir"] == "out" and p["enabled"])
-            raise CliError(f"no enabled output pair {rest[0]!r}; choose one of: {ids}", 2)
-        name = pd.pair_node_name(p)
-        if not pd.pair_status(m, _dump(runner))[name]:
-            raise CliError(f"{name} is not running; `pwctl devices apply` first", 1)
-        out.write(f"playing noise on {p['label']} (AUX{p['aux']}/{p['aux'] + 1})\n")
-        with tempfile.TemporaryDirectory() as tmp:
-            wav = Path(tmp) / "pwctl-test.wav"
-            write_noise(wav)
-            rc, text = runner(["pw-cat", "--playback", "--target", name, str(wav)])
-        if rc != 0:
-            raise CliError(f"pw-cat failed: {text.strip() or f'exit {rc}'}", 1)
+        out.write(_test_pair(runner, m, rest[0]) + "\n")
         return 0
     raise CliError(DEVICES_USAGE, 2)
 
@@ -341,6 +351,7 @@ class Tui:
         self.current = {}
         self.presets = []
         self.block = None
+        self.devices = None
         self.lock = threading.Lock()
         self.proc = None
         self.hits = []
@@ -383,6 +394,25 @@ class Tui:
             self.presets = pc.load_presets(pc.presets_path())
         except (ValueError, OSError) as e:
             self.st.message = f"presets file problem: {e}"
+        if self.st.tab == "devices":
+            self._refresh_devices()
+
+    def _refresh_devices(self):
+        """Model, live status and whether the drop-in on disk is behind devices.json."""
+        try:
+            m = pd.load_model(pd.devices_path())
+        except (ValueError, OSError) as e:
+            self.st.message = f"devices.json problem: {e}"
+            return
+        try:
+            dump = pd.read_dump(self.runner)
+            status, buses = pd.pair_status(m, dump), {n.get("node.name") for n in pd.nodes(dump)}
+        except (pd.DevicesError, ValueError, FileNotFoundError):
+            status = buses = None
+        path = pd.dropin_path()
+        on_disk = path.read_text() if path.exists() else ""
+        self.devices = {"model": m, "status": status, "buses": buses,
+                        "dirty": pd.render_dropin(m) != on_disk}
 
     def _main(self, scr):
         c = self.curses
@@ -418,16 +448,19 @@ class Tui:
                 event = self._mouse_event(b)
                 if not event:
                     continue
-                self.st, actions = pc.handle_mouse(self.st, self.hits, y, x, event, self.current, self.presets)
+                self.st, actions = pc.handle_mouse(self.st, self.hits, y, x, event, self.current, self.presets,
+                                                   self.devices)
             else:
                 key = self._key(ch)
                 if not key:
                     continue
-                self.st, actions = pc.handle_key(self.st, key, self.current, self.presets)
+                self.st, actions = pc.handle_key(self.st, key, self.current, self.presets, self.devices)
             for action in actions:
                 if action == ("quit",):
                     return
                 self._do(scr, action)
+            if self.st.tab == "devices" and self.devices is None:
+                self._refresh_devices()
 
     def _mouse_event(self, b):
         c = self.curses
@@ -456,7 +489,7 @@ class Tui:
         h, w = scr.getmaxyx()
         with self.lock:
             block = self.block
-        lines, self.hits = pc.render_screen(self.st, self.current, block, self.presets, w, h)
+        lines, self.hits = pc.render_screen(self.st, self.current, block, self.presets, w, h, self.devices)
         scr.erase()
         for y, (text, style) in enumerate(lines):
             try:
@@ -516,9 +549,68 @@ class Tui:
             elif kind == "restart_wireplumber":
                 rc, out = self.runner(pc.RESTART_CMD)
                 self.st.message = "WirePlumber restarted" if rc == 0 else f"restart failed: {out.strip()}"
-        except (CliError, ValueError, KeyError, OSError) as e:
+            elif kind.startswith("dev_"):
+                self._do_devices(scr, action)
+        except (CliError, ValueError, KeyError, OSError, pd.DevicesError) as e:
             self.st.message = str(e)
         self._refresh()
+
+    def _save_devices(self, m, message):
+        pd.save_model(pd.devices_path(), m)
+        self.st.message = message
+
+    def _do_devices(self, scr, action):
+        kind = action[0]
+        m = self.devices["model"]
+        if kind == "dev_toggle":
+            m = pd.toggle_pair(m, action[1], action[2])
+            on = next(p["enabled"] for p in m["pairs"] if (p["dir"], p["id"]) == action[1:])
+            self._save_devices(m, f"{action[2]} turned {'on' if on else 'off'}")
+        elif kind == "dev_prompt_label":
+            item = action[1]
+            old = next((p["label"] for p in m["pairs"] if ("pair", p["dir"], p["id"]) == item),
+                       next((b["label"] for b in m["buses"] if ("bus", b["name"]) == item), ""))
+            label = self._prompt(scr, f"label for {item[-1]} (empty keeps {old!r}):")
+            if label:
+                self._save_devices(pd.set_label(m, item, label), f"relabelled {item[-1]}")
+        elif kind == "dev_prompt_bus":
+            name = self._prompt(scr, "bus name (letters, digits, - _; empty cancels):")
+            if name:
+                self._save_devices(pd.add_bus(m, name), f"added bus {name}")
+        elif kind == "dev_delete_bus":
+            self._save_devices(pd.delete_bus(m, action[1]), f"deleted bus {action[1]}")
+        elif kind == "dev_preview":
+            diff = pd.diff_dropin(pd.dropin_path(), pd.render_dropin(m))
+            if not diff:
+                self.st.message = "drop-in is up to date"
+                return
+            self.curses.endwin()
+            try:
+                subprocess.run([os.environ.get("PAGER", "less")], input=diff, text=True)
+            except FileNotFoundError:
+                self.st.message = "no pager; run `pwctl devices preview`"
+            scr.refresh()
+        elif kind == "dev_test":
+            self.st.message = _test_pair(self.runner, m, action[1])
+        elif kind == "dev_apply":
+            self._apply_devices(scr, m)
+
+    def _apply_devices(self, scr, m):
+        path = pd.dropin_path()
+        pd.check_ours(path)
+        pd.save_model(pd.devices_path(), m)
+        if not pd.write_dropin(path, pd.render_dropin(m)):
+            self.st.message = "drop-in already up to date"
+            return
+        self.st.message = "restarting PipeWire…"
+        self._draw(scr)
+        _restart(self.runner)
+        problems = _problems(m, self.runner, settle=True)
+        threading.Thread(target=self._pwtop, daemon=True).start()  # the old pw-top died with PipeWire
+        if problems:
+            self.st.message = f"{len(problems)} problem(s): {problems[0]}; see `pwctl devices check`"
+        else:
+            self.st.message = f"applied: all {sum(p['enabled'] for p in m['pairs'])} pairs present"
 
 
 if __name__ == "__main__":

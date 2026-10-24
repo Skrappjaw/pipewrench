@@ -10,7 +10,6 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-import pwcore
 
 DUMP_CMD = ["pw-dump"]
 HW_MATCH = "usb-BOSS_GCS-8"
@@ -18,7 +17,7 @@ HW_OUT = "alsa_output.usb-BOSS_GCS-8-01.pro-output-0"
 HW_IN = "alsa_input.usb-BOSS_GCS-8-01.pro-input-0"
 HW_CHANNELS = {"out": 14, "in": 20}
 NODE_PREFIX = "pwctl.gcs8"
-RATES = [r for r in pwcore.setting("clock.force-rate").choices if r]
+RATES = [44100, 48000, 88200, 96000, 176400, 192000]  # pwcore force-rate choices, minus "do not force"
 
 
 class DevicesError(Exception):
@@ -165,6 +164,55 @@ def save_model(path, m):
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(m, indent=2) + "\n")
     os.replace(tmp, path)
+
+
+# --- model edits: each returns a new, validated model ------------------------
+
+def dev_items(m):
+    """Rows as the Devices tab shows them: inputs, outputs, then buses."""
+    return ([("pair", d, p["id"]) for d in ("in", "out") for p in m["pairs"] if p["dir"] == d]
+            + [("bus", b["name"]) for b in m["buses"]])
+
+
+def _copy(m):
+    return json.loads(json.dumps(m))
+
+
+def _find(m, item):
+    if item[0] == "pair":
+        found = [p for p in m["pairs"] if p["dir"] == item[1] and p["id"] == item[2]]
+    else:
+        found = [b for b in m["buses"] if b["name"] == item[1]]
+    if not found:
+        raise KeyError(item)
+    return found[0]
+
+
+def set_label(m, item, label):
+    m = _copy(m)
+    _find(m, item)["label"] = label
+    validate_model(m)
+    return m
+
+
+def toggle_pair(m, d, pid):
+    m = _copy(m)
+    p = _find(m, ("pair", d, pid))
+    p["enabled"] = not p["enabled"]
+    return m
+
+
+def add_bus(m, name, label=None):
+    m = _copy(m)
+    m["buses"].append({"name": name, "label": label or name})
+    validate_model(m)
+    return m
+
+
+def delete_bus(m, name):
+    m = _copy(m)
+    m["buses"].remove(_find(m, ("bus", name)))
+    return m
 
 
 # --- drop-in generator (SPA-JSON) --------------------------------------------

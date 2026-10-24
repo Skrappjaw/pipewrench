@@ -477,6 +477,60 @@ def _props_name(o):
     return ((o.get("info") or {}).get("props") or {}).get("node.name", "")
 
 
+# --- 7a. model edits (used by the TUI) ---------------------------------------
+
+def test_rates_match_pwcore_choices():
+    import pwcore
+    assert pd.RATES == [r for r in pwcore.setting("clock.force-rate").choices if r]
+
+
+def test_items_group_inputs_outputs_buses():
+    m = pd.default_model()
+    m["pairs"] = [_pair(m, "out", "ch3aux"), _pair(m, "in", "ch2")]
+    assert pd.dev_items(m) == [("pair", "in", "ch2"), ("pair", "out", "ch3aux"), ("bus", "SYSTEM"), ("bus", "GAME")]
+
+
+def test_set_label_on_pair_and_bus_keeps_node_names():
+    m = pd.default_model()
+    m2 = pd.set_label(m, ("pair", "out", "ch3aux"), "Spotify")
+    assert _pair(m2, "out", "ch3aux")["label"] == "Spotify"
+    assert _pair(m, "out", "ch3aux")["label"] == "GCS-8 CH 3-AUX (Music)"  # input untouched
+    m3 = pd.set_label(m2, ("bus", "GAME"), "Game audio")
+    assert m3["buses"][1] == {"name": "GAME", "label": "Game audio"}
+
+
+def test_set_label_rejects_bad_text():
+    with pytest.raises(ValueError):
+        pd.set_label(pd.default_model(), ("pair", "in", "ch2"), 'quote"d')
+
+
+def test_toggle_pair():
+    m = pd.toggle_pair(pd.default_model(), "in", "main")
+    assert _pair(m, "in", "main")["enabled"] is False
+    assert _pair(pd.toggle_pair(m, "in", "main"), "in", "main")["enabled"] is True
+
+
+def test_add_and_delete_bus():
+    m = pd.add_bus(pd.default_model(), "VOIP_MIC")
+    assert m["buses"][-1] == {"name": "VOIP_MIC", "label": "VOIP_MIC"}
+    with pytest.raises(ValueError, match="duplicate"):
+        pd.add_bus(m, "VOIP_MIC")
+    with pytest.raises(ValueError, match="bus name"):
+        pd.add_bus(m, "has space")
+    m = pd.delete_bus(m, "SYSTEM")
+    assert [b["name"] for b in m["buses"]] == ["GAME", "VOIP_MIC"]
+
+
+def test_edits_on_unknown_items_raise_keyerror():
+    m = pd.default_model()
+    with pytest.raises(KeyError):
+        pd.toggle_pair(m, "in", "nope")
+    with pytest.raises(KeyError):
+        pd.delete_bus(m, "NOPE")
+    with pytest.raises(KeyError):
+        pd.set_label(m, ("bus", "NOPE"), "x")
+
+
 def test_dropin_brackets_balance():
     text = pd.render_dropin(pd.default_model())
     body = "\n".join(line for line in text.splitlines() if not line.startswith("#"))
