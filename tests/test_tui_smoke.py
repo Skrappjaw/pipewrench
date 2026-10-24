@@ -100,16 +100,16 @@ def test_save_preset_via_prompt(app, tmp_path):
     assert "Low latency" in (tmp_path / "presets.json").read_text()
 
 
-def test_devices_tab_toggle_saves_and_marks_unapplied(app, tmp_path):
+def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
     app.expect("Force sample rate")
     app.send("4")
-    app.expect("GCS-8 CH 2 (Mic)")
-    app.expect("missing")  # fixture dump has no pwctl nodes
-    app.send("\x1bOB")  # down to MONITOR (keypad mode: application cursor keys)
-    app.send(" ")
-    app.expect("not applied")
+    app.expect("GCS-8 · profile HiFi")
+    app.send("a")
+    app.expect("bus name")
+    app.send("OBS\r")
+    app.expect("OBS saved")  # curses redraws only what changed; "bus " was already on screen
     app.send("q")
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pwctl" / "devices.json").read_text())
-    assert [p["enabled"] for p in saved["pairs"] if p["id"] == "monitor"] == [False]
-    assert not (tmp_path / "pipewire").exists()  # nothing written to PipeWire config
+    assert saved["buses"] == [{"name": "OBS", "label": "OBS"}]
+    assert not (tmp_path / "pipewire").exists() and not (tmp_path / "wireplumber").exists()

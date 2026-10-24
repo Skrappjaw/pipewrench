@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import pwdevices as pd
+import pwinventory as pi
 
 READ_CMD = ["pw-metadata", "-n", "settings", "0"]
 RESTART_CMD = ["systemctl", "--user", "restart", "wireplumber"]
@@ -307,6 +307,8 @@ class UIState:
     preset_cursor: int = 0
     top_scroll: int = 0
     dev_cursor: int = 0
+    dev_show_hidden: bool = False
+    dev_monitors: bool = False
     confirm: tuple = None
     message: str = ""
 
@@ -395,44 +397,106 @@ def _key_presets(st, key, current, presets):
     return st, []
 
 
+def devices_view(inv, config, dirty=False, owned=(), clash=(), pending=()):
+    """Everything the Devices tab draws: the live inventory, devices.json, whether the generated
+    files are behind it, and bus status (pwctl-owned, clashing with a bus made elsewhere, pending)."""
+    return {"inv": inv, "config": config, "dirty": dirty, "owned": set(owned), "clash": set(clash),
+            "pending": list(pending)}
+
+
+def _dev_lines(devices, st):
+    """(kind, obj) per list line: card, virtual (the heading), row or pending (a bus not yet created)."""
+    inv, hidden = devices["inv"], set(devices["config"]["hidden"])
+
+    def rows(rs):
+        rs = list(rs) + (pi.monitor_rows(rs) if st.dev_monitors else [])
+        return [("row", r) for r in rs if st.dev_show_hidden or r.name not in hidden]
+
+    lines = []
+    for card in inv.cards:
+        if card.name in hidden and not st.dev_show_hidden:
+            continue
+        lines.append(("card", card))
+        lines += rows(card.rows)
+    lines.append(("virtual", None))
+    lines += rows(inv.virtual)
+    lines += [("pending", b) for b in devices["pending"]]
+    return lines
+
+
+def dev_selectable(devices, st):
+    return [line for line in _dev_lines(devices, st) if line[0] != "virtual"]
+
+
 def _key_devices(st, key, devices):
     if devices is None:
         return st, []
     if key == "a":
         return st, [("dev_prompt_bus",)]
-    if key == "p":
+    if key == "v":
         return st, [("dev_preview",)]
     if key == "A":
         st.confirm = ("dev_apply",)
         return st, []
-    items = pd.dev_items(devices["model"])
+    if key == "H":
+        st.dev_show_hidden = not st.dev_show_hidden
+        return st, []
+    if key == "m":
+        st.dev_monitors = not st.dev_monitors
+        return st, []
+    items = dev_selectable(devices, st)
     if not items:
         return st, []
     st.dev_cursor = max(0, min(len(items) - 1, st.dev_cursor))
-    item = items[st.dev_cursor]
+    kind, obj = items[st.dev_cursor]
+    bus_names = {b["name"] for b in devices["config"]["buses"]}
     if key in ("up", "down"):
         st.dev_cursor = max(0, min(len(items) - 1, st.dev_cursor + (1 if key == "down" else -1)))
+    elif key in ("d", "left", "right", " "):
+        if kind != "row":
+            st.message = "select a device row first"
+            return st, []
+        try:
+            cmd = {"d": pi.default_cmd, " ": pi.mute_cmd,
+                   "left": lambda r: pi.volume_cmd(r, "-5%"), "right": lambda r: pi.volume_cmd(r, "+5%")}[key](obj)
+        except ValueError as e:
+            st.message = str(e)
+            return st, []
+        return st, [("dev_cmd", cmd)]
     elif key == "enter":
-        return st, [("dev_prompt_label", item)]
-    elif key == " ":
-        if item[0] == "pair":
-            return st, [("dev_toggle", item[1], item[2])]
-        st.message = "buses are always on; d deletes one"
-    elif key == "d":
-        if item[0] == "bus":
-            st.confirm = ("dev_delete_bus", item[1])
+        if kind == "pending":
+            return st, [("dev_prompt_label", obj["name"], obj["label"])]
+        if kind == "row" and obj.kind != "monitor":
+            return st, [("dev_prompt_label", obj.name, obj.label)]
+        st.message = "Enter labels a device row; p switches this card's profile"
+    elif key == "p":
+        card_id = obj.id if kind == "card" else obj.card_id if kind == "row" else None
+        if card_id is None:
+            st.message = "virtual devices have no card profile"
+            return st, []
+        return st, [("dev_prompt_profile", card_id)]
+    elif key == "h":
+        if kind == "pending":
+            st.message = "a pending bus isn't running yet; x deletes it"
+            return st, []
+        return st, [("dev_hide", obj.name)]
+    elif key == "x":
+        name = obj["name"] if kind == "pending" else obj.name if kind == "row" else None
+        if name in bus_names:
+            st.confirm = ("dev_delete_bus", name)
         else:
-            st.message = "pairs can't be deleted; space turns one off"
+            st.message = "only buses in devices.json can be deleted"
     elif key == "t":
-        if item[0] == "pair" and item[1] == "out":
-            return st, [("dev_test", item[2])]
-        st.message = "t plays a test noise on an output pair"
+        if kind == "row" and obj.kind != "monitor" and obj.direction in ("out", "duplex"):
+            return st, [("dev_test", obj.name)]
+        st.message = "t plays a test noise on an output"
     return st, []
 
 
 _MOUSE_BUTTONS = {"apply": "enter", "revert": "esc", "restart": "R", "preset_apply": "enter",
                   "preset_save": "s", "preset_edit": "e", "preset_delete": "d",
-                  "dev_apply": "A", "dev_preview": "p", "dev_add_bus": "a", "dev_test": "t"}
+                  "dev_default": "d", "dev_mute": " ", "dev_label": "enter", "dev_profile": "p",
+                  "dev_add_bus": "a", "dev_apply": "A"}
 
 
 def handle_mouse(st, hits, y, x, event, current, presets, devices=None):
@@ -475,7 +539,7 @@ HELP = {
     "settings": "↑↓ select  ←→ change  Enter apply  Esc revert  R restart WP  Tab switch  q quit",
     "top": "↑↓ PgUp/PgDn scroll  Tab switch  q quit",
     "presets": "↑↓ select  Enter apply  s save current  e edit label  d delete  Tab switch  q quit",
-    "devices": "edits save to devices.json at once; nothing reaches PipeWire until A",
+    "devices": "d ←→ Space p t act at once · Enter h a x edit devices.json · A applies it",
 }
 
 
@@ -508,7 +572,7 @@ def _confirm_question(confirm):
     kind, arg = confirm[0], (confirm[1] if len(confirm) > 1 else None)
     return {"restart": "Restart WirePlumber?",
             "delete": f"Delete preset {arg!r}?",
-            "dev_apply": "Write the devices drop-in and restart PipeWire? Audio drops for a moment.",
+            "dev_apply": "Apply devices.json? This writes the generated files and restarts PipeWire or WirePlumber.",
             "dev_delete_bus": f"Delete bus {arg!r}? (applies on A)"}[kind]
 
 
@@ -603,57 +667,61 @@ def _render_presets(cv, st, current, block, presets, body_h):
 
 # Always on screen in the Devices tab; the bottom help line is too narrow and gives way to messages.
 DEVICE_KEYS = [
-    "  Keys: ↑↓ select   Enter rename   Space on/off   t test (output pairs)",
-    "        a add bus   d delete bus   p preview   A apply   Tab/1-4 tabs   q quit",
+    "  Keys: ↑↓ select  d default  ←→ volume  Space mute  Enter label  p profile",
+    "        t test  h hide  H show hidden  m monitors  a add bus  x delete bus",
+    "        v preview  A apply  Tab/1-4 tabs  q quit",
 ]
 
 
-def _device_rows(st, devices):
-    """(text, style, item index or None) for every list row, group headings included."""
-    m, status, buses = devices["model"], devices["status"], devices["buses"]
-    items = pd.dev_items(m)
-    cursor = max(0, min(len(items) - 1, st.dev_cursor))
-    pairs = {(p["dir"], p["id"]): p for p in m["pairs"]}
-    bus_labels = {b["name"]: b["label"] for b in m["buses"]}
-    rows, heading = [], None
-    for i, item in enumerate(items):
-        title = {"in": "Inputs", "out": "Outputs"}.get(item[1]) if item[0] == "pair" else "Buses"
-        if title != heading:
-            rows.append((f"  {title}", "title", None))
-            heading = title
-        prefix = "> " if i == cursor else "  "
-        if item[0] == "pair":
-            p = pairs[item[1:]]
-            name = pd.pair_node_name(p)
-            state = ("off" if not p["enabled"] else "?" if status is None
-                     else "ok" if status.get(name) else "missing")
-            aux = f"AUX{p['aux']}/{p['aux'] + 1}"
-            text = f"{prefix}{state:<8} {p['label']:<28} {aux:<10} {name}"
-        else:
-            state = "?" if buses is None else "ok" if item[1] in buses else "missing"
-            text = f"{prefix}{state:<8} {bus_labels[item[1]]:<28} {'bus':<10} {item[1]}"
-        rows.append((text, "selected" if i == cursor else "alert" if state == "missing" else "normal", i))
-    return rows
+def _fit(text, width):
+    return text if len(text) <= width else text[:width - 1] + "…"
+
+
+def _device_line_text(kind, obj, devices, selected):
+    prefix = "> " if selected else "  "
+    if kind == "card":
+        return f"{prefix}{obj.label} · profile {obj.active or '?'}", "title"
+    if kind == "virtual":
+        return "  Virtual", "title"
+    if kind == "pending":
+        return f"{prefix}+ duplex {_fit(obj['label'], 30):<30} pending: A creates it  {obj['name']}", "dim"
+    c = devices["config"]
+    vol = "muted" if obj.mute else "" if obj.volume is None else f"{round(obj.volume * 100)}%"
+    pending = c["labels"].get(obj.name)
+    hidden = obj.name in c["hidden"]
+    tags = [t for t, on in (("pwctl", obj.name in devices["owned"]), ("made outside pwctl", obj.name in devices["clash"]),
+                            ("hidden", hidden), (f"label → {pending}", bool(pending) and pending != obj.label)) if on]
+    text = (f"{prefix}{'★' if obj.default else ' '} {obj.direction:<6} {_fit(obj.label, 30):<30} "
+            f"{obj.state or '?':<9} {vol:<6} {obj.id:>5}" + (f"  [{', '.join(tags)}]" if tags else ""))
+    return text, "dim" if hidden else "normal"
 
 
 def _render_devices(cv, st, devices, body_h):
     if devices is None:
         cv.add("  loading devices…", "dim")
         return
-    rows = _device_rows(st, devices)
+    lines, n_sel = [], 0
+    selectable = dev_selectable(devices, st)
+    cursor = max(0, min(len(selectable) - 1, st.dev_cursor)) if selectable else -1
+    for kind, obj in _dev_lines(devices, st):
+        idx = None if kind == "virtual" else n_sel
+        text, style = _device_line_text(kind, obj, devices, idx == cursor)
+        lines.append((text, "selected" if idx == cursor else style, idx))
+        if idx is not None:
+            n_sel += 1
     room = max(1, body_h - 3 - len(DEVICE_KEYS))  # blank line, buttons, note and key legend sit below
-    at = next((n for n, r in enumerate(rows) if r[1] == "selected"), 0)
+    at = next((n for n, line in enumerate(lines) if line[1] == "selected"), 0)
     start = 0 if at < room else at - room + 1
-    for text, style, idx in rows[start:start + room]:
+    for text, style, idx in lines[start:start + room]:
         row = cv.add(text, style)
         if idx is not None:
             cv.hit(row, 0, cv.width, ("device", idx))
     cv.add("")
-    _buttons(cv, [("dev_apply", "Apply"), ("dev_preview", "Preview"), ("dev_add_bus", "Add bus"),
-                  ("dev_test", "Test")])
+    _buttons(cv, [("dev_default", "Default"), ("dev_mute", "Mute"), ("dev_label", "Label"),
+                  ("dev_profile", "Profile"), ("dev_add_bus", "Add bus"), ("dev_apply", "Apply")])
     if devices["dirty"]:
-        cv.add("  * saved to devices.json but not applied; A applies (restarts PipeWire)", "alert")
+        cv.add("  * devices.json has changes not applied; A applies (restarts PipeWire or WirePlumber)", "alert")
     else:
-        cv.add("  drop-in matches devices.json", "dim")
+        cv.add("  generated files match devices.json", "dim")
     for line in DEVICE_KEYS:
         cv.add(line, "dim")

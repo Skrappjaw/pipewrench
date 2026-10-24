@@ -6,6 +6,19 @@ import re
 from dataclasses import dataclass, field, replace
 
 HW_APIS = ("alsa", "bluez5")
+DUMP_CMD = ["pw-dump"]
+
+
+class InventoryError(Exception):
+    pass
+
+
+def read_dump(run):
+    rc, out = run(DUMP_CMD)
+    if rc != 0:
+        raise InventoryError(out.strip() or f"pw-dump exited {rc}")
+    return json.loads(out)
+
 _DIRECTION = {"Audio/Sink": "out", "Audio/Source": "in", "Audio/Duplex": "duplex"}
 _DIR_ORDER = {"out": 0, "in": 1, "duplex": 2}
 
