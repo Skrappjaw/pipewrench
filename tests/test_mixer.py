@@ -96,18 +96,16 @@ def test_sections_and_default_stars():
 def test_volume_bar_over_100_reads_as_alert_and_mute_as_dim():
     loud = dataclasses.replace(MX["playback"][0][0], volume=1.3, mute=False)
     text, spans = pc._volume_bar(loud)
-    assert text.endswith("130%") and any(r == "alert" for *_, r in spans)
+    assert text.startswith("130%") and any(r == "alert" for *_, r in spans)
     text, spans = pc._volume_bar(dataclasses.replace(loud, mute=True))
-    assert text.endswith("muted") and {r for *_, r in spans} == {"dim"}
+    assert text.startswith("muted") and {r for *_, r in spans} <= {"dim", "bar_dim"}
     assert "no volume control" in pc._volume_bar(dataclasses.replace(loud, volume=None))[0]
-
 
 def test_cursor_bar_covers_the_name_not_the_volume():
     lines, _ = screen(at("Discord"))
-    style = next(s for t, s in lines if "Discord →" in t)
-    roles = [r for *_, r in style[1]]
-    assert roles[0] == "selected" and "ok" in roles
-
+    i = next(n for n, (t, _) in enumerate(lines) if "Discord →" in t)
+    assert [r for *_, r in lines[i][1][1]] == ["selected"]      # the name line
+    assert "ok" in [r for *_, r in lines[i + 1][1][1]]          # its volume line keeps its colours
 
 def test_loading_before_the_first_dump():
     assert "loading the mixer" in body(pc.render_screen(pc.UIState(), CUR, None, [], 80, 20)[0])
@@ -214,13 +212,13 @@ def test_the_menu_box_sits_under_its_row_and_stays_in_view():
     st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
     lines, hits = screen(st)
     text = [t for t, _ in lines]
-    row = next(i for i, t in enumerate(text) if "GCS-8 CH 3-AUX" in t and "█" in t)
-    assert "GCS-8 CH 3-AUX" in text[row + 1] and "> Set as system default" in text[row + 2]
+    row = next(i for i, t in enumerate(text) if t.rstrip().endswith("GCS-8 CH 3-AUX"))
+    assert "█" in text[row + 1]                                  # its volume line, then the box
+    assert "GCS-8 CH 3-AUX" in text[row + 2] and "> Set as system default" in text[row + 3]
     assert lines[row][1][1][0][2] == "anchor"  # the row under an open menu is an anchor, not a cursor
     st, _ = key(at("GCS-8 CH 4", "recording"), "enter")
     lines, _ = screen(st, height=20)
     assert any("Back" in t for t, _ in lines)
-
 
 def test_click_on_a_menu_item_picks_it():
     st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
@@ -263,11 +261,10 @@ def test_up_down_clamp():
     assert st.mix_cursor == 0
 
 
-def test_bars_line_up_for_devices_and_apps():
+def test_bars_line_up_within_devices_and_within_apps():
     lines, _ = screen(pc.UIState())
-    starts = {t.index("█") for t, _ in lines if "█" in t}
-    assert len(starts) == 1
-
+    starts = {len(t) - len(t.lstrip()) for t, _ in lines if "█" in t}
+    assert starts == {6, 8}  # devices' sub lines, apps' (one level deeper)
 
 # --- live meters -------------------------------------------------------------------------------
 
@@ -324,12 +321,13 @@ def test_metered_rows_draw_cells_and_v_turns_them_off():
     disc = next(r for _, sec, r in pc.mixer_selectable(m) if r.label == "Discord" and sec == "playback")
     m = {**m, "metered": {("playback", disc.id): (disc.serial, False)}, "levels": {("playback", disc.id): 0.5}}
     lines, _ = screen(pc.UIState(), m=m)
-    row = next(t for t, _ in lines if "Discord →" in t)
-    assert row.rstrip().endswith("·") and "█" in row.split("%", 1)[1]
+    i = next(n for n, (t, _) in enumerate(lines) if "Discord →" in t)
+    assert "█" in lines[i + 1][0] and lines[i + 2][0].rstrip().endswith("·")  # volume, then meter
     st, _ = key(pc.UIState(), "v", m=m)
     assert not st.meters and st.message == "meters off"
-    assert "·" not in next(t for t, _ in screen(st, m=m)[0] if "Discord →" in t)
-
+    lines = screen(st, m=m)[0]
+    i = next(n for n, (t, _) in enumerate(lines) if "Discord →" in t)
+    assert "·" not in lines[i + 2][0]
 
 def test_meter_streams_stay_out_of_patch_and_devices():
     import pwpatch as pp

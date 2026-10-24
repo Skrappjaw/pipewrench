@@ -30,20 +30,24 @@ THEMES = {
              "selected": ("black", "cyan", ""), "anchor": ("white", "blue", ""),
              "title": ("cyan", None, "bold"),
              "ok": ("green", None, "bold"), "pending": ("yellow", None, "bold"), "alert": ("red", None, "bold"),
-             "chip": ("black", "white", "")},
+             "chip": ("black", "white", ""),
+             "bar_ok": ("black", "green", ""), "bar_alert": ("black", "red", ""), "bar_dim": (None, None, "reverse dim")},
     "light": {"screen": ("black", "brightwhite", ""),
               "normal": (None, None, ""), "dim": (None, None, "dim"),
               "selected": ("black", "cyan", ""), "anchor": ("white", "blue", ""),
               "title": ("blue", None, "bold"),
               "ok": ("green", None, "bold"), "pending": ("magenta", None, "bold"), "alert": ("red", None, "bold"),
-              "chip": ("white", "black", "bold")},
+              "chip": ("white", "black", "bold"),
+              "bar_ok": ("white", "green", ""), "bar_alert": ("white", "red", ""), "bar_dim": (None, None, "reverse dim")},
     # Crowbar: Linux Mint's Mint-Y-Dark-Orange (gtk-3.0 colours); exact hex where the terminal allows.
     "crowbar": {"screen": ("#dedee0", "#2e2e33", ""),
                "normal": (None, None, ""), "dim": (None, None, "dim"),
                "selected": ("#000000", "#ff7139", ""), "anchor": ("#ff7139", "#45454b", ""),
                "title": ("#ff7139", None, "bold"),
                "ok": ("#73d216", None, "bold"), "pending": ("#f6d32d", None, "bold"), "alert": ("#fc4138", None, "bold"),
-               "chip": ("#2e2e33", "#dedee0", "")},
+               "chip": ("#2e2e33", "#dedee0", ""),
+               "bar_ok": ("#2e2e33", "#73d216", ""), "bar_alert": ("#2e2e33", "#fc4138", ""),
+               "bar_dim": (None, None, "reverse dim")},
 }
 THEME_NAMES = list(THEMES)
 METER_FALL = [10, 20, 40, 80]  # dB a second: slow, VU-like, through fast
@@ -87,12 +91,14 @@ def load_ui(path):
     return {"theme": theme if theme in THEMES else "dark",
             "meter_fps": ui.get("meter_fps") if ui.get("meter_fps") in METER_FPS else 10,
             "meter_fall": ui.get("meter_fall") if ui.get("meter_fall") in METER_FALL else 20,
-            "peak_hold": ui.get("peak_hold") if ui.get("peak_hold") in PEAK_HOLD else 1.5}
+            "peak_hold": ui.get("peak_hold") if ui.get("peak_hold") in PEAK_HOLD else 1.5,
+            "volume_bar": ui.get("volume_bar") if isinstance(ui.get("volume_bar"), bool) else True}
 
 
 def ui_prefs(st):
     """What ui.json keeps, from the live state."""
-    return {"theme": st.theme, "meter_fps": st.meter_fps, "meter_fall": st.meter_fall, "peak_hold": st.peak_hold}
+    return {"theme": st.theme, "meter_fps": st.meter_fps, "meter_fall": st.meter_fall, "peak_hold": st.peak_hold,
+            "volume_bar": st.volume_bar}
 
 
 def save_ui(path, ui):
@@ -417,6 +423,7 @@ class UIState:
     meter_fps: int = 10
     meter_fall: int = 20         # dB a second
     peak_hold: float = 1.5       # seconds; 0 is off
+    volume_bar: bool = True      # the bar under each Mixer channel; off leaves just the %
 
 
 # The now-playing bar's keys work on every tab; no tab uses these characters. * - + sit on the numpad.
@@ -468,7 +475,8 @@ THEME_ROW = len(SETTINGS)
 FPS_ROW = THEME_ROW + 1
 FALL_ROW = FPS_ROW + 1
 HOLD_ROW = FALL_ROW + 1
-PRESETS_ROW = HOLD_ROW + 1  # the first preset
+BAR_ROW = HOLD_ROW + 1
+PRESETS_ROW = BAR_ROW + 1  # the first preset
 
 
 def _key_settings(st, key, current, presets):
@@ -478,6 +486,9 @@ def _key_settings(st, key, current, presets):
         return st, [("prompt_save",)]
     if st.cursor >= PRESETS_ROW and key in ("enter", "e", "d", "left", "right"):
         return _key_preset_row(st, key, presets[st.cursor - PRESETS_ROW]["name"])
+    if key in ("left", "right") and st.cursor == BAR_ROW:
+        st.volume_bar = not st.volume_bar
+        return st, [("save_ui",)]
     if key in ("left", "right") and st.cursor in (FPS_ROW, FALL_ROW, HOLD_ROW):
         name, choices = {FPS_ROW: ("meter_fps", METER_FPS), FALL_ROW: ("meter_fall", METER_FALL),
                          HOLD_ROW: ("peak_hold", PEAK_HOLD)}[st.cursor]
@@ -910,6 +921,7 @@ def _render_settings(cv, st, current, block, presets, body_h, realtime=None):
     _display_row(cv, st, FALL_ROW, "Meter fall", f"{st.meter_fall} dB/s", "how fast a meter drops after a peak")
     _display_row(cv, st, HOLD_ROW, "Peak hold", f"{st.peak_hold:g} s" if st.peak_hold else "off",
                  f"a peak marker hangs, then falls {PEAK_FALL} dB/s")
+    _display_row(cv, st, BAR_ROW, "Volume bar", "on" if st.volume_bar else "off", "the bar under each Mixer channel")
     cv.add("")
     cv.add("  Presets", "title")
     _render_presets(cv, st, presets)
@@ -1295,18 +1307,28 @@ _BAR = 24          # cells for 0–150%
 _BAR_FULL = 16     # the cell where 100% ends
 
 
-def _volume_bar(row):
-    """(text, spans relative to the bar): filled to 100% in ok, past it in alert, the rest dim."""
+def _volume_bar(row, show_bar=True):
+    """(text, spans relative to it): the volume % written over the bar's first cells, inverted against
+    the cell under each character so it blends in; filled to 100% in ok, past it in alert, the rest dim.
+    show_bar False leaves just the %."""
     if row.volume is None:
-        return "no volume control".ljust(_BAR + 5), [(0, _BAR + 5, "dim")]
+        return "no volume control", [(0, 17, "dim")]
+    word = "muted" if row.mute else f"{round(row.volume * 100)}%"
+    if not show_bar:
+        return word, [(0, len(word), "dim")] if row.mute else []
     n = max(0, min(_BAR, round(row.volume / 1.5 * _BAR)))
-    text = "█" * n + "░" * (_BAR - n) + (" muted" if row.mute else f" {round(row.volume * 100):>3}%")
+    text = word + ("█" * n + "░" * (_BAR - n))[len(word):]
     if row.mute:
-        return text, [(0, len(text), "dim")]
-    spans = [(0, min(n, _BAR_FULL), "ok")]
-    if n > _BAR_FULL:
-        spans.append((_BAR_FULL, n, "alert"))
-    return text, spans + [(n, _BAR, "dim")]
+        spans = [(0, _BAR, "dim")]
+    else:
+        spans = [(0, min(n, _BAR_FULL), "ok")] + ([(_BAR_FULL, n, "alert")] if n > _BAR_FULL else []) + [(n, _BAR, "dim")]
+    for col in range(len(word)):  # the overlay last, so it draws over the bar's colours
+        role = "bar_dim" if row.mute or col >= n else "bar_alert" if col >= _BAR_FULL else "bar_ok"
+        if spans[-1][2] == role and spans[-1][1] == col:
+            spans[-1] = (spans[-1][0], col + 1, role)
+        else:
+            spans.append((col, col + 1, role))
+    return text, spans
 
 
 def _render_mixer(cv, st, mx, body_h):
@@ -1320,7 +1342,6 @@ def _render_mixer(cv, st, mx, body_h):
         st.mix_cursor = target[0]
     metered = mx.get("metered", {}) if st.meters else {}
     levels = mx.get("levels", {})
-    label_w = max(20, min(44, cv.width - _BAR - 14 - (_METER + 2 if metered else 0)))
     out, n_sel = [], 0
     for kind, section, row in _mixer_lines(mx):
         if kind == "head":
@@ -1337,25 +1358,22 @@ def _render_mixer(cv, st, mx, body_h):
             peers = row.outputs if section == "playback" else row.inputs
             name = f"{row.label} {'→' if section == 'playback' else '←'} {', '.join(peers) or 'nothing'}"
             star = " "
-        indent = "  " if kind == "app" else ""
-        w = label_w - len(indent)  # app rows sit under their section; the bars still line up
-        head = f"{'> ' if sel else '  '}{star} {indent}{_fit(name, w):<{w}} "
-        bar, spans = _volume_bar(row)
-        c0 = len(head)
-        spans = [(c0 + a, c0 + b, r) for a, b, r in spans]
+        indent = "  " if kind == "app" else ""  # app rows sit under their section
+        head = f"{'> ' if sel else '  '}{star} {indent}"
+        head += _fit(name, max(8, cv.width - len(head)))
+        # The name on its own line (the cursor bar covers it), then volume and meter as sub lines.
+        out.append((head, ("normal", [(0, len(head), "anchor" if target else "selected")]) if sel else "normal", n_sel))
+        pad = " " * (6 + len(indent))
+        bar, spans = _volume_bar(row, st.volume_bar)
+        out.append((pad + bar, ("normal", [(len(pad) + a, len(pad) + b, r) for a, b, r in spans]), n_sel))
         if (section, row.id) in metered:
             level = levels.get((section, row.id), 0.0)
             cells, cell_spans = _meter_cells(*(level if isinstance(level, tuple) else (level,)))
-            m0 = c0 + len(bar) + 2
-            bar += "  " + cells
-            spans += [(m0 + a, m0 + b, r) for a, b, r in cell_spans]
-        if sel:  # the cursor bar covers the name; the volume keeps its colours
-            spans = [(0, c0 - 1, "anchor" if target else "selected")] + spans
-        out.append((head + bar, ("normal", spans), n_sel))
+            out.append((pad + cells, ("normal", [(len(pad) + a, len(pad) + b, r) for a, b, r in cell_spans]), n_sel))
         if sel and target:
             out += _menu_box(row.label, [label for label, _ in mix_menu_items(mx, st)], st.mix_menu_cursor)
         n_sel += 1
-    cursor_at = next((k for k, line in enumerate(out) if line[2] == st.mix_cursor), 0)
+    cursor_at = max((k for k, line in enumerate(out) if line[2] == st.mix_cursor), default=0)  # the group's last line
     if target:  # keep the whole box in view: scroll to its foot
         cursor_at = next(k for k in range(len(out) - 1, -1, -1) if isinstance(out[k][2], tuple)) + 1
     start = 0 if cursor_at < body_h else cursor_at - body_h + 1

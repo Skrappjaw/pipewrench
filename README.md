@@ -65,6 +65,10 @@ Enter, Enter sets the system default. **All channel work happens here** (Skrappj
 (y/n); an empty name restores the default. **Card profile…** opens that channel's card on Devices with
 its profile menu open. Esc or any other key closes a menu.
 
+**Each channel is a small group:** its name, then its volume and (when metered) its meter on the lines
+under it. The volume % is written inside the bar at its left end, inverted against the bar so it blends
+in; Settings → Display → Volume bar off leaves just the %. The cursor moves channel to channel.
+
 Volume and mute act at once (`wpctl`). Running rows and the selected one show a live peak
 meter (green, yellow past −18 dB, red past −6 dB); a suspended device has no audio and isn't woken just
 to meter it. Design notes and CPU figures: `docs/mixer-plan.md`.
@@ -194,7 +198,8 @@ PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata 
 - **Meter fall** (Display): 10, 20, 40 or 80 dB a second after a peak; default 20.
 - **Peak hold** (Display): off, 0.5, 1, 1.5, 2 or 3 s; default 1.5. A `▌` marker hangs at the last peak,
   then falls 20 dB a second.
-- Both are saved with the theme in `~/.config/pwctl/ui.json`.
+- **Volume bar** (Display): on or off; default on. Off, each Mixer channel shows just its volume %.
+- All of these are saved with the theme in `~/.config/pwctl/ui.json`.
 - **Theme** (the Display section) is pwctl's own: dark, light, or crowbar (orange, after Mint-Y-Dark-Orange; needs 256 colours). ←→ switches it at once, and it's kept in
   `~/.config/pwctl/ui.json`. The colour roles are described in `docs/ui-conventions.md`.
 

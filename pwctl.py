@@ -822,7 +822,8 @@ class Tui:
 
     # Without colour the roles fall back to attributes; the > and * markers carry the rest.
     _PLAIN = {"selected": "reverse bold", "anchor": "underline", "chip": "reverse", "title": "bold",
-              "alert": "bold", "pending": "bold", "dim": "dim"}
+              "alert": "bold", "pending": "bold", "dim": "dim",
+              "bar_ok": "reverse", "bar_alert": "reverse", "bar_dim": "reverse dim"}
 
     def _apply_theme(self, scr):
         """Curses attributes for each colour role of the current theme (pc.THEMES)."""
@@ -978,7 +979,8 @@ class Tui:
             elif kind == "save_ui":
                 pc.save_ui(pc.ui_path(), pc.ui_prefs(self.st))
                 hold = f"{self.st.peak_hold:g} s" if self.st.peak_hold else "off"
-                self.st.message = f"meters: {self.st.meter_fps} fps, fall {self.st.meter_fall} dB/s, peak hold {hold}"
+                self.st.message = (f"meters: {self.st.meter_fps} fps, fall {self.st.meter_fall} dB/s, peak hold {hold}"
+                                   f" · volume bar {'on' if self.st.volume_bar else 'off'}")
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
             elif kind in ("media", "media_volume"):

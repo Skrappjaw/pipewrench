@@ -366,13 +366,13 @@ def test_every_theme_defines_every_role():
 
 def test_ui_file_round_trips_and_tolerates_junk(tmp_path):
     p = tmp_path / "pwctl" / "ui.json"
-    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5}
-    pc.save_ui(p, {"theme": "light", "meter_fps": 20, "meter_fall": 80, "peak_hold": 3})
-    assert pc.load_ui(p) == {"theme": "light", "meter_fps": 20, "meter_fall": 80, "peak_hold": 3}
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True}
+    pc.save_ui(p, {"theme": "light", "meter_fps": 20, "meter_fall": 80, "peak_hold": 3, "volume_bar": False})
+    assert pc.load_ui(p) == {"theme": "light", "meter_fps": 20, "meter_fall": 80, "peak_hold": 3, "volume_bar": False}
     p.write_text("{not json")
-    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5}
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True}
     p.write_text('{"theme": "neon", "meter_fps": 120}')
-    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5}
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True}
 
 
 def test_failed_messages_are_red_and_others_green():
@@ -444,7 +444,7 @@ def test_meter_fall_steps_and_saves():
     assert st.meter_fall == 40 and actions == [("save_ui",)]
     st, _ = key(st, *["left"] * 6)
     assert st.meter_fall == 10
-    assert pc.ui_prefs(st) == {"theme": "dark", "meter_fps": 10, "meter_fall": 10, "peak_hold": 1.5}
+    assert pc.ui_prefs(st) == {"theme": "dark", "meter_fps": 10, "meter_fall": 10, "peak_hold": 1.5, "volume_bar": True}
     text = "\n".join(t for t, _ in screen(st, height=40)[0])
     assert "Meter fall" in text and "10 dB/s" in text
     assert text.index("Meter frame rate") < text.index("Meter fall") < text.index("Peak hold") < text.index("Presets")
