@@ -33,8 +33,31 @@ THEMES = {
               "title": ("blue", None, "bold"), "button": ("green", None, "bold"),
               "ok": ("green", None, "bold"), "pending": ("magenta", None, "bold"), "alert": ("red", None, "bold"),
               "chip": ("white", "black", "bold")},
+    # Linux Mint's Mint-Y-Dark-Orange (gtk-3.0 colours); exact hex where the terminal allows.
+    "orange": {"screen": ("#dedee0", "#2e2e33", ""),
+               "normal": (None, None, ""), "dim": (None, None, "dim"),
+               "selected": ("#000000", "#ff7139", ""), "anchor": ("#ff7139", "#45454b", ""),
+               "title": ("#ff7139", None, "bold"), "button": ("#ff7139", None, "bold"),
+               "ok": ("#73d216", None, "bold"), "pending": ("#f6d32d", None, "bold"), "alert": ("#fc4138", None, "bold"),
+               "chip": ("#2e2e33", "#dedee0", "")},
 }
 THEME_NAMES = list(THEMES)
+THEME_MIN_COLOURS = {"orange": 256}  # below this the theme falls back to dark
+
+
+def hex_rgb(colour):
+    return tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def nearest_256(colour):
+    """The xterm-256 index closest to a #rrggbb colour (the 6×6×6 cube or the grey ramp)."""
+    r, g, b = hex_rgb(colour)
+    steps = [0, 95, 135, 175, 215, 255]
+    near = lambda v: min(range(6), key=lambda i: abs(steps[i] - v))  # noqa: E731
+    cube = 16 + 36 * near(r) + 6 * near(g) + near(b)
+    grey_i = max(0, min(23, round(((r + g + b) / 3 - 8) / 10)))
+    candidates = {cube: tuple(steps[near(v)] for v in (r, g, b)), 232 + grey_i: (8 + 10 * grey_i,) * 3}
+    return min(candidates, key=lambda k: sum((x - y) ** 2 for x, y in zip(candidates[k], (r, g, b))))
 
 
 def ui_path():

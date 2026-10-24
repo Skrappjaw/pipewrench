@@ -338,8 +338,8 @@ def test_theme_row_switches_at_once_and_reports_it():
     st, actions = key(st, "right")
     assert st.theme == "light" and actions == [("set_theme", "light")]
     assert "light" in "\n".join(t for t, _ in screen(st)[0])
-    st, actions = key(st, "right")
-    assert st.theme == "dark"
+    st, actions = key(st, "right", "right")
+    assert st.theme == "dark"  # dark → light → orange → dark
 
 
 def test_enter_on_the_theme_row_does_not_switch_it():
@@ -377,4 +377,17 @@ def test_black_text_is_never_bold():
     """Bold black renders grey in most terminals."""
     for theme in pc.THEMES.values():
         for fg, _, attr in theme.values():
-            assert not (fg == "black" and "bold" in attr)
+            assert not (fg in ("black", "#000000") and "bold" in attr)
+
+
+def test_nearest_256_picks_the_cube_or_the_grey_ramp():
+    assert pc.nearest_256("#ff8700") == 208
+    assert pc.nearest_256("#000000") == 16
+    assert pc.nearest_256("#808080") == 244
+    assert 232 <= pc.nearest_256("#2e2e33") <= 255
+
+
+def test_orange_theme_is_mint_y_dark_orange():
+    o = pc.THEMES["orange"]
+    assert o["selected"][1] == "#ff7139" and o["screen"][1] == "#2e2e33"
+    assert pc.load_ui is not None and "orange" in pc.THEME_NAMES

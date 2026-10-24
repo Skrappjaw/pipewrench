@@ -180,11 +180,28 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
     app = Pty(tmp_path, term)
     try:
         app.expect("light")
-        app.send("\x1bOB" * 10 + "\x1bOC")  # down to the theme row, then right
+        app.send("\x1bOB" * 10 + "\x1bOD")  # down to the theme row, then left: light → dark
         app.expect("theme: dark")
         assert json.loads((tmp_path / "pwctl" / "ui.json").read_text()) == {"theme": "dark"}
         app.send("5")
         app.expect("Destinations")
+        app.send("q")
+        assert app.wait_exit() == 0
+    finally:
+        try:
+            os.kill(app.pid, 9)
+            os.waitpid(app.pid, 0)
+        except (ProcessLookupError, ChildProcessError):
+            pass
+
+
+@pytest.mark.parametrize("term", ["xterm-256color", "xterm"])  # exact or nearest colours; dark fallback
+def test_orange_theme_starts(tmp_path, term):
+    (tmp_path / "pwctl").mkdir()
+    (tmp_path / "pwctl" / "ui.json").write_text('{"theme": "orange"}')
+    app = Pty(tmp_path, term)
+    try:
+        app.expect("needs 256 colours" if term == "xterm" else "orange")
         app.send("q")
         assert app.wait_exit() == 0
     finally:

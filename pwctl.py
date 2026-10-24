@@ -698,15 +698,27 @@ class Tui:
             return
         c.use_default_colors()
         bright = c.COLORS >= 16
+        theme = self.st.theme
+        if c.COLORS < pc.THEME_MIN_COLOURS.get(theme, 8):
+            theme = "dark"
+            self.st.message = self.st.failed = f"{self.st.theme} needs {pc.THEME_MIN_COLOURS[self.st.theme]} colours; showing dark"
+        exact = c.can_change_color() and c.COLORS >= 256
+        slots = iter(range(min(c.COLORS, 256) - 1, 15, -1))  # palette slots for exact hex; reset when pwctl exits
 
         def colour(name, default):
             if name is None:
                 return default
+            if name.startswith("#"):
+                if not exact:
+                    return pc.nearest_256(name)
+                n = next(slots)
+                c.init_color(n, *(v * 1000 // 255 for v in pc.hex_rgb(name)))
+                return n
             if name.startswith("bright"):
                 return getattr(c, f"COLOR_{name[6:].upper()}") + (8 if bright else 0)
             return getattr(c, f"COLOR_{name.upper()}")
 
-        roles = pc.THEMES[self.st.theme]
+        roles = pc.THEMES[theme]
         sfg, sbg, _ = roles["screen"]
         sfg, sbg = colour(sfg, -1), colour(sbg, -1)
         self.styles = {}
@@ -811,8 +823,8 @@ class Tui:
                 self.st.failed = "" if rc == 0 else self.st.message
             elif kind == "set_theme":
                 pc.save_ui(pc.ui_path(), {"theme": action[1]})
-                self._apply_theme(scr)
                 self.st.message = f"theme: {action[1]}"
+                self._apply_theme(scr)  # may replace the message: a theme the terminal can't show
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
             elif kind == "patch_cmds":
