@@ -120,8 +120,16 @@ def test_view_hides_and_adds_monitors(inv):
 def test_view_headings_carry_card_and_profile(inv):
     headings = [h for h, r in pi.view(inv) if r is None]
     assert "GCS-8 · profile HiFi" in headings
-    assert "HDA ATI HDMI · profile off" in headings
-    assert headings[-1] == "Virtual"
+    assert not any("profile off" in h for h in headings)
+
+
+def test_view_groups_off_cards_at_the_bottom(inv):
+    headings = [h for h, r in pi.view(inv) if r is None]
+    assert headings[headings.index("Virtual"):] == ["Virtual", "Off", "Built-in Audio · off",
+                                                    "HD Pro Webcam C920 · off", "HDA ATI HDMI · off"]
+    off = [c.name for c in inv.cards if c.active == "off"]
+    headings = [h for h, r in pi.view(inv, hidden=off) if r is None]
+    assert headings[-1] == "Virtual"  # no Off heading with nothing under it
 
 
 def test_hidden_card_hides_its_heading_and_rows(inv):

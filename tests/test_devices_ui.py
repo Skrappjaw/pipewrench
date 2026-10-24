@@ -66,10 +66,31 @@ def test_render_cards_rows_and_virtual():
 def test_render_cursor_starts_on_first_card_and_moves():
     lines, _ = screen(pc.UIState(tab="devices"))
     sel = [t for t, s in lines if s == "selected"]
-    assert len(sel) == 1 and "Built-in Audio" in sel[0]
+    assert len(sel) == 1 and "DualShock" in sel[0] and "profile" in sel[0]
     st, _ = key(pc.UIState(tab="devices"), "down")
     sel = [t for t, s in screen(st)[0] if s == "selected"]
-    assert "DualShock" in sel[0]
+    assert "DualShock" in sel[0] and " out " in sel[0]
+
+
+def test_off_cards_group_at_the_bottom_and_turn_on_from_their_menu():
+    lines, _ = screen(pc.UIState(tab="devices"), height=60)
+    text = body(lines)
+    assert text.index("Virtual") < text.index("+ Add bus…") < text.index("  Off\n") < text.index("Built-in Audio · off")
+    assert "profile off" not in text
+    assert next(s for t, s in lines if t == "  Off") == "title"
+    assert next(s for t, s in lines if "HDA ATI HDMI · off" in t) == "dim"
+    entries = pc.dev_selectable(dv(), pc.UIState(tab="devices"))
+    assert [o.label for k, o in entries[-3:]] == ["Built-in Audio", "HD Pro Webcam C920", "HDA ATI HDMI"]
+    st, actions = key(at("HDA ATI HDMI"), "enter")
+    assert actions == [] and st.dev_menu[0] == "card"
+
+
+def test_no_off_heading_when_every_off_card_is_hidden():
+    c = pcfg.default_config()
+    for card in INV.cards:
+        if card.active == "off":
+            c = pcfg.toggle_hidden(c, card.name)
+    assert "  Off" not in [t for t, _ in screen(pc.UIState(tab="devices"), dv(c), height=60)[0]]
 
 
 def test_hidden_rows_vanish_until_H():
@@ -298,10 +319,11 @@ def test_picking_the_active_profile_just_closes():
     assert actions == [] and st2.confirm is None and st2.dev_menu is None
 
 
-def test_add_bus_row_at_the_end():
+def test_add_bus_row_ends_the_virtual_group():
     entries = pc.dev_selectable(dv(), pc.UIState(tab="devices"))
-    assert entries[-1] == ("addbus", None)
-    st = pc.UIState(tab="devices", dev_cursor=len(entries) - 1)
+    i = entries.index(("addbus", None))
+    assert all(k == "card" and o.active == "off" for k, o in entries[i + 1:])  # only the Off group follows
+    st = pc.UIState(tab="devices", dev_cursor=i)
     assert "+ Add bus…" in body(screen(st, height=60)[0])
     assert key(st, "enter")[1] == [("dev_prompt_bus",)]
 

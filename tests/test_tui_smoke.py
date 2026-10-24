@@ -150,8 +150,7 @@ def test_devices_rename_is_enter_enter_type_enter(app, tmp_path):
     app.expect("Force sample rate")
     app.send(tab("devices"))
     app.expect("GCS-8 · profile HiFi")
-    app.send("\x1bOB")          # Built-in Audio -> DualShock card
-    app.send("\x1bOB")          # -> DualShock output row
+    app.send("\x1bOB")          # DualShock card -> its output row (off cards sit at the bottom)
     app.send("\r")              # Enter: actions
     app.expect("Rename")
     app.send("\x1bOB\r")        # ↓ Enter: Rename… (Set as system default leads the menu)
@@ -177,7 +176,6 @@ def test_devices_rename_empty_restores_the_default(app, tmp_path):
     app.expect("Force sample rate")
     app.send(tab("devices"))
     app.expect("GCS-8 · profile HiFi")
-    app.send("\x1bOB")
     app.send("\x1bOB")
     app.send("\r")
     app.expect("Rename")

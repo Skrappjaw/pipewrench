@@ -309,14 +309,18 @@ def view(inv, hidden=(), show_hidden=False, monitors=False):
         rows = list(rows) + (monitor_rows(rows) if monitors else [])
         return [("", r) for r in rows if show_hidden or r.name not in hidden]
 
+    off = []  # cards on profile off carry no devices; they wait at the bottom
     for c in inv.cards:
         if c.name in hidden and not show_hidden:
+            continue
+        if c.active == "off":
+            off.append((f"{c.label} · off", None))
             continue
         out.append((f"{c.label} · profile {c.active or '?'}", None))
         out += rows_of(c.rows)
     out.append(("Virtual", None))
     out += rows_of(inv.virtual)
-    return out
+    return out + ([("Off", None)] + off if off else [])
 
 
 # --- commands (wpctl) -------------------------------------------------------------

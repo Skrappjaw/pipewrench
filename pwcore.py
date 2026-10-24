@@ -538,16 +538,20 @@ def devices_view(inv, config, dirty=False, owned=(), clash=(), pending=()):
 
 
 def _dev_lines(devices, st):
-    """(kind, obj) per list line: card, virtual (the heading), row or pending (a bus not yet created)."""
+    """(kind, obj) per list line: card, virtual or off (headings), row, pending (a bus not yet created) or
+    addbus. Cards on profile off carry no devices, so they wait at the bottom under Off."""
     inv, hidden = devices["inv"], set(devices["config"]["hidden"])
 
     def rows(rs):
         rs = list(rs) + (pi.monitor_rows(rs) if st.dev_monitors else [])
         return [("row", r) for r in rs if st.dev_show_hidden or r.name not in hidden]
 
-    lines = []
+    lines, off = [], []
     for card in inv.cards:
         if card.name in hidden and not st.dev_show_hidden:
+            continue
+        if card.active == "off":
+            off.append(("card", card))
             continue
         lines.append(("card", card))
         lines += rows(card.rows)
@@ -555,11 +559,11 @@ def _dev_lines(devices, st):
     lines += rows(inv.virtual)
     lines += [("pending", b) for b in devices["pending"]]
     lines.append(("addbus", None))
-    return lines
+    return lines + ([("off", None)] + off if off else [])
 
 
 def dev_selectable(devices, st):
-    return [line for line in _dev_lines(devices, st) if line[0] != "virtual"]
+    return [line for line in _dev_lines(devices, st) if line[0] not in ("virtual", "off")]
 
 
 def _key_devices(st, key, devices):
@@ -951,10 +955,12 @@ def _fit(text, width):
 
 def _device_line_text(kind, obj, devices, selected):
     prefix = "> " if selected else "  "
+    if kind == "card" and obj.active == "off":
+        return f"{prefix}{obj.label} · off", "dim"
     if kind == "card":
         return f"{prefix}{obj.label} · profile {obj.active or '?'}", "title"
-    if kind == "virtual":
-        return "  Virtual", "title"
+    if kind in ("virtual", "off"):
+        return f"  {kind.title()}", "title"
     if kind == "addbus":
         return f"{prefix}+ Add bus…", "dim"
     if kind == "pending":
@@ -991,7 +997,7 @@ def _render_devices(cv, st, devices, body_h):
     cursor = max(0, min(len(selectable) - 1, st.dev_cursor)) if selectable else -1
     menu_at = None
     for kind, obj in _dev_lines(devices, st):
-        idx = None if kind == "virtual" else n_sel
+        idx = None if kind in ("virtual", "off") else n_sel
         text, style = _device_line_text(kind, obj, devices, idx == cursor)
         menu_open = idx == cursor and _menu_target(devices, st) is not None
         lines.append((text, "anchor" if menu_open else "selected" if idx == cursor else style, idx))
