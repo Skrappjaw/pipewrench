@@ -148,3 +148,26 @@ def test_devices_rename_is_enter_enter_type_enter(app, tmp_path):
     assert list(saved["labels"].values()) == ["Pad"]
     lua = (tmp_path / "wireplumber" / "main.lua.d" / "51-pwctl-labels.lua").read_text()
     assert '"Pad"' in lua
+
+
+def test_devices_rename_empty_restores_the_default(app, tmp_path):
+    ds4 = "alsa_output.usb-Sony_Interactive_Entertainment_Wireless_Controller-00.analog-stereo"
+    (tmp_path / "pwctl").mkdir(exist_ok=True)
+    (tmp_path / "pwctl" / "devices.json").write_text(json.dumps(
+        {"version": 2, "clock_rate": None, "buses": [], "labels": {ds4: "Pad"}, "hidden": []}))
+    app.expect("Force sample rate")
+    app.send("4")
+    app.expect("GCS-8 · profile HiFi")
+    app.send("\x1bOB")
+    app.send("\x1bOB")
+    app.send("\r")
+    app.expect("Rename")
+    app.send("\r")
+    app.expect("empty restores the default")
+    app.send("\r")              # empty
+    app.expect("Restart WirePlumber now")
+    app.send("n")
+    app.send("q")
+    assert app.wait_exit() == 0
+    saved = json.loads((tmp_path / "pwctl" / "devices.json").read_text())
+    assert saved["labels"] == {}

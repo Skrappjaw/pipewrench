@@ -800,18 +800,26 @@ class Tui:
             self.st.message = verb.get(action[1][1], " ".join(action[1]))
         elif kind == "dev_rename":
             name, old = action[1], action[2]
-            label = self._prompt(scr, f"new name for {old} (empty keeps it):")
-            if not label or label == old:
+            label = self._prompt(scr, f"new name for {old} (empty restores the default):")
+            bus = next((b for b in c["buses"] if b["name"] == name), None)
+            if not label:
+                # Empty restores the default: drop the custom label (a bus goes back to its own name).
+                if (bus and bus["label"] == name) or (not bus and name not in c["labels"]):
+                    self.st.message = f"{old} already has its default name"
+                    return
+                label = name if bus else None
+            elif label == old:
                 self.st.message = "name unchanged"
                 return
             c = pcfg.set_label(c, name, label)
             pcfg.save_config(pcfg.config_path(), c)
             for path, text, _ in _generated(self.runner, c, self.wp_version):
                 pcfg.write_generated(path, text)
-            if any(b["name"] == name for b in c["buses"]):
-                self.st.message = f"renamed {old} to {label}; a bus shows its new name after the next login"
+            what = f"renamed {old} to {label}" if label else f"{old} goes back to its default name"
+            if bus:
+                self.st.message = f"{what}; a bus shows its new name after the next login"
             else:
-                self.st.message = f"renamed {old} to {label}"
+                self.st.message = what
                 self.st.confirm = ("restart_labels",)  # labels only show once WirePlumber reloads its rules
         elif kind == "dev_profile":
             _, card_id, index, profile = action

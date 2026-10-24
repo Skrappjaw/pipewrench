@@ -113,6 +113,7 @@ An inventory of every audio card, sink, source and bus on the system, read from 
 | + Add bus… | asks for a name and creates it live |
 
 - **Rename** saves the label and writes the label file, then asks "Restart WirePlumber now to show it?"
+  An empty name restores the default.
   (y/n), because labels only appear after WirePlumber reloads. A bus shows its new name after the next
   login.
 - **Without opening a menu:** ←→ change the volume.
