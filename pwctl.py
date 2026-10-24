@@ -9,6 +9,7 @@ watch pw-top, and keep labelled presets.
     pwctl top                  run pw-top
     pwctl preset list | save NAME [LABEL] | apply NAME | delete NAME
     pwctl devices [list] | default | volume | mute | profile | label | hide | bus | apply …
+    pwctl patch [list] | connect SRC DST | disconnect SRC DST
 """
 import array
 import os
@@ -25,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pwcore as pc  # noqa: E402
 import pwconfig as pcfg  # noqa: E402
 import pwinventory as pi  # noqa: E402
+import pwpatch as pp  # noqa: E402
 
 SETTERS = {"rate": "clock.force-rate", "buf": "clock.force-quantum", "min": "clock.min-quantum",
            "max": "clock.max-quantum", "log": "log.level"}
@@ -145,6 +147,8 @@ def _cli(argv, runner, out, err, execvp, ask):
         return _preset(args, runner, out)
     if cmd == "devices":
         return _devices(args, runner, out, err, ask)
+    if cmd == "patch":
+        return _patch(args, runner, out)
     raise CliError(f"unknown command {cmd!r}\n\nusage:\n{USAGE}", 2)
 
 
@@ -493,6 +497,48 @@ def _devices(args, runner, out, err, ask):
         _run(runner, pcfg.RESTART_WIREPLUMBER)
         return 0
     raise CliError(DEVICES_USAGE, 2)
+
+
+PATCH_USAGE = "usage: pwctl patch [list] | connect SRC DST | disconnect SRC DST"
+
+
+def _graph(runner):
+    return pp.graph(_dump(runner))
+
+
+def _endpoint(find, key, what):
+    try:
+        e = find(key)
+    except LookupError as e:
+        raise CliError(str(e), 2)
+    if e is None:
+        raise CliError(f"no {what} {key!r}; see `pwctl patch list`", 2)
+    return e
+
+
+def _patch(args, runner, out):
+    sub, rest = (args[0], args[1:]) if args else ("list", [])
+    if sub == "list" and not rest:
+        g = _graph(runner)
+        for s in g.sources:
+            for d in g.targets(s):
+                pairs = [f"{a.channel}→{b.channel}" for a, b, linked in pp.port_pairs(g, s, d) if linked]
+                note = "" if g.state(s, d) == "full" else "  (partial)"
+                out.write(f"{s.label} → {d.label}  ({', '.join(pairs)}){note}\n")
+        return 0
+    if sub in ("connect", "disconnect") and len(rest) == 2:
+        g = _graph(runner)
+        s = _endpoint(g.find_source, rest[0], "source")
+        d = _endpoint(g.find_dest, rest[1], "destination")
+        cmds = (pp.connect_cmds if sub == "connect" else pp.disconnect_cmds)(g, s, d)
+        if not cmds:
+            out.write(f"{s.label} → {d.label} is {'already connected' if sub == 'connect' else 'not connected'}\n")
+            return 0
+        for cmd in cmds:
+            _run(runner, cmd)
+        out.write(f"{sub}ed {s.label} → {d.label}\n")
+        return 0
+    raise CliError(PATCH_USAGE, 2)
 
 
 def main(argv, runner=None, out=None, err=None, execvp=None, ask=None):
