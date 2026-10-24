@@ -403,6 +403,80 @@ def test_restart_command_restarts_pipewire_stack():
     assert pd.RESTART_CMD == ["systemctl", "--user", "restart", "pipewire", "pipewire-pulse", "wireplumber"]
 
 
+# --- 5. post-apply check -----------------------------------------------------
+
+def _node(name, cls, position):
+    return {"type": "PipeWire:Interface:Node", "id": abs(hash(name)) % 10000,
+            "info": {"props": {"node.name": name, "media.class": cls, "audio.position": position}}}
+
+
+def _applied_dump(m, position_style="spa"):
+    """A pw-dump as it should look after apply: hardware, then each pair's two nodes, then buses."""
+    out = dump()
+    for p in m["pairs"]:
+        if not p["enabled"]:
+            continue
+        name = pd.pair_node_name(p)
+        aux = [f"AUX{p['aux']}", f"AUX{p['aux'] + 1}"]
+        hw_pos = {"spa": f"[ {aux[0]} {aux[1]} ]", "comma": ",".join(aux), "list": aux}[position_style]
+        hw_cls = "Stream/Output/Audio" if p["dir"] == "out" else "Stream/Input/Audio"
+        out += [_node(name, "Audio/Sink" if p["dir"] == "out" else "Audio/Source", "[ FL FR ]"),
+                _node(f"{name}.hw", hw_cls, hw_pos)]
+    out += [_node(b["name"], "Audio/Duplex", "FL,FR") for b in m["buses"]]
+    return out
+
+
+@pytest.mark.parametrize("style", ["spa", "comma", "list"])
+def test_check_applied_all_present(style):
+    m = pd.default_model()
+    assert pd.check_applied(m, _applied_dump(m, style)) == []
+
+
+def test_check_applied_reports_missing_pair_and_bus():
+    m = pd.default_model()
+    d = [o for o in _applied_dump(m) if _props_name(o) not in ("pwctl.gcs8.out.ch3aux", "GAME")]
+    problems = pd.check_applied(m, d)
+    assert any("pwctl.gcs8.out.ch3aux" in p and "missing" in p for p in problems)
+    assert any("GAME" in p and "missing" in p for p in problems)
+    assert len(problems) == 2
+
+
+def test_check_applied_reports_wrong_channels():
+    m = pd.default_model()
+    d = _applied_dump(m)
+    for o in d:
+        if _props_name(o) == "pwctl.gcs8.out.ch3aux.hw":
+            o["info"]["props"]["audio.position"] = "[ AUX0 AUX1 ]"
+    problems = pd.check_applied(m, d)
+    assert problems == ["pwctl.gcs8.out.ch3aux.hw: on AUX0, AUX1, expected AUX8, AUX9"]
+
+
+def test_check_applied_ignores_disabled_pairs():
+    m = pd.default_model()
+    _pair(m, "in", "main")["enabled"] = False
+    assert pd.check_applied(m, _applied_dump(m)) == []
+
+
+def test_check_applied_reports_missing_hardware():
+    m = pd.default_model()
+    d = [o for o in _applied_dump(m) if "BOSS" not in _props_name(o)]
+    problems = pd.check_applied(m, d)
+    assert problems[0].startswith("GCS-8 not found")
+
+
+def test_pair_status_marks_present_and_missing():
+    m = pd.default_model()
+    d = [o for o in _applied_dump(m) if _props_name(o) != "pwctl.gcs8.in.ch2"]
+    status = pd.pair_status(m, d)
+    assert status["pwctl.gcs8.in.ch2"] is False
+    assert status["pwctl.gcs8.out.ch3aux"] is True
+    assert len(status) == 17
+
+
+def _props_name(o):
+    return ((o.get("info") or {}).get("props") or {}).get("node.name", "")
+
+
 def test_dropin_brackets_balance():
     text = pd.render_dropin(pd.default_model())
     body = "\n".join(line for line in text.splitlines() if not line.startswith("#"))

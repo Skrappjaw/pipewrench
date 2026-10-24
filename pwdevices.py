@@ -275,3 +275,38 @@ def rollback_dropin(path):
         path.unlink()
         return f"removed {path.name}; PipeWire is back to its stock config"
     return "nothing to roll back"
+
+
+# --- post-apply check --------------------------------------------------------
+
+def _positions(value):
+    """audio.position as pw-dump may show it: "A,B", "[ A B ]" or a list."""
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    return [s for s in re.split(r"[\s,\[\]]+", str(value or "")) if s]
+
+
+def check_applied(m, dump):
+    """Problems that keep the live graph from matching the model; empty when all is well."""
+    by_name = {p.get("node.name"): p for p in nodes(dump)}
+    enabled = [p for p in m["pairs"] if p["enabled"]]
+    problems = [f"GCS-8 not found: {m['device'][d]}" for d in ("out", "in")
+                if any(p["dir"] == d for p in enabled) and m["device"][d] not in by_name]
+    for p in enabled:
+        name = pair_node_name(p)
+        if name not in by_name:
+            problems.append(f"{name}: missing ({p['label']})")
+            continue
+        want = [f"AUX{p['aux']}", f"AUX{p['aux'] + 1}"]
+        hw = by_name.get(f"{name}.hw")
+        got = _positions(hw.get("audio.position")) if hw else None
+        if got != want:
+            where = ", ".join(got) if got else "no hardware stream"
+            problems.append(f"{name}.hw: on {where}, expected {', '.join(want)}")
+    problems += [f"{b['name']}: missing (bus)" for b in m["buses"] if b["name"] not in by_name]
+    return problems
+
+
+def pair_status(m, dump):
+    present = {p.get("node.name") for p in nodes(dump)}
+    return {pair_node_name(p): pair_node_name(p) in present for p in m["pairs"]}
