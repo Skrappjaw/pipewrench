@@ -52,7 +52,7 @@ def fixture_runner(fixdir):
         if argv == pcfg.VERSION_CMD:
             return 0, "wireplumber\nCompiled with libwireplumber 0.4.17\n"
         if argv == pi.DUMP_CMD:
-            return 0, (Path(fixdir) / "pwdump_inventory.json").read_text()
+            return 0, (Path(fixdir) / "pwdump_patch.json").read_text()
         return 0, ""
     return run
 
@@ -567,6 +567,7 @@ class Tui:
         self.block = None
         self.devices = None
         self.wp_version = None
+        self.patch = None
         self.lock = threading.Lock()
         self.proc = None
         self.hits = []
@@ -611,6 +612,14 @@ class Tui:
             self.st.message = f"presets file problem: {e}"
         if self.st.tab == "devices":
             self._refresh_devices()
+        if self.st.tab == "patch":
+            self._refresh_patch()
+
+    def _refresh_patch(self):
+        try:
+            self.patch = _graph(self.runner)
+        except CliError as e:
+            self.st.message = str(e)
 
     def _refresh_devices(self):
         """Inventory, devices.json, bus status and whether the generated files are behind."""
@@ -665,18 +674,20 @@ class Tui:
                 if not event:
                     continue
                 self.st, actions = pc.handle_mouse(self.st, self.hits, y, x, event, self.current, self.presets,
-                                                   self.devices)
+                                                   self.devices, self.patch)
             else:
                 key = self._key(ch)
                 if not key:
                     continue
-                self.st, actions = pc.handle_key(self.st, key, self.current, self.presets, self.devices)
+                self.st, actions = pc.handle_key(self.st, key, self.current, self.presets, self.devices, self.patch)
             for action in actions:
                 if action == ("quit",):
                     return
                 self._do(scr, action)
             if self.st.tab == "devices" and self.devices is None:
                 self._refresh_devices()
+            if self.st.tab == "patch" and self.patch is None:
+                self._refresh_patch()
 
     def _mouse_event(self, b):
         c = self.curses
@@ -705,7 +716,8 @@ class Tui:
         h, w = scr.getmaxyx()
         with self.lock:
             block = self.block
-        lines, self.hits = pc.render_screen(self.st, self.current, block, self.presets, w, h, self.devices)
+        lines, self.hits = pc.render_screen(self.st, self.current, block, self.presets, w, h, self.devices,
+                                            self.patch)
         scr.erase()
         for y, (text, style) in enumerate(lines):
             try:
@@ -767,6 +779,10 @@ class Tui:
                 self.st.message = "WirePlumber restarted" if rc == 0 else f"restart failed: {out.strip()}"
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
+            elif kind == "patch_cmds":
+                for cmd in action[1]:
+                    _run(self.runner, cmd)
+                self.st.message = "unlinked" if action[1][0][1] == "-d" else "linked"
         except (CliError, ValueError, KeyError, LookupError, OSError, pcfg.ConfigError) as e:
             self.st.message = str(e)
         self._refresh()

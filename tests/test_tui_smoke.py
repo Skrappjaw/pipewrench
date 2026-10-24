@@ -114,3 +114,16 @@ def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
     assert saved["buses"] == [{"name": "OBS", "label": "OBS"}]
     assert 'node.name = "OBS"' in (tmp_path / "pipewire" / "pipewire.conf.d" / "50-pwctl-devices.conf").read_text()
     assert not (tmp_path / "wireplumber").exists()
+
+
+def test_patch_tab_shows_both_views(app):
+    app.expect("Force sample rate")
+    app.send("5")
+    app.expect("Destinations")
+    app.expect("Discord")
+    app.send("g")
+    app.expect("column view")
+    app.send("p")
+    app.expect("Ports:")
+    app.send("q")
+    assert app.wait_exit() == 0

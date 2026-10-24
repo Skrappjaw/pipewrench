@@ -18,9 +18,9 @@ On this machine, `pwctl` → `projects/pwctl/pwctl.py` (branch `main`).
 
 Needs PipeWire's command-line tools: `pw-metadata`, `pw-top`, `pw-dump`, `pw-cat`, plus `systemctl --user`.
 
-## The four views
+## The five views
 
-Switch views with `Tab`, the number keys `1`–`4`, or a click on the tab bar. `q` quits from any view.
+Switch views with `Tab`, the number keys `1`–`5`, or a click on the tab bar. `q` quits from any view.
 The bottom line shows that view's keys, and gives way to status messages.
 
 ### 1 Settings
@@ -138,6 +138,37 @@ Mouse:
 
 The key legend is always on screen.
 
+### 5 Patch
+
+A patch bay for live connections, in two layouts switched with `g`:
+- **Columns:** sources on the left, destinations on the right; ● marks where the selected source goes.
+- **Grid:** sources down the side, numbered destinations across the top (names in a key below):
+  - ● connected
+  - ◐ one channel only
+  - · not connected
+
+How it works:
+- **Sources:** app playback, device inputs and buses.
+- **Destinations:** app recording, device outputs and buses.
+- **Connecting** links matching channels (FL→FL, FR→FR); a mono source feeds both channels.
+- **Ports:** `p` shows every port pair for fine patches, e.g. mono to left only.
+- **Monitors:** outputs' monitors are hidden until `m`.
+
+| Key | Action |
+|---|---|
+| ↑ ↓ / ← → | columns: select / switch column. Grid: source / destination |
+| Enter | connect or disconnect the selected pair (on a source in columns: move to the destinations) |
+| p | port pairs for the selected pair; Enter toggles one; `p`/Esc back |
+| g | switch between columns and grid |
+| m | show or hide output monitors |
+
+Mouse:
+- click selects; double-click connects or disconnects
+- in the grid, click a cell
+
+Links made here last until a restart or until the app reconnects. Saved patch sets are planned
+as part of scenes.
+
 ## Command line
 
 ```
@@ -165,6 +196,10 @@ pwctl devices preview                diff of the generated files against what's 
 pwctl devices apply [--restart]      write the generated files; --restart asks, restarts, then checks
 pwctl devices rollback               restore the previous files (or remove them); no restart
 pwctl devices restart                restart WirePlumber, after y/n
+
+pwctl patch [list]                   every live connection, with its channels
+pwctl patch connect SRC DST          link matching channels (mono feeds both)
+pwctl patch disconnect SRC DST       remove every link between them
 ```
 
 DEV is a node id, an exact `node.name`, or a label that matches exactly one device. CARD is a card id,
@@ -240,6 +275,7 @@ github.com/Skrappjaw/gcs-8-linux.
 | `pwctl.py` | entry point: CLI dispatch, the subprocess runner, the curses `Tui` |
 | `pwcore.py` | pure logic: settings metadata, `pw-top` parsing, presets, the UI state machine and screen rendering |
 | `pwinventory.py` | pure logic: the device inventory from `pw-dump`, lookups, wpctl command builders |
+| `pwpatch.py` | pure logic: patch bay graph (sources, destinations, ports), channel pairing, pw-link commands |
 | `pwconfig.py` | pure logic: `devices.json`, the generated drop-in and label rules, apply/rollback safety |
 
 The pure modules never run commands. Callers pass a `runner(argv) -> (rc, output)`, which is how
@@ -287,6 +323,18 @@ the tests replace PipeWire.
   - `profile_cmd(card, profile)`: by index or name
   - `bus_create_cmd(name, label)`, `destroy_cmd(row)`: live buses via `pw-cli`
 - `merge_dump(text)`: applies the update arrays `pw-dump` prints when the graph changes mid-read
+
+### pwpatch.py
+
+- `graph(dump)`: a `Graph` of source and destination `Endpoint`s, with their `Port`s and the links
+- `Graph`:
+  - `state(src, dst)`: full / partial / none
+  - `targets(src)`
+  - `find_source(key)`, `find_dest(key)`
+- `pair_ports(src_ports, dst_ports)`: FL→FL, mono to all, all to mono, else by position
+- commands:
+  - `connect_cmds`, `disconnect_cmds`, `toggle_cmds`: `pw-link` commands, skipping links that exist
+  - `port_pairs`, `port_toggle_cmd`: port-level detail
 
 ### pwconfig.py
 
@@ -339,6 +387,7 @@ PWCTL_LIVE=1 python3 -m pytest tests/test_live.py # read-only checks against the
 | `test_config.py` | `devices.json` v2, migration, edits, generated files (golden files in `tests/fixtures/golden/`), backups, rollback, checks |
 | `test_commands.py` | wpctl command builders, bus clash check |
 | `test_devices_cli.py` | `pwctl devices …` with a fake runner; restarts are recorded, never run |
+| `test_patch.py`, `test_patch_cli.py`, `test_patch_ui.py` | patch graph, pairing, commands, CLI, both views, ports, mouse (fixture: a live `pw-dump` with ports and links) |
 | `test_devices_ui.py` | Devices tab keys, mouse, rendering, scrolling, key legend |
 | `test_tui_smoke.py` | the real curses UI in a pty against fixtures |
 | `test_live.py` | opt-in; writes back only the values already set |

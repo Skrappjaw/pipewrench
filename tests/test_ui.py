@@ -161,8 +161,10 @@ def test_tab_and_number_keys_switch_tabs():
     st, _ = key(st, "tab")
     assert st.tab == "devices"
     st, _ = key(st, "tab")
+    assert st.tab == "patch"
+    st, _ = key(st, "tab")
     assert st.tab == "settings"
-    for k, tab in (("2", "top"), ("3", "presets"), ("4", "devices"), ("1", "settings")):
+    for k, tab in (("2", "top"), ("3", "presets"), ("4", "devices"), ("5", "patch"), ("1", "settings")):
         st, _ = key(st, k)
         assert st.tab == tab
 

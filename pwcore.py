@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pwinventory as pi
+import pwpatch as pp
 
 READ_CMD = ["pw-metadata", "-n", "settings", "0"]
 RESTART_CMD = ["systemctl", "--user", "restart", "wireplumber"]
@@ -295,8 +296,8 @@ def summarize_preset(p):
 
 # --- TUI state machine -------------------------------------------------------
 
-TABS = ["settings", "top", "presets", "devices"]
-TAB_TITLES = {"settings": "1 Settings", "top": "2 Top", "presets": "3 Presets", "devices": "4 Devices"}
+TABS = ["settings", "top", "presets", "devices", "patch"]
+TAB_TITLES = {"settings": "1 Settings", "top": "2 Top", "presets": "3 Presets", "devices": "4 Devices", "patch": "5 Patch"}
 
 
 @dataclass
@@ -309,11 +310,18 @@ class UIState:
     dev_cursor: int = 0
     dev_show_hidden: bool = False
     dev_monitors: bool = False
+    patch_view: str = "cols"     # cols | grid
+    patch_side: str = "src"      # src | dst (column view)
+    patch_src: int = 0
+    patch_dst: int = 0
+    patch_monitors: bool = False
+    patch_ports: bool = False
+    patch_port: int = 0
     confirm: tuple = None
     message: str = ""
 
 
-def handle_key(st, key, current, presets, devices=None):
+def handle_key(st, key, current, presets, devices=None, patch=None):
     """Return (new_state, actions). Nothing touches PipeWire until an action is executed.
 
     devices is the Devices tab's view: {"model", "status", "buses", "dirty"}, or None until loaded.
@@ -333,11 +341,13 @@ def handle_key(st, key, current, presets, devices=None):
     if key == "tab":
         st.tab = TABS[(TABS.index(st.tab) + 1) % len(TABS)]
         return st, []
-    if key in ("1", "2", "3", "4"):
+    if key in ("1", "2", "3", "4", "5"):
         st.tab = TABS[int(key) - 1]
         return st, []
     if st.tab == "devices":
         return _key_devices(st, key, devices)
+    if st.tab == "patch":
+        return _key_patch(st, key, patch)
     return {"settings": _key_settings, "top": _key_top, "presets": _key_presets}[st.tab](st, key, current, presets)
 
 
@@ -501,7 +511,7 @@ _MOUSE_BUTTONS = {"apply": "enter", "revert": "esc", "restart": "R", "preset_app
                   "dev_add_bus": "a", "dev_apply": "A"}
 
 
-def handle_mouse(st, hits, y, x, event, current, presets, devices=None):
+def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=None):
     """Map a mouse event onto the same keys the keyboard uses."""
     if st.confirm:
         return dataclasses.replace(st, confirm=None, message="cancelled (y confirms)"), []
@@ -528,9 +538,19 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None):
     elif kind == "device":
         st = dataclasses.replace(st, dev_cursor=target[1])
         keys = {"double": ["enter"], "wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
+    elif kind in ("patch_src", "patch_dst"):
+        side = "src" if kind == "patch_src" else "dst"
+        st = dataclasses.replace(st, patch_side=side, **{f"patch_{side}": target[1]})
+        keys = {"double": ["enter"] if side == "dst" else [], "wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
+    elif kind == "patch_cell":
+        st = dataclasses.replace(st, patch_src=target[1], patch_dst=target[2])
+        keys = ["enter"] if event == "double" else []
+    elif kind == "patch_port":
+        st = dataclasses.replace(st, patch_port=target[1])
+        keys = ["enter"] if event == "double" else []
     actions = []
     for k in keys:
-        st, a = handle_key(st, k, current, presets, devices)
+        st, a = handle_key(st, k, current, presets, devices, patch)
         actions += a
     return st, actions
 
@@ -542,6 +562,7 @@ HELP = {
     "top": "↑↓ PgUp/PgDn scroll  Tab switch  q quit",
     "presets": "↑↓ select  Enter apply  s save current  e edit label  d delete  Tab switch  q quit",
     "devices": "buses and d ←→ Space p act now · labels show after R or next login",
+    "patch": "links made here are live only; saved patch sets come with scenes",
 }
 
 
@@ -577,7 +598,7 @@ def _confirm_question(confirm):
             "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now."}[kind]
 
 
-def render_screen(st, current, block, presets, width, height, devices=None):
+def render_screen(st, current, block, presets, width, height, devices=None, patch=None):
     cv = _Canvas(width)
     text, spans = " ", []
     for tab in TABS:
@@ -591,6 +612,8 @@ def render_screen(st, current, block, presets, width, height, devices=None):
     body_h = height - len(cv.lines) - 1
     if st.tab == "devices":
         _render_devices(cv, st, devices, body_h)
+    elif st.tab == "patch":
+        _render_patch(cv, dataclasses.replace(st), patch, body_h)
     else:
         {"settings": _render_settings, "top": _render_top, "presets": _render_presets}[st.tab](
             cv, st, current, block, presets, body_h)
@@ -670,7 +693,7 @@ def _render_presets(cv, st, current, block, presets, body_h):
 DEVICE_KEYS = [
     "  Keys: ↑↓ select  d default  ←→ volume  Space mute  Enter label  p profile",
     "        t test  h hide  H show hidden  m monitors  a add bus  x delete bus",
-    "        v preview  A apply  R restart WirePlumber  Tab/1-4 tabs  q quit",
+    "        v preview  A apply  R restart WirePlumber  Tab/1-5 tabs  q quit",
 ]
 
 
@@ -727,3 +750,185 @@ def _render_devices(cv, st, devices, body_h):
         cv.add("  generated files match devices.json", "dim")
     for line in DEVICE_KEYS:
         cv.add(line, "dim")
+
+
+# --- Patch tab -------------------------------------------------------------------------
+
+PATCH_KEYS = {
+    "cols": ["  Keys: ↑↓ select  ←→ column  Enter connect/disconnect  p ports",
+             "        g grid view  m monitors  Tab/1-5 tabs  q quit"],
+    "grid": ["  Keys: ↑↓ source  ←→ destination  Enter connect/disconnect  p ports",
+             "        g column view  m monitors  Tab/1-5 tabs  q quit"],
+    "ports": ["  Keys: ↑↓ select  Enter link/unlink this port pair  p or Esc back",
+              "        Tab/1-5 tabs  q quit"],
+}
+_STATE_MARK = {"full": "●", "partial": "◐", "none": "·"}
+
+
+def patch_sources(g, st):
+    return [s for s in g.sources if st.patch_monitors or not s.monitor]
+
+
+def _patch_pair(g, st):
+    """(sources, source, destination) under the cursors, clamping them; None when nothing to pick."""
+    srcs = patch_sources(g, st)
+    if not srcs or not g.dests:
+        return srcs, None, None
+    st.patch_src = max(0, min(len(srcs) - 1, st.patch_src))
+    st.patch_dst = max(0, min(len(g.dests) - 1, st.patch_dst))
+    return srcs, srcs[st.patch_src], g.dests[st.patch_dst]
+
+
+def _toggle(g, st, s, d):
+    cmds = pp.toggle_cmds(g, s, d)
+    if not cmds:
+        st.message = f"nothing to link between {s.label} and {d.label}"
+        return st, []
+    return st, [("patch_cmds", cmds)]
+
+
+def _key_patch(st, key, g):
+    if g is None:
+        return st, []
+    if key == "g":
+        st.patch_view = "grid" if st.patch_view == "cols" else "cols"
+        st.patch_ports = False
+        return st, []
+    if key == "m":
+        st.patch_monitors = not st.patch_monitors
+        return st, []
+    srcs, s, d = _patch_pair(g, st)
+    if s is None:
+        return st, []
+    if st.patch_ports:
+        rows = pp.port_pairs(g, s, d)
+        st.patch_port = max(0, min(len(rows) - 1, st.patch_port))
+        if key in ("up", "down"):
+            st.patch_port = max(0, min(len(rows) - 1, st.patch_port + (1 if key == "down" else -1)))
+        elif key == "enter" and rows:
+            a, b, _ = rows[st.patch_port]
+            return st, [("patch_cmds", [pp.port_toggle_cmd(g, a, b)])]
+        elif key in ("p", "esc"):
+            st.patch_ports = False
+        return st, []
+    if key == "p":
+        st.patch_ports, st.patch_port = True, 0
+        return st, []
+    step = {"up": -1, "down": 1}.get(key)
+    if st.patch_view == "grid":
+        if step:
+            st.patch_src = max(0, min(len(srcs) - 1, st.patch_src + step))
+        elif key in ("left", "right"):
+            st.patch_dst = max(0, min(len(g.dests) - 1, st.patch_dst + (1 if key == "right" else -1)))
+        elif key == "enter":
+            return _toggle(g, st, s, d)
+        return st, []
+    if key in ("left", "right"):
+        st.patch_side = "dst" if key == "right" else "src"
+    elif step and st.patch_side == "src":
+        st.patch_src = max(0, min(len(srcs) - 1, st.patch_src + step))
+    elif step:
+        st.patch_dst = max(0, min(len(g.dests) - 1, st.patch_dst + step))
+    elif key == "enter":
+        if st.patch_side == "src":
+            st.patch_side = "dst"
+        else:
+            return _toggle(g, st, s, d)
+    return st, []
+
+
+def _window(n, cursor, room):
+    start = 0 if cursor < room else cursor - room + 1
+    return range(start, min(n, start + room))
+
+
+def _pair_status(g, s, d):
+    state = g.state(s, d)
+    if state == "none":
+        return f"  {s.label} → {d.label}: not connected"
+    linked = ", ".join(f"{a.channel}→{b.channel}" for a, b, on in pp.port_pairs(g, s, d) if on)
+    return f"  {s.label} → {d.label}: {'connected' if state == 'full' else 'partly connected'} ({linked})"
+
+
+def _render_patch(cv, st, g, body_h):
+    if g is None:
+        cv.add("  loading the patch bay…", "dim")
+        return
+    srcs, s, d = _patch_pair(g, st)
+    if s is None:
+        cv.add("  no audio sources or destinations", "dim")
+        return
+    room = max(1, body_h - 3 - 2)  # blank, status, blank-free legend (2 lines)
+    if st.patch_ports:
+        cv.add(f"  Ports: {s.label} → {d.label}", "title")
+        rows = pp.port_pairs(g, s, d)
+        st.patch_port = max(0, min(len(rows) - 1, st.patch_port))
+        for i in _window(len(rows), st.patch_port, room - 1):
+            a, b, on = rows[i]
+            sel = i == st.patch_port
+            row = cv.add(f"{'> ' if sel else '  '}{'●' if on else '·'} {a.name:<20} → {b.name}",
+                         "selected" if sel else "normal")
+            cv.hit(row, 0, cv.width, ("patch_port", i))
+        legend = PATCH_KEYS["ports"]
+    elif st.patch_view == "grid":
+        _render_patch_grid(cv, st, g, srcs, room)
+        legend = PATCH_KEYS["grid"]
+    else:
+        _render_patch_cols(cv, st, g, srcs, s, room)
+        legend = PATCH_KEYS["cols"]
+    cv.add("")
+    if st.patch_view == "cols" and st.patch_side == "src" and not st.patch_ports:
+        targets = g.targets(s)
+        cv.add(f"  {s.label} → {', '.join(x.label for x in targets)}" if targets
+               else f"  {s.label}: not connected", "alert" if targets else "dim")
+    else:
+        cv.add(_pair_status(g, s, d), "alert" if g.state(s, d) != "none" else "dim")
+    for line in legend:
+        cv.add(line, "dim")
+
+
+def _render_patch_cols(cv, st, g, srcs, s, room):
+    half = max(20, (cv.width - 3) // 2)
+    cv.add(f"  {'Sources':<{half - 2}}│ Destinations", "title")
+    left = list(_window(len(srcs), st.patch_src, room - 1))
+    right = list(_window(len(g.dests), st.patch_dst, room - 1))
+    for n in range(max(len(left), len(right))):
+        lt, rt = "", ""
+        if n < len(left):
+            i = left[n]
+            count = len(g.targets(srcs[i]))
+            mark = "> " if i == st.patch_src and st.patch_side == "src" else "* " if i == st.patch_src else "  "
+            lt = f"{mark}{_fit(srcs[i].label, half - 7):<{half - 7}} {('●' + str(count)) if count else '':>3}"
+        if n < len(right):
+            j = right[n]
+            mark = "> " if j == st.patch_dst and st.patch_side == "dst" else "  "
+            rt = f"{mark}{_STATE_MARK[g.state(s, g.dests[j])].replace('·', ' ')} {_fit(g.dests[j].label, half - 4)}"
+        selected = (n < len(left) and left[n] == st.patch_src and st.patch_side == "src")
+        row = cv.add(f"{lt:<{half}}│ {rt}", "selected" if selected else "normal")
+        if n < len(left):
+            cv.hit(row, 0, half, ("patch_src", left[n]))
+        if n < len(right):
+            cv.hit(row, half + 1, cv.width, ("patch_dst", right[n]))
+
+
+def _render_patch_grid(cv, st, g, srcs, room):
+    label_w = 30
+    cols_fit = max(1, (cv.width - label_w - 3) // 3)
+    cols = list(_window(len(g.dests), st.patch_dst, cols_fit))
+    key_rows = (len(cols) + 2) // 3
+    rows = list(_window(len(srcs), st.patch_src, max(1, room - 2 - key_rows)))
+    cv.add(" " * (label_w + 2) + "".join(f"{j + 1:>3}" for j in cols), "title")
+    for i in rows:
+        cells = ""
+        for j in cols:
+            mark = _STATE_MARK[g.state(srcs[i], g.dests[j])]
+            cells += f"[{mark}]" if (i, j) == (st.patch_src, st.patch_dst) else f" {mark} "
+        sel = i == st.patch_src
+        row = cv.add(f"{'> ' if sel else '  '}{_fit(srcs[i].label, label_w):<{label_w}}{cells}",
+                     "selected" if sel else "normal")
+        for k, j in enumerate(cols):
+            c0 = 2 + label_w + 3 * k
+            cv.hit(row, c0, c0 + 3, ("patch_cell", i, j))
+    cv.add("")
+    for start in range(0, len(cols), 3):
+        cv.add("  " + "".join(f"{j + 1:>3} {_fit(g.dests[j].label, 30):<31}" for j in cols[start:start + 3]), "dim")
