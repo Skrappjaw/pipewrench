@@ -798,20 +798,27 @@ class Tui:
             _run(self.runner, action[1])
             verb = {"set-default": "default set", "set-volume": "volume", "set-mute": "mute toggled"}
             self.st.message = verb.get(action[1][1], " ".join(action[1]))
-        elif kind == "dev_prompt_label":
+        elif kind == "dev_rename":
             name, old = action[1], action[2]
-            label = self._prompt(scr, f"label for {old} (empty clears a label, Esc-Enter keeps it):")
-            self._save_config(pcfg.set_label(c, name, label or None),
-                              f"label saved for {old}; A applies it" if label else f"label cleared for {old}; A applies it")
-        elif kind == "dev_prompt_profile":
-            card = inv.find_card(action[1])
-            choices = ", ".join(f"{p.index} {p.name}" for p in card.profiles)
-            answer = self._prompt(scr, f"profile for {card.label} ({choices}; empty cancels):")
-            if not answer:
-                self.st.message = "cancelled"
+            label = self._prompt(scr, f"new name for {old} (empty keeps it):")
+            if not label or label == old:
+                self.st.message = "name unchanged"
                 return
-            _run(self.runner, pi.profile_cmd(card, answer))
-            self.st.message = f"{card.label} switched to {answer}"
+            c = pcfg.set_label(c, name, label)
+            pcfg.save_config(pcfg.config_path(), c)
+            for path, text, _ in _generated(self.runner, c, self.wp_version):
+                pcfg.write_generated(path, text)
+            if any(b["name"] == name for b in c["buses"]):
+                self.st.message = f"renamed {old} to {label}; a bus shows its new name after the next login"
+            else:
+                self.st.message = f"renamed {old} to {label}"
+                self.st.confirm = ("restart_labels",)  # labels only show once WirePlumber reloads its rules
+        elif kind == "dev_profile":
+            _, card_id, index, profile = action
+            _run(self.runner, ["wpctl", "set-profile", str(card_id), str(index)])
+            self.st.message = f"switched to {profile}"
+        elif kind == "dev_bus_create":
+            self.st.message = _bus_add(self.runner, c, inv, action[1])
         elif kind == "dev_hide":
             c = pcfg.toggle_hidden(c, action[1])
             self._save_config(c, f"{'hidden' if action[1] in c['hidden'] else 'shown'}; H shows hidden rows")

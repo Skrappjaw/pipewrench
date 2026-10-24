@@ -310,6 +310,8 @@ class UIState:
     dev_cursor: int = 0
     dev_show_hidden: bool = False
     dev_monitors: bool = False
+    dev_menu: tuple = None       # ("row", node name) | ("card", id) | ("pending", bus name)
+    dev_menu_cursor: int = 0
     patch_view: str = "cols"     # cols | grid
     patch_side: str = "src"      # src | dst (column view)
     patch_src: int = 0
@@ -333,7 +335,8 @@ def handle_key(st, key, current, presets, devices=None, patch=None):
             kind = st.confirm
             st.confirm = None
             # confirm tuples name their action, except the two v1 ones
-            return st, [{"restart": ("restart_wireplumber",), "delete": ("delete_preset", *kind[1:])}.get(kind[0], kind)]
+            return st, [{"restart": ("restart_wireplumber",), "restart_labels": ("restart_wireplumber",),
+                         "delete": ("delete_preset", *kind[1:])}.get(kind[0], kind)]
         # Any other key cancels: a missed prompt that swallowed keys looked like a frozen screen.
         st.confirm, st.message = None, "cancelled" if key in ("n", "esc") else "cancelled (y confirms)"
         return st, []
@@ -432,6 +435,7 @@ def _dev_lines(devices, st):
     lines.append(("virtual", None))
     lines += rows(inv.virtual)
     lines += [("pending", b) for b in devices["pending"]]
+    lines.append(("addbus", None))
     return lines
 
 
@@ -442,6 +446,8 @@ def dev_selectable(devices, st):
 def _key_devices(st, key, devices):
     if devices is None:
         return st, []
+    if st.dev_menu:
+        return _key_menu(st, key, devices)
     if key == "a":
         return st, [("dev_prompt_bus",)]
     if key == "v":
@@ -476,19 +482,18 @@ def _key_devices(st, key, devices):
             return st, []
         return st, [("dev_cmd", cmd)]
     elif key == "enter":
-        if kind == "pending":
-            return st, [("dev_prompt_label", obj["name"], obj["label"])]
-        if kind == "row" and obj.kind != "monitor":
-            return st, [("dev_prompt_label", obj.name, obj.label)]
-        st.message = "Enter labels a device row; p switches this card's profile"
+        if kind == "addbus":
+            return st, [("dev_prompt_bus",)]
+        _open_menu(st, kind, obj)
     elif key == "p":
         card_id = obj.id if kind == "card" else obj.card_id if kind == "row" else None
-        if card_id is None:
+        card = next((c for c in devices["inv"].cards if c.id == card_id), None)
+        if card is None:
             st.message = "virtual devices have no card profile"
             return st, []
-        return st, [("dev_prompt_profile", card_id)]
+        _open_menu(st, "card", card)
     elif key == "h":
-        if kind == "pending":
+        if kind in ("pending", "addbus"):
             st.message = "a pending bus isn't running yet; x deletes it"
             return st, []
         return st, [("dev_hide", obj.name)]
@@ -536,8 +541,11 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
         keys = ["enter"] if event == "double" else []
     elif kind == "toplist":
         keys = {"wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
+    elif kind == "dev_menu_item":
+        st = dataclasses.replace(st, dev_menu_cursor=target[1])
+        keys = ["enter"] if event in ("click", "double") else []
     elif kind == "device":
-        st = dataclasses.replace(st, dev_cursor=target[1])
+        st = dataclasses.replace(st, dev_cursor=target[1], dev_menu=None)
         keys = {"double": ["enter"], "wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
     elif kind in ("patch_src", "patch_dst"):
         side = "src" if kind == "patch_src" else "dst"
@@ -592,9 +600,13 @@ def _buttons(cv, labels):
         cv.hit(row, c0, c1, ("button", target))
 
 
-def _confirm_question(confirm):
+def _confirm_question(confirm, devices=None):
     kind, arg = confirm[0], (confirm[1] if len(confirm) > 1 else None)
+    if kind == "dev_profile":
+        card = next((c for c in (devices or {"inv": pi.Inventory([], [], {})})["inv"].cards if c.id == arg), None)
+        return f"Switch {card.label if card else 'the card'} to {confirm[3]}? Audio on that card drops for a moment."
     return {"restart": "Restart WirePlumber?",
+            "restart_labels": "Restart WirePlumber now to show it? Apps like Discord may lose their audio.",
             "delete": f"Delete preset {arg!r}?",
             "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now."}[kind]
 
@@ -623,7 +635,7 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     while len(cv.lines) < height - 1:
         cv.add("")
     if st.confirm:
-        cv.add(f" {_confirm_question(st.confirm)} y/n", "alert")
+        cv.add(f" {_confirm_question(st.confirm, devices)} y/n", "alert")
     else:
         cv.add(f" {st.message}" if st.message else f" {HELP[st.tab]}", "alert" if st.message else "dim")
     return cv.lines, cv.hits
@@ -692,10 +704,10 @@ def _render_presets(cv, st, current, block, presets, body_h):
 
 # Always on screen in the Devices tab; the bottom help line is too narrow and gives way to messages.
 DEVICE_KEYS = [
-    "  Keys: ↑↓ select  d default  ←→ volume  Space mute  Enter label  p profile",
-    "        t test  h hide  H show hidden  m monitors  a add bus  x delete bus",
-    "        v preview  A apply  R restart WirePlumber  Tab/1-5 tabs  q quit",
+    "  Keys: ↑↓ select  Enter actions  ←→ volume  Space mute  d default",
+    "        m monitors  H show hidden  R restart WirePlumber  Tab/1-5 tabs  q quit",
 ]
+MENU_KEYS = ["  Keys: ↑↓ choose  Enter pick  Esc back", ""]
 
 
 def _fit(text, width):
@@ -708,6 +720,8 @@ def _device_line_text(kind, obj, devices, selected):
         return f"{prefix}{obj.label} · profile {obj.active or '?'}", "title"
     if kind == "virtual":
         return "  Virtual", "title"
+    if kind == "addbus":
+        return f"{prefix}+ Add bus…", "dim"
     if kind == "pending":
         return f"{prefix}+ duplex {_fit(obj['label'], 30):<30} pending: A creates it  {obj['name']}", "dim"
     c = devices["config"]
@@ -729,27 +743,34 @@ def _render_devices(cv, st, devices, body_h):
     lines, n_sel = [], 0
     selectable = dev_selectable(devices, st)
     cursor = max(0, min(len(selectable) - 1, st.dev_cursor)) if selectable else -1
+    menu_at = None
     for kind, obj in _dev_lines(devices, st):
         idx = None if kind == "virtual" else n_sel
         text, style = _device_line_text(kind, obj, devices, idx == cursor)
         lines.append((text, "selected" if idx == cursor else style, idx))
         if idx is not None:
             n_sel += 1
+        if idx == cursor and _menu_target(devices, st) is not None:
+            title = obj.label if kind in ("row", "card") else obj["name"]
+            lines += _menu_lines(devices, st, title)
+            menu_at = len(lines) - 1
     room = max(1, body_h - 3 - len(DEVICE_KEYS))  # blank line, buttons, note and key legend sit below
-    at = next((n for n, line in enumerate(lines) if line[1] == "selected"), 0)
+    at = menu_at if menu_at is not None else next((n for n, line in enumerate(lines) if line[1] == "selected"), 0)
     start = 0 if at < room else at - room + 1
     for text, style, idx in lines[start:start + room]:
         row = cv.add(text, style)
-        if idx is not None:
+        if isinstance(idx, tuple):
+            cv.hit(row, 4, cv.width, ("dev_menu_item", idx[1]))
+        elif idx is not None:
             cv.hit(row, 0, cv.width, ("device", idx))
     cv.add("")
-    _buttons(cv, [("dev_default", "Default"), ("dev_mute", "Mute"), ("dev_label", "Label"),
+    _buttons(cv, [("dev_default", "Default"), ("dev_mute", "Mute"), ("dev_label", "Actions"),
                   ("dev_profile", "Profile"), ("dev_add_bus", "Add bus"), ("dev_apply", "Apply")])
     if devices["dirty"]:
         cv.add("  * label or clock changes not written yet; A writes them (no restart)", "alert")
     else:
         cv.add("  generated files match devices.json", "dim")
-    for line in DEVICE_KEYS:
+    for line in (MENU_KEYS if st.dev_menu else DEVICE_KEYS):
         cv.add(line, "dim")
 
 
@@ -964,3 +985,103 @@ def _render_port_matrix(cv, st, g, s, d, room):
         for k, j in enumerate(cols):
             c0 = 2 + row_w + cell_w * k
             cv.hit(row, c0, c0 + cell_w, ("patch_pcell", i, j))
+
+
+# --- Devices tab: Enter-driven action menus ------------------------------------------------
+
+def _menu_target(devices, st):
+    """The (kind, obj) the open menu belongs to, or None if it has gone away."""
+    if not st.dev_menu:
+        return None
+    kind, ref = st.dev_menu
+    for k, obj in dev_selectable(devices, st):
+        if k == kind == "row" and obj.name == ref:
+            return k, obj
+        if k == kind == "card" and obj.id == ref:
+            return k, obj
+        if k == kind == "pending" and obj["name"] == ref:
+            return k, obj
+    return None
+
+
+def dev_menu_items(devices, st):
+    """[(label, op)] for the open menu."""
+    target = _menu_target(devices, st)
+    if target is None:
+        return []
+    kind, obj = target
+    hidden = set(devices["config"]["hidden"])
+    if kind == "card":
+        items = [(f"{'●' if p.name == obj.active else '○'} {p.name}", ("profile", p.index, p.name)) for p in obj.profiles]
+        return items + [("Unhide card" if obj.name in hidden else "Hide card", ("hide", obj.name)), ("Back", ("back",))]
+    if kind == "pending":
+        return [("Create now", ("create", obj["name"])), ("Rename…", ("rename", obj["name"], obj["label"])),
+                ("Delete bus", ("delete", obj["name"])), ("Back", ("back",))]
+    hide = ("Unhide" if obj.name in hidden else "Hide", ("hide", obj.name))
+    if obj.kind == "monitor":
+        return [hide, ("Back", ("back",))]
+    items = [("Rename…", ("rename", obj.name, obj.label)), ("Make default", ("default",)),
+             ("Unmute" if obj.mute else "Mute", ("mute",))]
+    if obj.direction in ("out", "duplex"):
+        items.append(("Test sound", ("test", obj.name)))
+    items.append(hide)
+    if obj.kind == "virtual":
+        items.append(("Delete bus", ("delete", obj.name)))
+    return items + [("Back", ("back",))]
+
+
+def _open_menu(st, kind, obj):
+    if kind == "card":
+        st.dev_menu = ("card", obj.id)
+        names = [p.name for p in obj.profiles]
+        st.dev_menu_cursor = names.index(obj.active) if obj.active in names else 0
+    else:
+        st.dev_menu = (kind, obj.name if kind == "row" else obj["name"])
+        st.dev_menu_cursor = 0
+
+
+def _key_menu(st, key, devices):
+    items = dev_menu_items(devices, st)
+    if not items:
+        st.dev_menu = None
+        return st, []
+    st.dev_menu_cursor = max(0, min(len(items) - 1, st.dev_menu_cursor))
+    if key in ("up", "down"):
+        st.dev_menu_cursor = max(0, min(len(items) - 1, st.dev_menu_cursor + (1 if key == "down" else -1)))
+        return st, []
+    target = _menu_target(devices, st)
+    st.dev_menu = None
+    if key != "enter":
+        return st, []  # Esc, ← or any other key closes the menu, like a cancelled prompt
+    op = items[st.dev_menu_cursor][1]
+    obj = target[1]
+    if op[0] == "rename":
+        return st, [("dev_rename", op[1], op[2])]
+    if op[0] in ("default", "mute"):
+        try:
+            return st, [("dev_cmd", (pi.default_cmd if op[0] == "default" else pi.mute_cmd)(obj))]
+        except ValueError as e:
+            st.message = str(e)
+            return st, []
+    if op[0] == "test":
+        return st, [("dev_test", op[1])]
+    if op[0] == "hide":
+        return st, [("dev_hide", op[1])]
+    if op[0] == "delete":
+        st.confirm = ("dev_delete_bus", op[1])
+    elif op[0] == "create":
+        return st, [("dev_bus_create", op[1])]
+    elif op[0] == "profile" and op[2] != obj.active:
+        st.confirm = ("dev_profile", obj.id, op[1], op[2])
+    return st, []
+
+
+def _menu_lines(devices, st, title):
+    items = dev_menu_items(devices, st)
+    inner = max(24, max((len(label) for label, _ in items), default=0) + 4, len(title) + 4)
+    lines = [(f"    ┌─ {title} " + "─" * max(0, inner - len(title) - 3) + "┐", "title", None)]
+    for k, (label, _) in enumerate(items):
+        sel = k == st.dev_menu_cursor
+        lines.append((f"    │ {'> ' if sel else '  '}{label:<{inner - 4}} │", "selected" if sel else "normal", ("menu", k)))
+    lines.append(("    └" + "─" * (inner + 1) + "┘", "title", None))
+    return lines

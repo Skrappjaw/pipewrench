@@ -101,25 +101,26 @@ An inventory of every audio card, sink, source and bus on the system, read from 
   multichannel interface such as the BOSS GCS-8 (see github.com/Skrappjaw/gcs-8-linux) therefore
   reads in channel order.
 
-Two kinds of keys:
+**Everything starts with Enter.** Select something with ↑↓, press Enter, and pick from its menu with
+↑↓ and Enter. Esc or ← closes the menu, and so does any other key.
 
-| Act at once | |
+| Selected | Its menu |
 |---|---|
-| d | make the selected device the default output or input |
-| ← → | volume −5% / +5% |
-| Space | mute toggle |
-| p | switch the card's profile (prompts with the list; on a card heading or any of its rows) |
-| t | play a 1-second quiet noise burst on an output |
-| a | add a bus: created live, and kept in `devices.json` and the drop-in so it returns at every login |
-| x | delete a virtual bus, after y/n: removed live and forgotten, even one pwctl didn't make |
+| a device | Rename…, Make default, Mute/Unmute, Test sound (outputs), Hide |
+| a bus | the same, plus Delete bus (after y/n) |
+| a pending bus | Create now, Rename…, Delete bus |
+| a card heading | its profiles (● is active; picking one asks y/n, since it interrupts that card), Hide card |
+| + Add bus… | asks for a name and creates it live |
 
-| Labels and view (no restart) | |
-|---|---|
-| Enter | label the device (empty clears). Apps show the label; the node name never changes, so they keep their picks |
-| h | hide or unhide the row or card (pwctl only, saved at once) |
-| v | preview the generated files in `$PAGER` |
-| A | write the generated files; nothing restarts |
-| R | restart WirePlumber now, after y/n, to show new labels |
+- **Rename** saves the label and writes the label file, then asks "Restart WirePlumber now to show it?"
+  (y/n), because labels only appear after WirePlumber reloads. A bus shows its new name after the next
+  login.
+- **Without opening a menu:** ←→ change the volume.
+- **Shortcuts for the menu items:**
+  - `d` make default, `Space` mute, `t` test
+  - `p` the card's profile menu
+  - `h` hide, `a` add bus, `x` delete bus
+  - `v` preview, `A` write files, `R` restart WirePlumber
 
 View toggles: **H** shows hidden rows (dimmed), **m** adds a "(monitor)" input per output, as
 capture apps such as OBS see them.

@@ -127,3 +127,24 @@ def test_patch_tab_shows_both_views(app):
     app.expect("Ports:")
     app.send("q")
     assert app.wait_exit() == 0
+
+
+def test_devices_rename_is_enter_enter_type_enter(app, tmp_path):
+    app.expect("Force sample rate")
+    app.send("4")
+    app.expect("GCS-8 · profile HiFi")
+    app.send("\x1bOB")          # Built-in Audio -> DualShock card
+    app.send("\x1bOB")          # -> DualShock output row
+    app.send("\r")              # Enter: actions
+    app.expect("Rename")
+    app.send("\r")              # Enter: Rename…
+    app.expect("new name")
+    app.send("Pad\r")           # type, Enter
+    app.expect("Restart WirePlumber now")
+    app.send("n")
+    app.send("q")
+    assert app.wait_exit() == 0
+    saved = json.loads((tmp_path / "pwctl" / "devices.json").read_text())
+    assert list(saved["labels"].values()) == ["Pad"]
+    lua = (tmp_path / "wireplumber" / "main.lua.d" / "51-pwctl-labels.lua").read_text()
+    assert '"Pad"' in lua

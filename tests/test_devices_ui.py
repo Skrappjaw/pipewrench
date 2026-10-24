@@ -97,16 +97,6 @@ def test_clash_tag_on_bus_made_outside_pwctl():
     assert "outside pwctl" in next(line for line in text.splitlines() if "SYSTEM" in line)
 
 
-def test_legend_fits_80_and_lists_every_key():
-    lines, _ = screen(pc.UIState(tab="devices", message="hello"), width=80)
-    text = body(lines)
-    for k in ("↑↓", "d default", "←→ volume", "Space mute", "Enter label", "p profile", "t test",
-              "h hide", "H show hidden", "m monitors", "a add bus", "x delete bus", "v preview", "A apply",
-              "R restart", "q quit"):
-        assert k in text, k
-    assert all(len(t.rstrip()) <= 80 for t, _ in lines)
-
-
 def test_scrolls_to_keep_cursor_visible():
     st = at("VOIP_MIC")
     lines, _ = screen(st, height=20)
@@ -143,8 +133,9 @@ def test_monitor_rows_refuse_commands():
 
 def test_profile_from_card_or_its_row():
     gcs = INV.find_card("GCS-8")
-    assert key(at("GCS-8"), "p")[1] == [("dev_prompt_profile", gcs.id)]
-    assert key(at(CH2_IN), "p")[1] == [("dev_prompt_profile", gcs.id)]
+    for target in ("GCS-8", CH2_IN):          # p opens the card's profile menu, same as Enter on its heading
+        st, actions = key(at(target), "p")
+        assert actions == [] and st.dev_menu == ("card", gcs.id)
     st, actions = key(at("SYSTEM"), "p")
     assert actions == [] and "card" in st.message
 
@@ -156,13 +147,6 @@ def test_test_noise_on_outputs_only():
 
 
 # --- keys: config edits ------------------------------------------------------------------
-
-def test_enter_labels_rows_and_pending_buses():
-    assert key(at(CH2_IN), "enter")[1] == [("dev_prompt_label", CH2_IN, "GCS-8 CH 2")]
-    c = pcfg.add_bus(pcfg.default_config(), "OBS")
-    d = dv(c, pending=c["buses"])
-    assert key(at("OBS", d), "enter", devices=d)[1] == [("dev_prompt_label", "OBS", "OBS")]
-
 
 def test_hide_rows_and_cards():
     assert key(at(CH2_IN), "h")[1] == [("dev_hide", CH2_IN)]
@@ -202,19 +186,9 @@ def click(st, target, event="click"):
     return pc.handle_mouse(st, hits, row, c0, event, CUR, [], devices=dv())
 
 
-def test_click_selects_double_click_labels_wheel_moves():
-    i = pc.dev_selectable(dv(), pc.UIState(tab="devices")).index(("row", INV.find(CH2_IN)))
-    st, actions = click(pc.UIState(tab="devices"), ("device", i))
-    assert st.dev_cursor == i and actions == []
-    _, actions = click(pc.UIState(tab="devices"), ("device", i), "double")
-    assert actions == [("dev_prompt_label", CH2_IN, "GCS-8 CH 2")]
-    st, _ = click(pc.UIState(tab="devices"), ("device", 0), "wheel_down")
-    assert st.dev_cursor == 1
-
-
 def test_buttons_land_on_labels():
     lines, hits = screen(pc.UIState(tab="devices"))
-    for target, label in (("dev_default", "[Default]"), ("dev_mute", "[Mute]"), ("dev_label", "[Label]"),
+    for target, label in (("dev_default", "[Default]"), ("dev_mute", "[Mute]"), ("dev_label", "[Actions]"),
                           ("dev_profile", "[Profile]"), ("dev_add_bus", "[Add bus]"), ("dev_apply", "[Apply]")):
         r, c0, c1 = hit_for(hits, ("button", target))
         assert lines[r][0][c0:c1] == label
@@ -228,3 +202,148 @@ def test_rows_show_connections():
     text = body(pc.render_screen(pc.UIState(tab="devices"), CUR, None, [], 120, 50, devices=d)[0])
     assert "← Brave" in next(line for line in text.splitlines() if "GCS-8 CH USB" in line and " out " in line)
     assert "→ cinnamon" in next(line for line in text.splitlines() if "GCS-8 CH 2 " in line)
+
+
+def test_legend_leads_with_enter_and_fits_80():
+    lines, _ = screen(pc.UIState(tab="devices", message="hello"), width=80)
+    text = body(lines)
+    for k in ("↑↓ select", "Enter actions", "←→ volume", "m monitors", "H show hidden", "q quit"):
+        assert k in text, k
+    assert all(len(t.rstrip()) <= 80 for t, _ in lines)
+
+
+# --- Enter-driven action menus --------------------------------------------------------------
+
+def open_menu(target, devices=None):
+    d = devices or dv()
+    st, actions = key(at(target, d), "enter", devices=d)
+    assert actions == [] and st.dev_menu is not None
+    return st, d
+
+
+def menu_labels(st, d):
+    return [label for label, _ in pc.dev_menu_items(d, st)]
+
+
+def pick(st, d, label):
+    items = menu_labels(st, d)
+    st = pc.dataclasses.replace(st, dev_menu_cursor=items.index(label))
+    return key(st, "enter", devices=d)
+
+
+def test_enter_on_a_hardware_output_opens_its_actions():
+    st, d = open_menu(CH3_OUT)
+    assert menu_labels(st, d) == ["Rename…", "Make default", "Mute", "Test sound", "Hide", "Back"]
+    text = body(screen(st, d, height=60)[0])
+    assert "Rename…" in text and "Make default" in text
+
+
+def test_input_has_no_test_sound_and_muted_says_unmute():
+    st, d = open_menu(CH2_IN)
+    assert "Test sound" not in menu_labels(st, d)
+    muted = pc.devices_view(pi.Inventory([pi.Card(1, "c", "Card", [], "on", [pi.Row(5, "n", "Mic", "in", "hardware",
+                            card_id=1, mute=True)])], [], {"sink": None, "source": None}), pcfg.default_config())
+    st2, _ = key(pc.UIState(tab="devices", dev_cursor=1), "enter", devices=muted)
+    assert "Unmute" in menu_labels(st2, muted)
+
+
+def test_menu_actions_map_to_the_same_commands():
+    st, d = open_menu(CH2_IN)
+    st2, actions = pick(st, d, "Make default")
+    assert actions == [("dev_cmd", ["wpctl", "set-default", "96"])] and st2.dev_menu is None
+    _, actions = pick(st, d, "Mute")
+    assert actions == [("dev_cmd", ["wpctl", "set-mute", "96", "toggle"])]
+    _, actions = pick(st, d, "Hide")
+    assert actions == [("dev_hide", CH2_IN)]
+    _, actions = pick(open_menu(CH3_OUT)[0], d, "Test sound")
+    assert actions == [("dev_test", CH3_OUT)]
+
+
+def test_rename_asks_for_the_label():
+    st, d = open_menu(CH2_IN)
+    _, actions = pick(st, d, "Rename…")
+    assert actions == [("dev_rename", CH2_IN, "GCS-8 CH 2")]
+
+
+def test_bus_menu_adds_delete_with_confirm():
+    st, d = open_menu("VOIP")
+    assert menu_labels(st, d)[-2:] == ["Delete bus", "Back"]
+    st2, actions = pick(st, d, "Delete bus")
+    assert actions == [] and st2.confirm == ("dev_delete_bus", "VOIP")
+
+
+def test_pending_bus_menu():
+    c = pcfg.add_bus(pcfg.default_config(), "OBS")
+    d = dv(c, pending=c["buses"])
+    st, _ = open_menu("OBS", d)
+    assert menu_labels(st, d) == ["Create now", "Rename…", "Delete bus", "Back"]
+    _, actions = pick(st, d, "Create now")
+    assert actions == [("dev_bus_create", "OBS")]
+
+
+def test_card_heading_lists_profiles_and_switches_after_confirm():
+    st, d = open_menu("GCS-8")
+    items = menu_labels(st, d)
+    assert items[:4] == ["○ off", "● HiFi", "○ Direct", "○ pro-audio"] and items[-2:] == ["Hide card", "Back"]
+    st2, actions = pick(st, d, "○ pro-audio")
+    assert actions == [] and st2.confirm == ("dev_profile", 95, 3, "pro-audio")
+    assert "Switch GCS-8 to pro-audio?" in body(screen(st2, d)[0])
+    assert key(st2, "y", devices=d)[1] == [("dev_profile", 95, 3, "pro-audio")]
+
+
+def test_picking_the_active_profile_just_closes():
+    st, d = open_menu("GCS-8")
+    st2, actions = pick(st, d, "● HiFi")
+    assert actions == [] and st2.confirm is None and st2.dev_menu is None
+
+
+def test_add_bus_row_at_the_end():
+    entries = pc.dev_selectable(dv(), pc.UIState(tab="devices"))
+    assert entries[-1] == ("addbus", None)
+    st = pc.UIState(tab="devices", dev_cursor=len(entries) - 1)
+    assert "+ Add bus…" in body(screen(st, height=60)[0])
+    assert key(st, "enter")[1] == [("dev_prompt_bus",)]
+
+
+def test_menu_navigation_and_closing():
+    st, d = open_menu(CH3_OUT)
+    st, _ = key(st, "down", "down", devices=d)
+    assert st.dev_menu_cursor == 2
+    st, _ = key(st, "up", devices=d)
+    assert st.dev_menu_cursor == 1
+    for k in ("esc", "left", "x"):
+        st2, actions = key(st, k, devices=d)
+        assert st2.dev_menu is None and actions == []
+    _, actions = pick(st, d, "Back")
+    assert actions == []
+
+
+def test_menu_follows_the_row_not_a_stale_index():
+    st, d = open_menu(CH3_OUT)
+    assert st.dev_menu == ("row", CH3_OUT)
+
+
+def test_click_on_a_menu_item_picks_it():
+    st, d = open_menu(CH2_IN)
+    lines, hits = screen(st, d, height=60)
+    k = menu_labels(st, d).index("Make default")
+    row, c0, _ = hit_for(hits, ("dev_menu_item", k))
+    _, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, [], devices=d)
+    assert actions == [("dev_cmd", ["wpctl", "set-default", "96"])]
+
+
+def test_click_selects_double_click_opens_actions_wheel_moves():
+    i = pc.dev_selectable(dv(), pc.UIState(tab="devices")).index(("row", INV.find(CH2_IN)))
+    st, actions = click(pc.UIState(tab="devices"), ("device", i))
+    assert st.dev_cursor == i and actions == []
+    st, actions = click(pc.UIState(tab="devices"), ("device", i), "double")
+    assert actions == [] and st.dev_menu == ("row", CH2_IN)
+    st, _ = click(pc.UIState(tab="devices"), ("device", 0), "wheel_down")
+    assert st.dev_cursor == 1
+
+
+def test_rename_restart_question_warns_about_apps():
+    st = pc.UIState(tab="devices", confirm=("restart_labels",))
+    text = body(screen(st)[0])
+    assert "Restart WirePlumber now" in text and "Discord" in text
+    assert key(st, "y")[1] == [("restart_wireplumber",)]
