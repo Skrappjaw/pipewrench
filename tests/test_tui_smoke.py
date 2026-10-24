@@ -144,6 +144,17 @@ def test_patch_tab_shows_both_views(app):
     assert app.wait_exit() == 0
 
 
+def test_mixer_enter_opens_a_menu_and_device_settings_lands_on_devices(app):
+    app.expect("Playback")      # pwctl opens on the Mixer, cursor on the first output
+    app.send("\r")              # Enter: actions, not the default
+    app.expect("Set as system default")
+    app.send("\x1bOB\x1bOB\x1bOB\r")  # ↓↓↓ Enter: Device settings…
+    app.expect("Rename")        # Devices, with that row's menu open
+    app.send("q")
+    app.send("q")
+    assert app.wait_exit() == 0
+
+
 def test_devices_rename_is_enter_enter_type_enter(app, tmp_path):
     app.expect("Playback")  # pwctl opens on the Mixer
     app.send(tab("settings"))
