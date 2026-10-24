@@ -754,6 +754,7 @@ class Tui:
             return
         owned, clash, pending = _bus_status(c, inv)
         self.devices = pc.devices_view(inv, c, dirty=dirty, owned=owned, clash=clash, pending=pending)
+        self.st = pc.focus_device(self.st, self.devices)  # Mixer → Device settings… lands on its row
 
     def _main(self, scr):
         c = self.curses
@@ -799,7 +800,7 @@ class Tui:
                 if action == ("quit",):
                     return
                 self._do(scr, action)
-            if self.st.tab == "devices" and self.devices is None:
+            if self.st.tab == "devices" and (self.devices is None or self.st.dev_focus):
                 self._refresh_devices()
             if self.st.tab == "patch" and self.patch is None:
                 self._refresh_patch()
@@ -979,6 +980,12 @@ class Tui:
                     else:
                         _run(self.runner, pi.volume_cmd(stream, action[1]))
                         self.st.message = f"{player.label} volume {action[1]}"
+            elif kind == "mix_test":
+                rows = [r for _, _, r in pc.mixer_selectable(self.mixer)] if self.mixer else []
+                row = next((r for r in rows if r.name == action[1]), None)
+                if row is None:
+                    raise LookupError(f"{action[1]} has gone away")
+                self.st.message = _play_noise(self.runner, row)
             elif kind == "mix_cmd":
                 _run(self.runner, action[1])
                 verb = {"set-default": "default set", "set-volume": "volume", "set-mute": "mute toggled"}

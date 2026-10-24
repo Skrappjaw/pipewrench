@@ -386,6 +386,8 @@ TAB_TITLES = {t: f"{n} {t.capitalize()}" for n, t in enumerate(TABS, start=1)}
 class UIState:
     tab: str = "mixer"
     mix_cursor: int = 0
+    mix_menu: tuple = None       # (section, node id) of the row whose menu is open
+    mix_menu_cursor: int = 0
     meters: bool = True          # live levels on the Mixer (v toggles)
     cursor: int = 0
     pending: dict = field(default_factory=dict)
@@ -395,6 +397,7 @@ class UIState:
     dev_monitors: bool = False
     dev_menu: tuple = None       # ("row", node name) | ("card", id) | ("pending", bus name)
     dev_menu_cursor: int = 0
+    dev_focus: str = None        # a node name to select on Devices with its menu open (Mixer → Device settings…)
     patch_view: str = "cols"     # cols | grid
     patch_side: str = "src"      # src | dst (column view)
     patch_src: int = 0
@@ -650,8 +653,11 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
         st = dataclasses.replace(st, cursor=PRESETS_ROW + target[1])
         keys = ["enter"] if event == "double" else []
     elif kind == "mix_row":
-        st = dataclasses.replace(st, mix_cursor=target[1])
+        st = dataclasses.replace(st, mix_cursor=target[1], mix_menu=None)
         keys = {"double": ["enter"], "wheel_up": ["right"], "wheel_down": ["left"]}.get(event, [])
+    elif kind == "mix_menu_item":
+        st = dataclasses.replace(st, mix_menu_cursor=target[1])
+        keys = ["enter"] if event in ("click", "double") else []
     elif kind == "toplist":
         keys = {"wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
     elif kind == "dev_menu_item":
@@ -685,7 +691,7 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
 TAB_KEYS = [(f"Tab/1-{len(TABS)}", "tabs"), ("q", "quit")]
 # (key, slug) pairs; Enter first wherever it acts. Drawn as a box of chips by _key_box.
 LEGENDS = {
-    "mixer": [("Enter", "make default"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"),
+    "mixer": [("Enter", "actions"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"),
               ("v", "meters")] + TAB_KEYS,
     "settings": [("Enter", "apply"), ("↑↓", "select"), ("←→", "change"), ("Esc", "revert"),
                  ("s", "save as preset"), ("R", "restart WirePlumber")] + TAB_KEYS,
@@ -695,6 +701,7 @@ LEGENDS = {
     "devices": [("Enter", "actions"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"), ("d", "default"),
                 ("m", "monitors"), ("H", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
     "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
+    "mixer menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
     "patch cols": [("Enter", "connect/disconnect"), ("↑↓", "select"), ("←→", "column"), ("p", "ports"),
                    ("g", "grid view"), ("m", "monitors")] + TAB_KEYS,
     "patch grid": [("Enter", "connect/disconnect"), ("↑↓", "source"), ("←→", "destination"), ("p", "ports"),
@@ -740,6 +747,8 @@ def _chip_key(label):
 def legend(st):
     if st.tab == "devices" and st.dev_menu:
         return LEGENDS["devices menu"]
+    if st.tab == "mixer" and st.mix_menu:
+        return LEGENDS["mixer menu"]
     if st.tab == "settings" and st.cursor >= PRESETS_ROW:
         return LEGENDS["presets"]
     if st.tab == "patch" and st.patch_menu:
@@ -1052,6 +1061,8 @@ def _is_default(mx, section, row):
 def _key_mixer(st, key, mx):
     if mx is None:
         return st, []
+    if st.mix_menu:
+        return _key_mix_menu(st, key, mx)
     items = mixer_selectable(mx)
     if not items:
         return st, []
@@ -1070,15 +1081,72 @@ def _key_mixer(st, key, mx):
                 st.message = st.failed = f"{row.label} can't be muted here"
                 return st, []
             return st, [("mix_cmd", pi.mute_cmd(row))]
-        elif key in ("enter", "d") and kind == "dev":
-            return st, [("mix_cmd", pi.default_cmd(row))]
-        elif key == "d":
-            st.message = st.failed = "only a device can be the default; apps follow it"
+        elif key == "enter":
+            if _mix_items(mx, kind, section, row):
+                st.mix_menu, st.mix_menu_cursor = (section, row.id), 0
+            else:
+                st.message = st.failed = f"{row.label} has nothing to set here"
         elif key == "v":
             st.meters = not st.meters
             st.message = "meters on" if st.meters else "meters off"
     except ValueError as e:
         st.message = st.failed = str(e)
+    return st, []
+
+
+def _mix_menu_target(mx, st):
+    """(index, kind, section, row) of the row the open menu belongs to, or None if it has gone away."""
+    if not st.mix_menu or mx is None:
+        return None
+    return next(((n, kind, section, row) for n, (kind, section, row) in enumerate(mixer_selectable(mx))
+                 if (section, row.id) == st.mix_menu), None)
+
+
+def _mix_items(mx, kind, section, row):
+    """[(label, op)] for a row's menu. Setting the default moves every app that follows it, so it's never
+    on a single key; it leads the menu so Enter, Enter still reaches it."""
+    mute = [("Unmute" if row.mute else "Mute", ("mute",))] if row.mute is not None else []
+    if kind == "app":
+        return mute + [("Back", ("back",))] if mute else []
+    items = [("★ System default", ("back",)) if _is_default(mx, section, row)
+             else ("Set as system default", ("default",))] + mute
+    if section == "playback" and row.direction in ("out", "duplex"):
+        items.append(("Test sound", ("test",)))
+    return items + [("Device settings…", ("settings",)), ("Back", ("back",))]
+
+
+def mix_menu_items(mx, st):
+    target = _mix_menu_target(mx, st)
+    return [] if target is None else _mix_items(mx, *target[1:])
+
+
+def _key_mix_menu(st, key, mx):
+    target = _mix_menu_target(mx, st)
+    items = mix_menu_items(mx, st)
+    if not items:
+        st.mix_menu = None
+        return st, []
+    st.mix_cursor = target[0]
+    st.mix_menu_cursor = max(0, min(len(items) - 1, st.mix_menu_cursor))
+    if key in ("up", "down"):
+        st.mix_menu_cursor = max(0, min(len(items) - 1, st.mix_menu_cursor + (1 if key == "down" else -1)))
+        return st, []
+    st.mix_menu = None
+    if key != "enter":
+        return st, []  # Esc or any other key closes the menu, like a cancelled prompt
+    op, row = items[st.mix_menu_cursor][1][0], target[3]
+    try:
+        if op == "default":
+            return st, [("mix_cmd", pi.default_cmd(row))]
+        if op == "mute":
+            return st, [("mix_cmd", pi.mute_cmd(row))]
+    except ValueError as e:
+        st.message = st.failed = str(e)
+        return st, []
+    if op == "test":
+        return st, [("mix_test", row.name)]
+    if op == "settings":
+        st.tab, st.dev_focus, st.dev_menu = "devices", row.name, None
     return st, []
 
 
@@ -1163,6 +1231,9 @@ def _render_mixer(cv, st, mx, body_h):
         return
     items = mixer_selectable(mx)
     st.mix_cursor = max(0, min(len(items) - 1, st.mix_cursor)) if items else 0
+    target = _mix_menu_target(mx, st)
+    if target:
+        st.mix_cursor = target[0]
     metered = mx.get("metered", {}) if st.meters else {}
     levels = mx.get("levels", {})
     label_w = max(20, min(44, cv.width - _BAR - 14 - (_METER + 2 if metered else 0)))
@@ -1194,15 +1265,21 @@ def _render_mixer(cv, st, mx, body_h):
             m0 = c0 + len(bar) + 2
             bar += "  " + cells
             spans += [(m0 + a, m0 + b, r) for a, b, r in cell_spans]
-        if sel:
-            spans = [(0, c0 - 1, "selected")] + spans  # the cursor bar covers the name; the volume keeps its colours
+        if sel:  # the cursor bar covers the name; the volume keeps its colours
+            spans = [(0, c0 - 1, "anchor" if target else "selected")] + spans
         out.append((head + bar, ("normal", spans), n_sel))
+        if sel and target:
+            out += _menu_box(row.label, [label for label, _ in mix_menu_items(mx, st)], st.mix_menu_cursor)
         n_sel += 1
     cursor_at = next((k for k, line in enumerate(out) if line[2] == st.mix_cursor), 0)
+    if target:  # keep the whole box in view: scroll to its foot
+        cursor_at = next(k for k in range(len(out) - 1, -1, -1) if isinstance(out[k][2], tuple)) + 1
     start = 0 if cursor_at < body_h else cursor_at - body_h + 1
     for text, style, idx in out[start:start + body_h]:
         row = cv.add(text, style)
-        if idx is not None:
+        if isinstance(idx, tuple):
+            cv.hit(row, 4, cv.width, ("mix_menu_item", idx[1]))
+        elif idx is not None:
             cv.hit(row, 0, cv.width, ("mix_row", idx))
 
 
@@ -1528,6 +1605,19 @@ def _open_menu(st, kind, obj):
     else:
         st.dev_menu = (kind, obj.name if kind == "row" else obj["name"])
         st.dev_menu_cursor = 0
+
+
+def focus_device(st, devices):
+    """Resolve dev_focus once Devices has loaded: put the cursor on that row and open its menu."""
+    if not st.dev_focus or devices is None:
+        return st
+    name, st = st.dev_focus, dataclasses.replace(st, dev_focus=None)
+    for i, (kind, obj) in enumerate(dev_selectable(devices, st)):
+        if kind == "row" and obj.name == name:
+            st.dev_cursor = i
+            _open_menu(st, kind, obj)
+            break
+    return st
 
 
 def _key_menu(st, key, devices):

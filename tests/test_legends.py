@@ -24,11 +24,13 @@ STATES = {
     "presets": pc.UIState(tab="settings", cursor=pc.PRESETS_ROW),  # a preset row inside Settings
     "devices": pc.UIState(tab="devices"),
     "devices menu": pc.UIState(tab="devices", dev_menu=("card", 95), dev_cursor=5),
+    "mixer": pc.UIState(tab="mixer"),
+    "mixer menu": pc.UIState(tab="mixer", mix_menu=("playback", 116)),
     "patch columns": pc.UIState(tab="patch"),
     "patch grid": pc.UIState(tab="patch", patch_view="grid"),
     "patch ports": pc.UIState(tab="patch", patch_ports=True, patch_side="dst"),
 }
-ENTER = {"settings": "apply", "presets": "apply", "devices": "actions", "devices menu": "pick",
+ENTER = {"mixer": "actions", "mixer menu": "pick", "settings": "apply", "presets": "apply", "devices": "actions", "devices menu": "pick",
          "patch columns": "connect/disconnect", "patch grid": "connect/disconnect", "patch ports": "link/unlink"}
 
 
@@ -80,7 +82,7 @@ def test_keys_are_chips_with_their_slug(name):
     assert all(k and s for k, s in pairs), pairs
 
 
-@pytest.mark.parametrize("name", [n for n in STATES if n != "devices menu"])
+@pytest.mark.parametrize("name", [n for n in STATES if not n.endswith(" menu")])
 def test_every_box_ends_with_tabs_and_quit(name):
     pairs = chips(render(STATES[name]))
     assert pairs[-2:] == [(f"Tab/1-{len(pc.TABS)}", "tabs"), ("q", "quit")]

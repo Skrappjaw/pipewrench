@@ -129,12 +129,111 @@ def test_arrows_step_volume_and_space_mutes():
     assert key(st, " ")[1] == [("mix_cmd", ["wpctl", "set-mute", str(play.id), "toggle"])]
 
 
-def test_enter_makes_a_device_the_default_but_not_an_app():
-    dev = pc.mixer_selectable(MX)[0][2]
-    assert key(pc.UIState(mix_cursor=0), "enter")[1] == [("mix_cmd", ["wpctl", "set-default", str(dev.id)])]
-    assert key(at("Discord"), "enter")[1] == []
-    st, actions = key(at("Discord"), "d")
-    assert actions == [] and st.message == st.failed
+def labels(st, m=MX):
+    return [label for label, _ in pc.mix_menu_items(m, st)]
+
+
+def row_at(st, m=MX):
+    return pc.mixer_selectable(m)[st.mix_cursor][2]
+
+
+def test_enter_opens_a_menu_and_enter_again_sets_the_system_default():
+    st, actions = key(at("GCS-8 CH 3-AUX"), "enter")
+    assert actions == [] and st.mix_menu == ("playback", row_at(st).id)
+    assert labels(st) == ["Set as system default", "Mute", "Test sound", "Device settings…", "Back"]
+    st, actions = key(st, "enter")
+    assert actions == [("mix_cmd", ["wpctl", "set-default", str(row_at(st).id)])] and st.mix_menu is None
+
+
+def test_the_current_default_says_so_and_picking_it_just_closes():
+    st, _ = key(at("GCS-8 CH USB"), "enter")
+    assert labels(st)[0] == "★ System default"
+    st, actions = key(st, "enter")
+    assert actions == [] and st.mix_menu is None
+
+
+def test_inputs_have_no_test_sound():
+    st, _ = key(at("GCS-8 CH 3", "recording"), "enter")
+    assert labels(st) == ["Set as system default", "Mute", "Device settings…", "Back"]
+
+
+def test_an_app_menu_mutes_and_d_is_no_longer_a_shortcut():
+    st, _ = key(at("Discord"), "enter")
+    assert labels(st) == ["Mute", "Back"]
+    _, actions = key(st, "enter")
+    assert actions == [("mix_cmd", ["wpctl", "set-mute", str(row_at(st).id), "toggle"])]
+    for target in ("Discord", "GCS-8 CH 3-AUX"):
+        st, actions = key(at(target), "d")
+        assert actions == [] and st.mix_menu is None
+
+
+def test_menu_items_map_to_their_actions():
+    st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
+    row = row_at(st)
+    assert key(st, "down", "enter")[1] == [("mix_cmd", ["wpctl", "set-mute", str(row.id), "toggle"])]
+    assert key(st, "down", "down", "enter")[1] == [("mix_test", row.name)]
+    st2, actions = key(st, "down", "down", "down", "enter")
+    assert actions == [] and st2.tab == "devices" and st2.dev_focus == row.name
+    st2, actions = key(st, "up", "enter")  # clamps on the first item
+    assert actions[0][1][1] == "set-default"
+    st2, actions = key(st, *["down"] * 9, "enter")  # Back
+    assert actions == [] and st2.mix_menu is None
+
+
+def test_any_other_key_closes_the_menu_without_acting():
+    for k in ("esc", "left", "right", " ", "v"):
+        st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
+        st, actions = key(st, k)
+        assert actions == [] and st.mix_menu is None, k
+
+
+def test_a_jack_client_with_nothing_to_do_opens_no_menu():
+    m = mx(with_reaper(DUMP))
+    st, actions = key(at("REAPER", m=m), "enter", m=m)
+    assert actions == [] and st.mix_menu is None and st.message == st.failed
+
+
+def test_menu_follows_its_row_not_a_stale_index():
+    st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
+    st = dataclasses.replace(st, mix_cursor=0)  # the list shifted under the open menu
+    assert labels(st)[0] == "Set as system default" and key(st, "enter")[1][0][1][-1] == str(
+        next(r.id for _, _, r in pc.mixer_selectable(MX) if r.label == "GCS-8 CH 3-AUX"))
+
+
+def test_device_settings_lands_on_the_row_with_its_menu_open():
+    inv = pi.inventory(DUMP)
+    devices = pc.devices_view(inv, pcfg.default_config())
+    st, _ = key(at("GCS-8 CH 3-AUX"), "enter", "down", "down", "down", "enter")
+    st = pc.focus_device(st, devices)
+    kind, obj = pc.dev_selectable(devices, st)[st.dev_cursor]
+    assert obj.label == "GCS-8 CH 3-AUX" and st.dev_menu == ("row", obj.name) and st.dev_focus is None
+
+
+def test_the_menu_box_sits_under_its_row_and_stays_in_view():
+    st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
+    lines, hits = screen(st)
+    text = [t for t, _ in lines]
+    row = next(i for i, t in enumerate(text) if "GCS-8 CH 3-AUX" in t and "█" in t)
+    assert "GCS-8 CH 3-AUX" in text[row + 1] and "> Set as system default" in text[row + 2]
+    assert lines[row][1][1][0][2] == "anchor"  # the row under an open menu is an anchor, not a cursor
+    st, _ = key(at("GCS-8 CH 4", "recording"), "enter")
+    lines, _ = screen(st, height=20)
+    assert any("Back" in t for t, _ in lines)
+
+
+def test_click_on_a_menu_item_picks_it():
+    st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
+    _, hits = screen(st)
+    row, c0, _ = next((r, a, b) for r, a, b, t in hits if t == ("mix_menu_item", 1))
+    _, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, [], mixer=MX)
+    assert actions[0][1][1] == "set-mute"
+
+
+def test_legend_leads_with_enter_actions_and_the_menu_has_its_own():
+    from test_legends import chips
+    assert chips(screen(pc.UIState())[0])[0] == ("Enter", "actions")
+    st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
+    assert chips(screen(st)[0])[0] == ("Enter", "pick")
 
 
 def test_no_volume_control_is_refused():
@@ -143,14 +242,16 @@ def test_no_volume_control_is_refused():
     assert actions == [] and "no volume control" in st.message and st.message == st.failed
 
 
-def test_wheel_changes_volume_and_double_click_is_enter():
+def test_wheel_changes_volume_and_double_click_opens_the_menu():
     st = pc.UIState()
     _, hits = screen(st)
     row, c0, _, _ = next(h for h in hits if h[3] == ("mix_row", 0))
     _, actions = pc.handle_mouse(st, hits, row, c0, "wheel_up", CUR, [], mixer=MX)
     assert actions[0][1][1] == "set-volume" and actions[0][1][-1] == "5%+"
-    _, actions = pc.handle_mouse(st, hits, row, c0, "double", CUR, [], mixer=MX)
-    assert actions[0][1][1] == "set-default"
+    st2, actions = pc.handle_mouse(st, hits, row, c0, "double", CUR, [], mixer=MX)
+    assert actions == [] and st2.mix_menu is not None
+    st3, _ = pc.handle_mouse(st2, hits, row, c0, "click", CUR, [], mixer=MX)
+    assert st3.mix_menu is None  # a click on a row closes the menu
 
 
 def test_up_down_clamp():
