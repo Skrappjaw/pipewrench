@@ -568,6 +568,7 @@ class Tui:
         self.devices = None
         self.wp_version = None
         self.patch = None
+        self.mixer = None
         self.lock = threading.Lock()
         self.proc = None
         self.hits = []
@@ -614,6 +615,21 @@ class Tui:
             self._refresh_devices()
         if self.st.tab == "patch":
             self._refresh_patch()
+        if self.st.tab == "mixer":
+            self._refresh_mixer()
+
+    def _refresh_mixer(self):
+        """Devices and app streams from one pw-dump; hidden rows come from devices.json."""
+        try:
+            c = pcfg.load_config(pcfg.config_path())
+            dump = _dump(self.runner)
+        except (ValueError, OSError) as e:
+            self.st.message = self.st.failed = f"devices.json problem: {e}"
+            return
+        except CliError as e:
+            self.st.message = self.st.failed = str(e)
+            return
+        self.mixer = pc.mixer_view(pi.inventory(dump), c, pi.streams(dump))
 
     def _refresh_patch(self):
         try:
@@ -670,12 +686,13 @@ class Tui:
                 if not event:
                     continue
                 self.st, actions = pc.handle_mouse(self.st, self.hits, y, x, event, self.current, self.presets,
-                                                   self.devices, self.patch)
+                                                   self.devices, self.patch, self.mixer)
             else:
                 key = self._key(ch)
                 if not key:
                     continue
-                self.st, actions = pc.handle_key(self.st, key, self.current, self.presets, self.devices, self.patch)
+                self.st, actions = pc.handle_key(self.st, key, self.current, self.presets, self.devices, self.patch,
+                                                 self.mixer)
             for action in actions:
                 if action == ("quit",):
                     return
@@ -684,6 +701,8 @@ class Tui:
                 self._refresh_devices()
             if self.st.tab == "patch" and self.patch is None:
                 self._refresh_patch()
+            if self.st.tab == "mixer" and self.mixer is None:
+                self._refresh_mixer()
 
     # Without colour the roles fall back to attributes; the > and * markers carry the rest.
     _PLAIN = {"selected": "reverse bold", "anchor": "underline", "chip": "reverse", "title": "bold",
@@ -755,7 +774,7 @@ class Tui:
         with self.lock:
             block = self.block
         lines, self.hits = pc.render_screen(self.st, self.current, block, self.presets, w, h, self.devices,
-                                            self.patch)
+                                            self.patch, self.mixer)
         scr.erase()
         for y, (text, style) in enumerate(lines):
             try:
@@ -827,6 +846,10 @@ class Tui:
                 self._apply_theme(scr)  # may replace the message: a theme the terminal can't show
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
+            elif kind == "mix_cmd":
+                _run(self.runner, action[1])
+                verb = {"set-default": "default set", "set-volume": "volume", "set-mute": "mute toggled"}
+                self.st.message = verb.get(action[1][1], " ".join(action[1]))
             elif kind == "patch_cmds":
                 for cmd in action[1]:
                     _run(self.runner, cmd)

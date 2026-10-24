@@ -82,6 +82,8 @@ def app(tmp_path):
 
 
 def test_tab_key_mouse_click_and_quit(app):
+    app.expect("Playback")  # pwctl opens on the Mixer
+    app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send("\t")
     app.expect("QUANT")
@@ -94,6 +96,8 @@ def test_tab_key_mouse_click_and_quit(app):
 
 
 def test_save_preset_via_prompt(app, tmp_path):
+    app.expect("Playback")  # pwctl opens on the Mixer
+    app.send(tab("settings"))
     app.expect("Force sample rate")
     app.expect("no presets")  # Presets sit inside Settings
     app.send("s")
@@ -108,6 +112,8 @@ def test_save_preset_via_prompt(app, tmp_path):
 
 
 def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
+    app.expect("Playback")  # pwctl opens on the Mixer
+    app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send(tab("devices"))
     app.expect("GCS-8 · profile HiFi")
@@ -124,6 +130,8 @@ def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
 
 
 def test_patch_tab_shows_both_views(app):
+    app.expect("Playback")  # pwctl opens on the Mixer
+    app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send(tab("patch"))
     app.expect("Destinations")
@@ -137,6 +145,8 @@ def test_patch_tab_shows_both_views(app):
 
 
 def test_devices_rename_is_enter_enter_type_enter(app, tmp_path):
+    app.expect("Playback")  # pwctl opens on the Mixer
+    app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send(tab("devices"))
     app.expect("GCS-8 · profile HiFi")
@@ -162,6 +172,8 @@ def test_devices_rename_empty_restores_the_default(app, tmp_path):
     (tmp_path / "pwctl").mkdir(exist_ok=True)
     (tmp_path / "pwctl" / "devices.json").write_text(json.dumps(
         {"version": 2, "clock_rate": None, "buses": [], "labels": {ds4: "Pad"}, "hidden": []}))
+    app.expect("Playback")  # pwctl opens on the Mixer
+    app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send(tab("devices"))
     app.expect("GCS-8 · profile HiFi")
@@ -186,6 +198,8 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
     (tmp_path / "pwctl" / "ui.json").write_text('{"theme": "light"}')
     app = Pty(tmp_path, term)
     try:
+        app.expect("Playback")
+        app.send(tab("settings"))
         app.expect("light")
         app.send("\x1bOB" * 10 + "\x1bOD")  # down to the theme row, then left: light → dark
         app.expect("theme: dark")
@@ -208,7 +222,9 @@ def test_crowbar_theme_starts(tmp_path, term):
     (tmp_path / "pwctl" / "ui.json").write_text('{"theme": "orange"}')  # the old name still loads
     app = Pty(tmp_path, term)
     try:
-        app.expect("needs 256 colours" if term == "xterm" else "crowbar")
+        app.expect("needs 256 colours" if term == "xterm" else "Playback")
+        app.send(tab("settings"))
+        app.expect("crowbar")
         app.send("q")
         assert app.wait_exit() == 0
     finally:

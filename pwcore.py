@@ -363,13 +363,14 @@ def summarize_preset(p):
 # --- TUI state machine -------------------------------------------------------
 
 # Basic first (everyday audio), then the engineering tools. Presets live inside Settings.
-TABS = ["devices", "patch", "settings", "top"]
+TABS = ["mixer", "devices", "patch", "settings", "top"]
 TAB_TITLES = {t: f"{n} {t.capitalize()}" for n, t in enumerate(TABS, start=1)}
 
 
 @dataclass
 class UIState:
-    tab: str = "settings"
+    tab: str = "mixer"
+    mix_cursor: int = 0
     cursor: int = 0
     pending: dict = field(default_factory=dict)
     top_scroll: int = 0
@@ -394,7 +395,7 @@ class UIState:
     theme: str = "dark"
 
 
-def handle_key(st, key, current, presets, devices=None, patch=None):
+def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
     """Return (new_state, actions). Nothing touches PipeWire until an action is executed.
 
     devices is the Devices tab's view: {"model", "status", "buses", "dirty"}, or None until loaded.
@@ -418,6 +419,8 @@ def handle_key(st, key, current, presets, devices=None, patch=None):
     if key.isdigit() and 1 <= int(key) <= len(TABS):
         st.tab = TABS[int(key) - 1]
         return st, []
+    if st.tab == "mixer":
+        return _key_mixer(st, key, mixer)
     if st.tab == "devices":
         return _key_devices(st, key, devices)
     if st.tab == "patch":
@@ -585,7 +588,7 @@ def _key_devices(st, key, devices):
     return st, []
 
 
-def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=None):
+def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=None, mixer=None):
     """Map a mouse event onto the same keys the keyboard uses."""
     if st.confirm:
         return dataclasses.replace(st, confirm=None, message="cancelled (y confirms)"), []
@@ -607,6 +610,9 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
     elif kind == "preset":
         st = dataclasses.replace(st, cursor=THEME_ROW + 1 + target[1])
         keys = ["enter"] if event == "double" else []
+    elif kind == "mix_row":
+        st = dataclasses.replace(st, mix_cursor=target[1])
+        keys = {"double": ["enter"], "wheel_up": ["right"], "wheel_down": ["left"]}.get(event, [])
     elif kind == "toplist":
         keys = {"wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
     elif kind == "dev_menu_item":
@@ -630,7 +636,7 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
         keys = ["enter"] if event == "double" else []
     actions = []
     for k in keys:
-        st, a = handle_key(st, k, current, presets, devices, patch)
+        st, a = handle_key(st, k, current, presets, devices, patch, mixer)
         actions += a
     return st, actions
 
@@ -640,6 +646,7 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
 TAB_KEYS = [(f"Tab/1-{len(TABS)}", "tabs"), ("q", "quit")]
 # (key, slug) pairs; Enter first wherever it acts. Drawn as a box of chips by _key_box.
 LEGENDS = {
+    "mixer": [("Enter", "make default"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute")] + TAB_KEYS,
     "settings": [("Enter", "apply"), ("↑↓", "select"), ("←→", "change"), ("Esc", "revert"),
                  ("s", "save as preset"), ("R", "restart WirePlumber")] + TAB_KEYS,
     "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
@@ -657,7 +664,8 @@ LEGENDS = {
                     ("p Esc", "back")] + TAB_KEYS,
 }
 # The status line under the legend: messages, else a short hint (never keys).
-HINTS = {"devices": "buses and volume act at once · new labels show after a WirePlumber restart",
+HINTS = {"mixer": "volume and mute act at once · ★ is the default playback or recording device",
+         "devices": "buses and volume act at once · new labels show after a WirePlumber restart",
          "patch": "links made here are live only; saved patch sets come with scenes"}
 
 
@@ -736,7 +744,7 @@ def _confirm_question(confirm, devices=None):
             "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now."}[kind]
 
 
-def render_screen(st, current, block, presets, width, height, devices=None, patch=None):
+def render_screen(st, current, block, presets, width, height, devices=None, patch=None, mixer=None):
     cv = _Canvas(width)
     text, spans = " ", []
     for tab in TABS:
@@ -750,7 +758,9 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     cv.add("─" * width, "dim")
     footer, chips = _key_box(legend(st), width)
     body_h = height - len(cv.lines) - 1 - len(footer)
-    if st.tab == "devices":
+    if st.tab == "mixer":
+        _render_mixer(cv, st, mixer, body_h)
+    elif st.tab == "devices":
         _render_devices(cv, st, devices, body_h)
     elif st.tab == "patch":
         _render_patch(cv, dataclasses.replace(st), patch, body_h)
@@ -917,6 +927,127 @@ def _render_devices(cv, st, devices, body_h):
         cv.add("  * label or clock changes not written yet; A writes them (no restart)", "pending")
     else:
         cv.add("  generated files match devices.json", "dim")
+
+
+# --- Mixer tab: everyday volume, mute and defaults (docs/mixer-plan.md) --------------------------
+
+def mixer_view(inv, config, streams):
+    """What the Mixer lists: devices (not hidden, not monitors) and app streams, by direction."""
+    hidden = set(config["hidden"])
+    devs = [r for r in inv.rows() if r.kind != "monitor" and r.name not in hidden]
+    return {"defaults": inv.defaults,
+            "playback": ([r for r in devs if r.direction in ("out", "duplex")], [a for a in streams if a.direction == "out"]),
+            "recording": ([r for r in devs if r.direction in ("in", "duplex")], [a for a in streams if a.direction == "in"])}
+
+
+def _mixer_lines(mx):
+    """[(kind, section, row)]: kind is head | sub | dev | app; dev and app lines are selectable."""
+    lines = []
+    for title, section in (("Playback", "playback"), ("Recording", "recording")):
+        devs, apps = mx[section]
+        lines.append(("head", title, None))
+        lines += [("dev", section, r) for r in devs]
+        if apps:
+            lines.append(("sub", "Apps", None))
+            lines += [("app", section, r) for r in apps]
+    return lines
+
+
+def mixer_selectable(mx):
+    return [line for line in _mixer_lines(mx) if line[0] in ("dev", "app")]
+
+
+def _is_default(mx, section, row):
+    return row.name == mx["defaults"]["sink" if section == "playback" else "source"]
+
+
+def _key_mixer(st, key, mx):
+    if mx is None:
+        return st, []
+    items = mixer_selectable(mx)
+    if not items:
+        return st, []
+    st.mix_cursor = max(0, min(len(items) - 1, st.mix_cursor))
+    kind, section, row = items[st.mix_cursor]
+    try:
+        if key in ("up", "down"):
+            st.mix_cursor = max(0, min(len(items) - 1, st.mix_cursor + (1 if key == "down" else -1)))
+        elif key in ("left", "right"):
+            if row.volume is None:
+                st.message = st.failed = f"{row.label} has no volume control here"
+                return st, []
+            return st, [("mix_cmd", pi.volume_cmd(row, "+5%" if key == "right" else "-5%"))]
+        elif key == " ":
+            if row.mute is None:
+                st.message = st.failed = f"{row.label} can't be muted here"
+                return st, []
+            return st, [("mix_cmd", pi.mute_cmd(row))]
+        elif key in ("enter", "d") and kind == "dev":
+            return st, [("mix_cmd", pi.default_cmd(row))]
+        elif key == "d":
+            st.message = st.failed = "only a device can be the default; apps follow it"
+    except ValueError as e:
+        st.message = st.failed = str(e)
+    return st, []
+
+
+_BAR = 24          # cells for 0–150%
+_BAR_FULL = 16     # the cell where 100% ends
+
+
+def _volume_bar(row):
+    """(text, spans relative to the bar): filled to 100% in ok, past it in alert, the rest dim."""
+    if row.volume is None:
+        return "no volume control".ljust(_BAR + 5), [(0, _BAR + 5, "dim")]
+    n = max(0, min(_BAR, round(row.volume / 1.5 * _BAR)))
+    text = "█" * n + "░" * (_BAR - n) + (" muted" if row.mute else f" {round(row.volume * 100):>3}%")
+    if row.mute:
+        return text, [(0, len(text), "dim")]
+    spans = [(0, min(n, _BAR_FULL), "ok")]
+    if n > _BAR_FULL:
+        spans.append((_BAR_FULL, n, "alert"))
+    return text, spans + [(n, _BAR, "dim")]
+
+
+def _render_mixer(cv, st, mx, body_h):
+    if mx is None:
+        cv.add("  loading the mixer…", "dim")
+        return
+    items = mixer_selectable(mx)
+    st.mix_cursor = max(0, min(len(items) - 1, st.mix_cursor)) if items else 0
+    label_w = max(20, min(44, cv.width - _BAR - 14))
+    out, n_sel = [], 0
+    for kind, section, row in _mixer_lines(mx):
+        if kind == "head":
+            out.append((f"  {section}", "title", None))
+            continue
+        if kind == "sub":
+            out.append((f"    {section}", "dim", None))
+            continue
+        sel = n_sel == st.mix_cursor
+        if kind == "dev":
+            name = row.label
+            star = "★" if _is_default(mx, section, row) else " "
+        else:
+            peers = row.outputs if section == "playback" else row.inputs
+            name = f"{row.label} {'→' if section == 'playback' else '←'} {', '.join(peers) or 'nothing'}"
+            star = " "
+        indent = "  " if kind == "app" else ""
+        w = label_w - len(indent)  # app rows sit under their section; the bars still line up
+        head = f"{'> ' if sel else '  '}{star} {indent}{_fit(name, w):<{w}} "
+        bar, spans = _volume_bar(row)
+        c0 = len(head)
+        spans = [(c0 + a, c0 + b, r) for a, b, r in spans]
+        if sel:
+            spans = [(0, c0 - 1, "selected")] + spans  # the cursor bar covers the name; the volume keeps its colours
+        out.append((head + bar, ("normal", spans), n_sel))
+        n_sel += 1
+    cursor_at = next((k for k, line in enumerate(out) if line[2] == st.mix_cursor), 0)
+    start = 0 if cursor_at < body_h else cursor_at - body_h + 1
+    for text, style, idx in out[start:start + body_h]:
+        row = cv.add(text, style)
+        if idx is not None:
+            cv.hit(row, 0, cv.width, ("mix_row", idx))
 
 
 # --- Patch tab -------------------------------------------------------------------------

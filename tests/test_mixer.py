@@ -1,0 +1,160 @@
+"""The Mixer tab: devices and app streams, with volume, mute and the default playback and recording device."""
+import dataclasses
+import json
+from pathlib import Path
+
+import pwconfig as pcfg
+import pwcore as pc
+import pwinventory as pi
+from test_patch import with_reaper
+
+FIX = Path(__file__).parent / "fixtures"
+CUR = pc.parse_settings((FIX / "settings.txt").read_text())
+DUMP = json.loads((FIX / "pwdump_patch.json").read_text())
+CH2_IN = "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_6_7__source"
+
+
+def mx(dump=DUMP, config=None):
+    return pc.mixer_view(pi.inventory(dump), config or pcfg.default_config(), pi.streams(dump))
+
+
+MX = mx()
+
+
+def screen(st, m=MX, width=100, height=60):
+    return pc.render_screen(st, CUR, None, [], width, height, mixer=m)
+
+
+def body(lines):
+    return "\n".join(t for t, _ in lines)
+
+
+def key(st, *keys, m=MX):
+    actions = []
+    for k in keys:
+        st, a = pc.handle_key(st, k, CUR, [], mixer=m)
+        actions += a
+    return st, actions
+
+
+def at(label, section="playback", m=MX):
+    """The Mixer with its cursor on the first row with this label in that section."""
+    i = next(n for n, (_, sec, r) in enumerate(pc.mixer_selectable(m)) if r.label == label and sec == section)
+    return pc.UIState(tab="mixer", mix_cursor=i)
+
+
+# --- model --------------------------------------------------------------------------------
+
+def test_streams_are_apps_with_volume_and_their_device():
+    rows = {(r.direction, r.label): r for r in pi.streams(DUMP)}
+    play, rec = rows[("out", "Discord")], rows[("in", "Discord")]
+    assert play.kind == rec.kind == "app" and play.volume == 1.0 and play.mute is False
+    assert play.outputs == ("GCS-8 CH 4-AUX",) and rec.inputs == ("GCS-8 CH 2",)
+
+
+def test_jack_clients_are_listed_without_volume():
+    rows = [r for r in pi.streams(with_reaper(DUMP)) if r.label == "REAPER"]
+    assert rows and all(r.volume is None and r.mute is None for r in rows)
+
+
+def test_meter_and_peak_streams_are_never_listed():
+    extra = [{"id": 900 + n, "type": "PipeWire:Interface:Node", "info": {"props": props, "params": {}}}
+             for n, props in enumerate([{"media.class": "Stream/Input/Audio", "node.name": pi.METER_NAME + "-7"},
+                                        {"media.class": "Stream/Input/Audio", "node.name": "pavu", "stream.monitor": True}])]
+    assert {r.id for r in pi.streams(DUMP + extra)} == {r.id for r in pi.streams(DUMP)}
+
+
+def test_mixer_leaves_out_hidden_rows_and_monitors():
+    hidden = mx(config=pcfg.toggle_hidden(pcfg.default_config(), CH2_IN))
+    assert CH2_IN not in [r.name for _, _, r in pc.mixer_selectable(hidden)]
+    assert not any(r.kind == "monitor" for _, _, r in pc.mixer_selectable(MX))
+
+
+# --- screen -------------------------------------------------------------------------------
+
+def test_mixer_is_the_first_tab_and_the_default():
+    assert pc.TABS[0] == "mixer" and pc.UIState().tab == "mixer"
+
+
+def test_sections_and_default_stars():
+    text = body(screen(pc.UIState())[0])
+    assert text.index("Playback") < text.index("Recording")
+    assert "Discord → GCS-8 CH 4-AUX" in text and "Discord ← GCS-8 CH 2" in text
+    stars = [t for t in text.splitlines()[:-1] if "★" in t]  # the last line is the hint, which names ★
+    assert len(stars) == 2  # one default output, one default input
+    sink = next(r.label for _, _, r in pc.mixer_selectable(MX) if r.name == MX["defaults"]["sink"])
+    assert sink in stars[0]
+
+
+def test_volume_bar_over_100_reads_as_alert_and_mute_as_dim():
+    loud = dataclasses.replace(MX["playback"][0][0], volume=1.3, mute=False)
+    text, spans = pc._volume_bar(loud)
+    assert text.endswith("130%") and any(r == "alert" for *_, r in spans)
+    text, spans = pc._volume_bar(dataclasses.replace(loud, mute=True))
+    assert text.endswith("muted") and {r for *_, r in spans} == {"dim"}
+    assert "no volume control" in pc._volume_bar(dataclasses.replace(loud, volume=None))[0]
+
+
+def test_cursor_bar_covers_the_name_not_the_volume():
+    lines, _ = screen(at("Discord"))
+    style = next(s for t, s in lines if "Discord →" in t)
+    roles = [r for *_, r in style[1]]
+    assert roles[0] == "selected" and "ok" in roles
+
+
+def test_loading_before_the_first_dump():
+    assert "loading the mixer" in body(pc.render_screen(pc.UIState(), CUR, None, [], 80, 20)[0])
+
+
+def test_rows_fit_the_width():
+    for width in (60, 100, 160):
+        lines, hits = screen(pc.UIState(), width=width)
+        assert all(len(t) <= width for t, _ in lines) and all(c1 <= width for _, _, c1, _ in hits)
+
+
+# --- keys and mouse -------------------------------------------------------------------------
+
+def test_arrows_step_volume_and_space_mutes():
+    st = at("Discord")
+    play = next(r for r in pi.streams(DUMP) if r.direction == "out")
+    assert key(st, "right")[1] == [("mix_cmd", ["wpctl", "set-volume", str(play.id), "5%+"])]
+    assert key(st, "left")[1] == [("mix_cmd", ["wpctl", "set-volume", str(play.id), "5%-"])]
+    assert key(st, " ")[1] == [("mix_cmd", ["wpctl", "set-mute", str(play.id), "toggle"])]
+
+
+def test_enter_makes_a_device_the_default_but_not_an_app():
+    dev = pc.mixer_selectable(MX)[0][2]
+    assert key(pc.UIState(mix_cursor=0), "enter")[1] == [("mix_cmd", ["wpctl", "set-default", str(dev.id)])]
+    assert key(at("Discord"), "enter")[1] == []
+    st, actions = key(at("Discord"), "d")
+    assert actions == [] and st.message == st.failed
+
+
+def test_no_volume_control_is_refused():
+    m = mx(with_reaper(DUMP))
+    st, actions = key(at("REAPER", m=m), "right", m=m)
+    assert actions == [] and "no volume control" in st.message and st.message == st.failed
+
+
+def test_wheel_changes_volume_and_double_click_is_enter():
+    st = pc.UIState()
+    _, hits = screen(st)
+    row, c0, _, _ = next(h for h in hits if h[3] == ("mix_row", 0))
+    _, actions = pc.handle_mouse(st, hits, row, c0, "wheel_up", CUR, [], mixer=MX)
+    assert actions[0][1][1] == "set-volume" and actions[0][1][-1] == "5%+"
+    _, actions = pc.handle_mouse(st, hits, row, c0, "double", CUR, [], mixer=MX)
+    assert actions[0][1][1] == "set-default"
+
+
+def test_up_down_clamp():
+    n = len(pc.mixer_selectable(MX))
+    st, _ = key(pc.UIState(), *["down"] * (n + 5))
+    assert st.mix_cursor == n - 1
+    st, _ = key(st, *["up"] * (n + 5))
+    assert st.mix_cursor == 0
+
+
+def test_bars_line_up_for_devices_and_apps():
+    lines, _ = screen(pc.UIState())
+    starts = {t.index("█") for t, _ in lines if "█" in t}
+    assert len(starts) == 1

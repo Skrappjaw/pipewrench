@@ -56,7 +56,7 @@ class Row:
     name: str
     label: str
     direction: str            # out | in | duplex
-    kind: str                 # hardware | virtual | monitor
+    kind: str                 # hardware | virtual | monitor | app (Mixer only)
     card_id: int = None
     state: str = None
     format: str = None
@@ -143,8 +143,7 @@ def _row(obj, defaults):
         return None
     params = info.get("params") or {}
     fmt = next((f for f in params.get("Format") or [] if isinstance(f, dict)), {})
-    props = next((x for x in params.get("Props") or [] if isinstance(x, dict) and "channelVolumes" in x), {})
-    vols = props.get("channelVolumes")
+    volume, mute = _volume(info)
     hardware = p.get("device.api") in HW_APIS and p.get("device.id") is not None
     name = p["node.name"]
     is_default = name in (defaults["sink"] if direction != "in" else None, defaults["source"] if direction != "out" else None)
@@ -153,8 +152,46 @@ def _row(obj, defaults):
                card_id=p.get("device.id") if hardware else None, state=info.get("state"),
                format=fmt.get("format"), rate=fmt.get("rate") or p.get("audio.rate"),
                channels=fmt.get("channels") or p.get("audio.channels"),
-               volume=round(max(vols) ** (1 / 3), 4) if vols else None,
-               mute=props.get("mute") if props else None, default=is_default)
+               volume=volume, mute=mute, default=is_default)
+
+
+def _volume(info):
+    """(volume on wpctl's cubic scale, mute) from a node's Props; (None, None) when it has no control."""
+    props = next((x for x in (info.get("params") or {}).get("Props") or []
+                  if isinstance(x, dict) and "channelVolumes" in x), {})
+    vols = props.get("channelVolumes")
+    return (round(max(vols) ** (1 / 3), 4) if vols else None), (props.get("mute") if props else None)
+
+
+_STREAM_DIRECTION = {"Stream/Output/Audio": "out", "Stream/Input/Audio": "in"}
+METER_NAME = "pwctl-meter"  # pwctl's own level-meter streams; never listed
+
+
+def streams(dump):
+    """App rows for the Mixer: playback ("out") and recording ("in") streams, plus JACK clients, which
+    have no media.class and no volume, listed by the way they're linked. Peak-detect streams are left out."""
+    peers = _peers(dump)
+    rows = []
+    for o in dump:
+        if o.get("type") != "PipeWire:Interface:Node" or "id" not in o:
+            continue
+        info = _info(o)
+        p = info.get("props") or {}
+        if p.get("stream.monitor") in (True, "true") or str(p.get("node.name", "")).startswith(METER_NAME):
+            continue
+        cls = p.get("media.class", "")
+        ins, outs = peers.get(o["id"], ((), ()))
+        if cls in _STREAM_DIRECTION:
+            directions = [_STREAM_DIRECTION[cls]]
+        elif not cls and p.get("media.type") == "Audio":
+            directions = [d for d, linked in (("out", outs), ("in", ins)) if linked] or ["out"]
+        else:
+            continue
+        volume, mute = _volume(info)
+        rows += [Row(id=o["id"], name=p.get("node.name", str(o["id"])), label=display_name(p), direction=d,
+                     kind="app", state=info.get("state"), volume=volume, mute=mute, inputs=ins, outputs=outs)
+                 for d in directions]
+    return sorted(rows, key=lambda r: natural_key(r.label))
 
 
 def _card(obj):

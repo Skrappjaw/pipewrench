@@ -20,66 +20,31 @@ Needs PipeWire's command-line tools: `pw-metadata`, `pw-top`, `pw-dump`, `pw-cat
 
 ## The five views
 
+**Basic** (everyday audio): Mixer, Devices. **Advanced** (engineering): Patch, Settings (clock and
+presets), Top. pwctl opens on the Mixer.
+
 Switch views with `Tab`, the number keys `1`–`5`, or a click on the tab bar. `q` quits from any view.
 Every view lists its keys the same way: a boxed legend at the bottom, each key a bold inverted chip with
 what it does beside it, starting with Enter wherever Enter acts. The line under the box carries
 messages and y/n questions.
 
-### 1 Settings
+### 1 Mixer
 
-PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata -n settings 0`).
-
-| Row | Metadata key | Choices |
-|---|---|---|
-| Force sample rate | `clock.force-rate` | do not force, 44100, 48000, 88200, 96000, 176400, 192000 |
-| Minimum buffer | `clock.min-quantum` | 8 … 8192 (powers of two) |
-| Max buffer | `clock.max-quantum` | 8 … 8192 |
-| Force buffer size | `clock.force-quantum` | do not force, 8 … 8192 |
-| Log level | `log.level` | No log, Error, Warning, Info, Debug, Trace |
-
-- Changing a value only marks it pending, shown with `*`. Nothing is written until you apply.
-- On Apply, writes are ordered so min never exceeds max at any step, and the force values go last.
-- A min above max blocks the apply. A forced buffer outside min/max, or a rate outside
-  `clock.allowed-rates`, applies with a warning.
-- Below the rows: the allowed rates and the defaults (`clock.rate`, `clock.quantum`).
-- These settings are runtime only. A PipeWire restart clears them.
-- **Theme** (the last row) is pwctl's own: dark, light, or crowbar (orange, after Mint-Y-Dark-Orange; needs 256 colours). ←→ switches it at once, and it's kept in
-  `~/.config/pwctl/ui.json`. The colour roles are described in `docs/ui-conventions.md`.
+Everyday audio in one place: every output and input (hidden rows and monitors left out), then the apps
+playing or recording. Each row has a volume bar: green to 100%, red past it (up to 150%), dim when
+muted. ★ marks the default playback and recording device. Apps show what they're connected to
+(`Discord → GCS-8 CH 4-AUX`); JACK clients like REAPER have no volume control here.
 
 | Key | Mouse | Action |
 |---|---|---|
-| ↑ ↓ | click a row | select a setting |
-| ← → | click ◀ ▶, or the wheel over a row | step the value (pending) |
-| Enter | its chip, or double-click a row | write all pending values |
-| Esc | its chip | drop pending values |
-| R | its chip | restart WirePlumber, after y/n |
+| ↑ ↓ | click a row | select |
+| ← → | the wheel over a row | volume −5% / +5% |
+| Space | its chip | mute or unmute |
+| Enter, d | double-click a device | make it the default |
 
-### 2 Top
+Volume, mute and the default act at once (`wpctl`). Design notes: `docs/mixer-plan.md`.
 
-A live `pw-top -b` view: state, ID, quantum, rate, WAIT, BUSY, W/Q, B/Q, ERR, format and name.
-Followers are shown with a `+` under their driver. Rows with errors show in red, idle rows dim.
-
-| Key | Mouse | Action |
-|---|---|---|
-| ↑ ↓, PgUp PgDn | wheel | scroll |
-
-### Presets (the bottom of Settings)
-
-Presets are no longer a tab of their own; they're the last section of Settings, under Clock and Display.
-Named, labelled snapshots of the Settings rows (force rate, force buffer, min, max, and optionally
-log level). They're stored in `~/.config/pwctl/presets.json`.
-
-| Key | Mouse | Action |
-|---|---|---|
-| ↑ ↓ | click a row | select a preset |
-| Enter | its chip, or double-click | write the preset's values (ordered as in Settings) |
-| s | its chip | save the current settings; asks for a name, then a label |
-| e | its chip | relabel the selected preset |
-| d | its chip | delete it, after y/n |
-
-Preset names are 1–32 letters, digits, `-` or `_`.
-
-### 4 Devices
+### 2 Devices
 
 An inventory of every audio card, sink, source and bus on the system, read from `pw-dump`.
 
@@ -145,7 +110,7 @@ Mouse:
 
 The key legend is always on screen.
 
-### 5 Patch
+### 3 Patch
 
 A patch bay for live connections, in two layouts switched with `g`:
 - **Columns:** sources on the left, destinations on the right; ● marks where the selected source goes.
@@ -179,6 +144,59 @@ Mouse:
 
 Links made here last until a restart or until the app reconnects. Saved patch sets are planned
 as part of scenes.
+
+### 4 Settings
+
+PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata -n settings 0`).
+
+| Row | Metadata key | Choices |
+|---|---|---|
+| Force sample rate | `clock.force-rate` | do not force, 44100, 48000, 88200, 96000, 176400, 192000 |
+| Minimum buffer | `clock.min-quantum` | 8 … 8192 (powers of two) |
+| Max buffer | `clock.max-quantum` | 8 … 8192 |
+| Force buffer size | `clock.force-quantum` | do not force, 8 … 8192 |
+| Log level | `log.level` | No log, Error, Warning, Info, Debug, Trace |
+
+- Changing a value only marks it pending, shown with `*`. Nothing is written until you apply.
+- On Apply, writes are ordered so min never exceeds max at any step, and the force values go last.
+- A min above max blocks the apply. A forced buffer outside min/max, or a rate outside
+  `clock.allowed-rates`, applies with a warning.
+- Below the rows: the allowed rates and the defaults (`clock.rate`, `clock.quantum`).
+- These settings are runtime only. A PipeWire restart clears them.
+- **Theme** (the Display section) is pwctl's own: dark, light, or crowbar (orange, after Mint-Y-Dark-Orange; needs 256 colours). ←→ switches it at once, and it's kept in
+  `~/.config/pwctl/ui.json`. The colour roles are described in `docs/ui-conventions.md`.
+
+| Key | Mouse | Action |
+|---|---|---|
+| ↑ ↓ | click a row | select a setting |
+| ← → | click ◀ ▶, or the wheel over a row | step the value (pending) |
+| Enter | its chip, or double-click a row | write all pending values |
+| Esc | its chip | drop pending values |
+| R | its chip | restart WirePlumber, after y/n |
+
+#### Presets (the bottom of Settings)
+
+Named, labelled snapshots of the Settings rows (force rate, force buffer, min, max, and optionally
+log level). They're stored in `~/.config/pwctl/presets.json`.
+
+| Key | Mouse | Action |
+|---|---|---|
+| ↑ ↓ | click a row | select a preset |
+| Enter | its chip, or double-click | write the preset's values (ordered as in Settings) |
+| s | its chip | save the current settings; asks for a name, then a label |
+| e | its chip | relabel the selected preset |
+| d | its chip | delete it, after y/n |
+
+Preset names are 1–32 letters, digits, `-` or `_`.
+
+### 5 Top
+
+A live `pw-top -b` view: state, ID, quantum, rate, WAIT, BUSY, W/Q, B/Q, ERR, format and name.
+Followers are shown with a `+` under their driver. Rows with errors show in red, idle rows dim.
+
+| Key | Mouse | Action |
+|---|---|---|
+| ↑ ↓, PgUp PgDn | wheel | scroll |
 
 ## Command line
 
