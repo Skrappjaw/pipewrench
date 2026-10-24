@@ -24,7 +24,7 @@ Needs PipeWire's command-line tools: `pw-metadata`, `pw-top`, `pw-dump`, `pw-cat
 presets), Top. pwctl opens on the Mixer.
 
 A **now-playing bar** sits above the keys on every tab. It shows the media player that's playing (MPRIS,
-via `busctl`): `.` play/pause, `/` stop, `<` `>` previous/next, `-` `+` its volume. Notes:
+via `busctl`): `/` stop, `*` play/pause, `-` `+` its volume (the numpad's top row and `+`), `<` `>` previous/next. Notes:
 `docs/media-bar-plan.md`.
 
 Switch views with `Tab`, the number keys `1`–`5`, or a click on the tab bar. `q` quits from any view.

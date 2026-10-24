@@ -559,6 +559,8 @@ def main(argv, runner=None, out=None, err=None, execvp=None, ask=None):
 
 # --- curses UI ---------------------------------------------------------------
 
+_NUMPAD = {b"kpDIV": "/", b"kpMUL": "*", b"kpSUB": "-", b"kpADD": "+", b"kpDOT": "."}
+
 class Meters:
     """Live peak levels for Mixer rows: one pw-record per target, each read on its own thread.
     Started only while the Mixer is open; stop() ends every one (docs/mixer-plan.md)."""
@@ -867,7 +869,10 @@ class Tui:
             return named[ch]
         if 32 <= ch < 127:
             return chr(ch)
-        return None
+        try:  # in keypad mode the numpad sends its own codes (\EOo and so on); ncurses names them kpDIV…
+            return _NUMPAD.get(c.keyname(ch))
+        except (ValueError, c.error):
+            return None
 
     def _sync_meters(self):
         metering = self.st.tab == "mixer" and self.st.meters and self.mixer and not os.environ.get("PWCTL_FIXTURES")

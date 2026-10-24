@@ -233,3 +233,12 @@ def test_crowbar_theme_starts(tmp_path, term):
             os.waitpid(app.pid, 0)
         except (ProcessLookupError, ChildProcessError):
             pass
+
+
+def test_numpad_keys_reach_the_media_bar(app):
+    """Keypad mode makes the numpad send \\EOj and friends; they must still act as * / - +."""
+    app.expect("Playback")
+    app.send("\x1bOj")  # numpad *
+    app.expect("no media player found")  # fixtures have no player, so the key got through
+    app.send("q")
+    assert app.wait_exit() == 0

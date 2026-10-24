@@ -56,7 +56,7 @@ def test_settings_render_shows_values_and_pending_marker():
     body = "\n".join(t for t, _ in lines)
     assert "Force sample rate" in body and "48000" in body
     assert "Force buffer size" in body and "128" in body
-    assert "*" not in body
+    assert not any("*" in t for t, _ in lines if "◀" in t)  # no pending marker on any setting row
     st, _ = key(st, "down", "down", "down", "right")  # force-quantum 128 -> 256 pending
     lines, _ = screen(st)
     row = [t for t, _ in lines if "Force buffer size" in t][0]
@@ -422,7 +422,7 @@ def test_no_button_rows(tab):
 def test_multi_key_chips_have_no_hit():
     _, hits = screen(UIState())
     keys = {t[1] for *_, t in hits if t[0] == "key"}
-    assert keys == {"enter", "esc", "s", "R", "q"} | {".", "/", "<", ">", "-", "+"}  # not ↑↓, ←→ or Tab/1-n
+    assert keys == {"enter", "esc", "s", "R", "q"} | {"*", "/", "<", ">", "-", "+"}  # not ↑↓, ←→ or Tab/1-n
 
 
 def test_meter_frame_rate_steps_and_saves():

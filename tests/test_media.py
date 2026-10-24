@@ -82,7 +82,7 @@ def test_stream_found_through_a_helper_process():
 
 @pytest.mark.parametrize("tab", pc.TABS)
 def test_media_keys_work_on_every_tab(tab):
-    for k, action in ((".", ("media", "play/pause")), ("/", ("media", "stop")), ("<", ("media", "previous")),
+    for k, action in (("*", ("media", "play/pause")), ("/", ("media", "stop")), ("<", ("media", "previous")),
                       (">", ("media", "next")), ("-", ("media_volume", "-5%")), ("+", ("media_volume", "+5%")),
                       ("=", ("media_volume", "+5%"))):
         assert pc.handle_key(pc.UIState(tab=tab), k, CUR, [])[1] == [action], (tab, k)
@@ -96,7 +96,8 @@ def test_bar_sits_above_the_keys_on_every_tab(tab):
     assert "▶ Brave · Morph — Twenty One Pilots" in text and "0:50 / 4:18" in text
     narrow, _ = bar(screen(pc.UIState(tab=tab), {"player": player(), "position": 50898601}, width=100)[0])
     assert "Brave · Morph" in narrow and "0:50 / 4:18" in narrow  # the artist is cut, not the title or time
-    assert " . " in text and "play" in text and " -  + " in text
+    assert " / " in text and " * " in text and " -  + " in text
+    assert text.index(" / ") < text.index(" * ") < text.index(" -  + ") < text.index(" < ")  # numpad order
 
 
 def test_nothing_playing_keeps_the_bar():
@@ -113,8 +114,8 @@ def test_paused_shows_the_pause_glyph():
 def test_bar_chips_are_clickable():
     st = pc.UIState()
     lines, hits = screen(st, {"player": player(), "position": 0})
-    row, c0, c1, _ = next(h for h in hits if h[3] == ("key", "."))
-    assert lines[row][0][c0:c1] == " . "
+    row, c0, c1, _ = next(h for h in hits if h[3] == ("key", "*"))
+    assert lines[row][0][c0:c1] == " * "
     assert pc.handle_mouse(st, hits, row, c0, "click", CUR, [])[1] == [("media", "play/pause")]
 
 
@@ -122,5 +123,9 @@ def test_bar_chips_are_clickable():
 def test_bar_fits_any_width(width):
     lines, hits = screen(pc.UIState(), {"player": player(title="x" * 200), "position": 0}, width=width)
     text, _ = bar(lines)
-    assert len(text) <= width and " next" in text
+    assert len(text) <= width and " / " in text and "stop" in text
     assert all(c1 <= width for _, _, c1, _ in hits)
+
+
+def test_dot_is_no_longer_a_media_key():
+    assert pc.handle_key(pc.UIState(tab="settings"), ".", CUR, [])[1] == []
