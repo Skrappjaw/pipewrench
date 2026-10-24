@@ -10,6 +10,7 @@ watch pw-top, and keep labelled presets.
     pwctl preset list | save NAME [LABEL] | apply NAME | delete NAME
     pwctl devices [list] | default | volume | mute | profile | label | hide | bus | apply …
     pwctl patch [list] | connect SRC DST | disconnect SRC DST
+    pwctl realtime             is PipeWire's audio realtime? and the fix if not
 """
 import array
 import os
@@ -28,6 +29,7 @@ import pwconfig as pcfg  # noqa: E402
 import pwinventory as pi  # noqa: E402
 import pwmedia as pm  # noqa: E402
 import pwpatch as pp  # noqa: E402
+import pwrealtime as prt  # noqa: E402
 
 SETTERS = {"rate": "clock.force-rate", "buf": "clock.force-quantum", "min": "clock.min-quantum",
            "max": "clock.max-quantum", "log": "log.level"}
@@ -150,6 +152,13 @@ def _cli(argv, runner, out, err, execvp, ask):
         return _devices(args, runner, out, err, ask)
     if cmd == "patch":
         return _patch(args, runner, out)
+    if cmd == "realtime":
+        s = prt.check(run=runner)
+        for label, mark, text in prt.rows(s):
+            out.write(f"{label:<16} {mark + ' ' if mark else ''}{text}\n")
+        for n, line in enumerate(prt.fix(s)):
+            out.write(f"{'fix:' if n == 0 else '':<16} {line}\n")
+        return 0 if s.ok else 1
     raise CliError(f"unknown command {cmd!r}\n\nusage:\n{USAGE}", 2)
 
 
@@ -629,6 +638,7 @@ class Tui:
         self.patch = None
         self.mixer = None
         self.about = None  # versions for the About tab; read when it first shows
+        self.realtime = None  # pwrealtime.Status for Settings; read on each Settings refresh
         self.meters = Meters()
         self.media, self.media_at = None, 0.0  # the player the bar shows, and when it was read
         self.lock = threading.Lock()
@@ -718,6 +728,8 @@ class Tui:
             self._refresh_patch()
         if self.st.tab == "mixer":
             self._refresh_mixer()
+        if self.st.tab == "settings":
+            self.realtime = "fixtures" if os.environ.get("PWCTL_FIXTURES") else prt.check(run=self.runner)
 
     def _refresh_mixer(self):
         """Devices and app streams from one pw-dump; hidden rows come from devices.json."""
@@ -892,7 +904,8 @@ class Tui:
         if self.st.tab == "about" and self.about is None:
             self.about = pc.about_info(self.runner)
         lines, self.hits = pc.render_screen(self.st, self.current, block, self.presets, w, h, self.devices,
-                                            self.patch, self.mixer, self._media_view(), self.about)
+                                            self.patch, self.mixer, self._media_view(), self.about,
+                                            self.realtime)
         scr.erase()
         for y, (text, style) in enumerate(lines):
             try:

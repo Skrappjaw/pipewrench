@@ -203,6 +203,21 @@ PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata 
 | Esc | its chip | drop pending values |
 | R | its chip | restart WirePlumber, after y/n |
 
+#### Realtime (under Clock)
+
+Read-only rows: is PipeWire's audio thread realtime, and the fix when it isn't. Checked on each
+Settings refresh (`pwrealtime.py`, which reads `/proc` and `/etc/security/limits.d`).
+
+- **pipewire group:** whether you're in the group the limits files grant `rtprio` to.
+- **realtime limit:** PipeWire's own `Max realtime priority`. It comes from the user's systemd
+  manager, so a group change needs a reboot (a logout can leave the manager running).
+- **audio threads:** each `pw-data-loop` thread, realtime (FIFO/RR) or not.
+- **portal refusals:** "Realtime error" lines from the desktop portal in the last 10 minutes; for
+  information only, since apps like Discord ask it too.
+- **fix:** the command to run in a terminal. pwrench never runs sudo.
+
+Background: the 2026-10-24 Discord stutter, in the vault's `docs/pipewire-realtime.md`.
+
 #### Presets (the bottom of Settings)
 
 Named, labelled snapshots of the Settings rows (force rate, force buffer, min, max, and optionally
@@ -265,6 +280,8 @@ pwctl devices restart                restart WirePlumber, after y/n
 pwctl patch [list]                   every live connection, with its channels
 pwctl patch connect SRC DST          link matching channels (mono feeds both)
 pwctl patch disconnect SRC DST       remove every link between them
+
+pwctl realtime                       realtime status and the fix; exit 0 when PipeWire audio is realtime
 ```
 
 DEV is a node id, an exact `node.name`, or a label that matches exactly one device. CARD is a card id,
@@ -403,6 +420,11 @@ the tests replace PipeWire.
   - `connect_cmds`, `disconnect_cmds`, `toggle_cmds`: `pw-link` commands, skipping links that exist
   - `port_pairs`, `port_toggle_cmd`: port-level detail
 
+### pwrealtime.py
+
+- `check()` → `Status`; `rows(status)` and `fix(status)` feed both Settings and `pwctl realtime`
+- `limits_groups`, `pipewire_procs` (reads `/proc`), `portal_refusals` (journalctl via a runner)
+
 ### pwconfig.py
 
 - **devices.json:**
@@ -456,6 +478,7 @@ PWCTL_LIVE=1 python3 -m pytest tests/test_live.py # read-only checks against the
 | `test_devices_cli.py` | `pwctl devices …` with a fake runner; restarts are recorded, never run |
 | `test_patch.py`, `test_patch_cli.py`, `test_patch_ui.py` | patch graph, pairing, commands, CLI, both views, ports, mouse (fixture: a live `pw-dump` with ports and links) |
 | `test_devices_ui.py` | Devices tab keys, mouse, rendering, scrolling, key legend |
+| `test_realtime.py` | realtime check against a fake `/proc` and limits files, fix rules, Settings section, CLI |
 | `test_about.py` | About tab: wordmark by width, colours, info block, version reads |
 | `test_tui_smoke.py` | the real curses UI in a pty against fixtures |
 | `test_live.py` | opt-in; writes back only the values already set |

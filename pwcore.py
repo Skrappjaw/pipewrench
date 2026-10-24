@@ -9,12 +9,14 @@ import json
 import math
 import os
 import re
+import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pwinventory as pi
 import pwmedia as pm
 import pwpatch as pp
+import pwrealtime as prt
 
 READ_CMD = ["pw-metadata", "-n", "settings", "0"]
 RESTART_CMD = ["systemctl", "--user", "restart", "wireplumber"]
@@ -793,7 +795,7 @@ def _confirm_question(confirm, devices=None):
 
 
 def render_screen(st, current, block, presets, width, height, devices=None, patch=None, mixer=None, media=None,
-                  about=None):
+                  about=None, realtime=None):
     cv = _Canvas(width)
     text, spans = " ", []
     for tab in TABS:
@@ -817,7 +819,7 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
         _render_about(cv, about)
     else:
         {"settings": _render_settings, "top": _render_top}[st.tab](
-            cv, st, current, block, presets, body_h)
+            cv, st, current, block, presets, body_h, realtime)
     body_end = height - 2 - len(footer)
     cv.lines = cv.lines[:body_end]
     cv.hits = [h for h in cv.hits if h[0] < body_end]
@@ -875,7 +877,7 @@ def _media_bar(cv, media):
         cv.hit(row, c0 + a, c0 + b, ("key", k))
 
 
-def _render_settings(cv, st, current, block, presets, body_h):
+def _render_settings(cv, st, current, block, presets, body_h, realtime=None):
     st.cursor = max(0, min(PRESETS_ROW + len(presets) - 1, st.cursor))
     cv.add("  Clock", "title")
     for i, s in enumerate(SETTINGS):
@@ -901,6 +903,8 @@ def _render_settings(cv, st, current, block, presets, body_h):
     for w in warnings:
         cv.add(f"  ! {w}", "alert")
     cv.add("")
+    _render_realtime(cv, realtime)
+    cv.add("")
     cv.add("  Display", "title")
     _display_row(cv, st, THEME_ROW, "Theme", st.theme, "applies at once")
     _display_row(cv, st, FPS_ROW, "Meter frame rate", f"{st.meter_fps} fps", "how often Mixer meters redraw")
@@ -910,6 +914,23 @@ def _render_settings(cv, st, current, block, presets, body_h):
     cv.add("")
     cv.add("  Presets", "title")
     _render_presets(cv, st, presets)
+
+
+def _render_realtime(cv, status):
+    """Read-only rows (no cursor): is PipeWire's audio thread realtime, and the fix when it isn't."""
+    cv.add("  Realtime", "title")
+    if status is None:
+        cv.add("  checking…", "dim")
+        return
+    if status == "fixtures":
+        cv.add("  not checked (fixtures)", "dim")
+        return
+    for label, mark, text in prt.rows(status):
+        cv.add(f"  {label:<20} {mark + ' ' if mark else ''}{text}", "normal" if mark else "dim")
+    for n, line in enumerate(prt.fix(status)):
+        head = "  fix: " if n == 0 else "       "
+        for k, part in enumerate(textwrap.wrap(line, max(10, cv.width - len(head)), break_on_hyphens=False)):
+            cv.add((head if k == 0 else " " * len(head)) + part, "ok" if status.ok else "pending")
 
 
 def _display_row(cv, st, idx, label, value, note):
@@ -979,7 +1000,7 @@ def _render_about(cv, about):
 _TOP_HDR = f"{'S':<2}{'ID':>5}{'QUANT':>7}{'RATE':>7}{'WAIT':>9}{'BUSY':>9}{'W/Q':>6}{'B/Q':>6}{'ERR':>5}  {'FORMAT':<16} NAME"
 
 
-def _render_top(cv, st, current, block, presets, body_h):
+def _render_top(cv, st, current, block, presets, body_h, realtime=None):
     if block is None:
         cv.add("  waiting for pw-top…", "dim")
         return
