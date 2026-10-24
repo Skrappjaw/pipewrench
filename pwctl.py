@@ -563,8 +563,8 @@ class Meters:
     Started only while the Mixer is open; stop() ends every one (docs/mixer-plan.md)."""
 
     def __init__(self):
-        self.procs, self.levels, self.lock = {}, {}, threading.Lock()  # levels: key -> (level, when)
-        self.fall = 20  # dB a second; the Tui keeps it in step with Settings
+        self.procs, self.levels, self.lock = {}, {}, threading.Lock()  # key -> (level, when, peak, peak_at)
+        self.fall, self.hold = 20, 1.5  # dB a second, seconds; the Tui keeps them in step with Settings
 
     def sync(self, targets):
         for key in set(self.procs) - set(targets):
@@ -586,8 +586,9 @@ class Meters:
             peak = max(map(abs, array.array("f", data)), default=0.0)
             now = time.monotonic()
             with self.lock:
-                level, when = self.levels.get(key, (0.0, now))
-                self.levels[key] = (pc.meter_level(level, peak, now - when, self.fall), now)
+                level, when, held, held_at = self.levels.get(key, (0.0, now, 0.0, now))
+                self.levels[key] = (pc.meter_level(level, peak, now - when, self.fall), now,
+                                    *pc.hold_peak(held, held_at, peak, now, self.hold))
         p.wait()  # its target went away: reap it, so it doesn't linger as <defunct>
 
     def _stop(self, key):
@@ -605,10 +606,12 @@ class Meters:
             self._stop(key)
 
     def snapshot(self):
-        """Levels now, falling since their last chunk (a suspended node sends none)."""
+        """{key: (level, held peak or None)} now; both keep falling between chunks (a suspended node sends none)."""
         now = time.monotonic()
         with self.lock:
-            return {k: pc.meter_level(level, 0.0, now - when, self.fall) for k, (level, when) in self.levels.items()}
+            return {k: (pc.meter_level(level, 0.0, now - when, self.fall),
+                        pc.held_peak(held, held_at, now, self.hold) if self.hold else None)
+                    for k, (level, when, held, held_at) in self.levels.items()}
 
 
 class Tui:
@@ -828,7 +831,7 @@ class Tui:
     def _sync_meters(self):
         metering = self.st.tab == "mixer" and self.st.meters and self.mixer and not os.environ.get("PWCTL_FIXTURES")
         targets = pc.meter_targets(self.mixer, self.st.mix_cursor) if metering else {}
-        self.meters.fall = self.st.meter_fall
+        self.meters.fall, self.meters.hold = self.st.meter_fall, self.st.peak_hold
         self.meters.sync(targets)
         if self.mixer:
             self.mixer["metered"], self.mixer["levels"] = targets, self.meters.snapshot()
@@ -911,7 +914,8 @@ class Tui:
                 self._apply_theme(scr)  # may replace the message: a theme the terminal can't show
             elif kind == "save_ui":
                 pc.save_ui(pc.ui_path(), pc.ui_prefs(self.st))
-                self.st.message = f"meters: {self.st.meter_fps} fps, fall {self.st.meter_fall} dB/s"
+                hold = f"{self.st.peak_hold:g} s" if self.st.peak_hold else "off"
+                self.st.message = f"meters: {self.st.meter_fps} fps, fall {self.st.meter_fall} dB/s, peak hold {hold}"
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
             elif kind == "mix_cmd":

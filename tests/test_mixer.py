@@ -231,3 +231,26 @@ def test_meter_streams_stay_out_of_patch_and_devices():
     d = DUMP + [meter, link]
     assert all(e.node != 950 for e in pp.graph(d).sources + pp.graph(d).dests)
     assert not any("pw-record" in r.outputs for r in pi.inventory(d).rows())
+
+
+
+# --- peak hold ---------------------------------------------------------------------------------
+
+def test_peak_marker_hangs_then_falls_20_db_a_second():
+    assert pc.held_peak(0.5, 10.0, 11.0, 1.5) == 0.5                      # still in its hold
+    assert abs(pc.held_peak(1.0, 10.0, 12.5, 1.5) - 0.1) < 1e-9           # a second past the hold: -20 dB
+
+
+def test_a_new_peak_restarts_the_hold_and_a_lower_one_does_not():
+    assert pc.hold_peak(0.5, 10.0, 0.8, 11.0, 1.5) == (0.8, 11.0)
+    assert pc.hold_peak(0.5, 10.0, 0.3, 11.0, 1.5) == (0.5, 10.0)
+    assert pc.hold_peak(0.5, 10.0, 0.3, 20.0, 1.5) == (0.3, 20.0)         # the marker has fallen below it
+
+
+def test_marker_sits_above_the_bar_in_its_zone_colour():
+    text, spans = pc._meter_cells(10 ** (-30 / 20), hold=10 ** (-3 / 20))  # bar at -30 dB, peak at -3 dB
+    m = text.index("▌")
+    assert m == 14 and text.count("█") == 6 and (m, m + 1, "alert") in spans
+    text, _ = pc._meter_cells(10 ** (-3 / 20), hold=10 ** (-30 / 20))      # marker under the bar: not drawn
+    assert "▌" not in text
+    assert "▌" not in pc._meter_cells(0.5)[0]                               # hold off

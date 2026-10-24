@@ -44,6 +44,8 @@ THEMES = {
 }
 THEME_NAMES = list(THEMES)
 METER_FALL = [10, 20, 40, 80]  # dB a second: slow, VU-like, through fast
+PEAK_HOLD = [0, 0.5, 1, 1.5, 2, 3]  # seconds a peak marker hangs before it falls; 0 is off
+PEAK_FALL = 20  # dB a second, once the hold is over
 METER_FPS = [5, 10, 15, 20, 30, 45, 60]  # new audio lands once per graph cycle (21 ms at 1024/48k); falls redraw every frame
 THEME_MIN_COLOURS = {"crowbar": 256}  # below this the theme falls back to dark
 
@@ -81,12 +83,13 @@ def load_ui(path):
     ui = ui if isinstance(ui, dict) else {}
     return {"theme": theme if theme in THEMES else "dark",
             "meter_fps": ui.get("meter_fps") if ui.get("meter_fps") in METER_FPS else 10,
-            "meter_fall": ui.get("meter_fall") if ui.get("meter_fall") in METER_FALL else 20}
+            "meter_fall": ui.get("meter_fall") if ui.get("meter_fall") in METER_FALL else 20,
+            "peak_hold": ui.get("peak_hold") if ui.get("peak_hold") in PEAK_HOLD else 1.5}
 
 
 def ui_prefs(st):
     """What ui.json keeps, from the live state."""
-    return {"theme": st.theme, "meter_fps": st.meter_fps, "meter_fall": st.meter_fall}
+    return {"theme": st.theme, "meter_fps": st.meter_fps, "meter_fall": st.meter_fall, "peak_hold": st.peak_hold}
 
 
 def save_ui(path, ui):
@@ -407,6 +410,7 @@ class UIState:
     theme: str = "dark"
     meter_fps: int = 10
     meter_fall: int = 20         # dB a second
+    peak_hold: float = 1.5       # seconds; 0 is off
 
 
 def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
@@ -446,7 +450,8 @@ def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
 THEME_ROW = len(SETTINGS)
 FPS_ROW = THEME_ROW + 1
 FALL_ROW = FPS_ROW + 1
-PRESETS_ROW = FALL_ROW + 1  # the first preset
+HOLD_ROW = FALL_ROW + 1
+PRESETS_ROW = HOLD_ROW + 1  # the first preset
 
 
 def _key_settings(st, key, current, presets):
@@ -456,8 +461,9 @@ def _key_settings(st, key, current, presets):
         return st, [("prompt_save",)]
     if st.cursor >= PRESETS_ROW and key in ("enter", "e", "d", "left", "right"):
         return _key_preset_row(st, key, presets[st.cursor - PRESETS_ROW]["name"])
-    if key in ("left", "right") and st.cursor in (FPS_ROW, FALL_ROW):
-        name, choices = ("meter_fps", METER_FPS) if st.cursor == FPS_ROW else ("meter_fall", METER_FALL)
+    if key in ("left", "right") and st.cursor in (FPS_ROW, FALL_ROW, HOLD_ROW):
+        name, choices = {FPS_ROW: ("meter_fps", METER_FPS), FALL_ROW: ("meter_fall", METER_FALL),
+                         HOLD_ROW: ("peak_hold", PEAK_HOLD)}[st.cursor]
         n = max(0, min(len(choices) - 1, choices.index(getattr(st, name)) + (1 if key == "right" else -1)))
         setattr(st, name, choices[n])
         return st, [("save_ui",)]
@@ -839,6 +845,8 @@ def _render_settings(cv, st, current, block, presets, body_h):
     _display_row(cv, st, THEME_ROW, "Theme", st.theme, "applies at once")
     _display_row(cv, st, FPS_ROW, "Meter frame rate", f"{st.meter_fps} fps", "how often Mixer meters redraw")
     _display_row(cv, st, FALL_ROW, "Meter fall", f"{st.meter_fall} dB/s", "how fast a meter drops after a peak")
+    _display_row(cv, st, HOLD_ROW, "Peak hold", f"{st.peak_hold:g} s" if st.peak_hold else "off",
+                 f"a peak marker hangs, then falls {PEAK_FALL} dB/s")
     cv.add("")
     cv.add("  Presets", "title")
     _render_presets(cv, st, presets)
@@ -1047,12 +1055,38 @@ def meter_level(prev, peak, dt, fall=20):
     return max(peak, prev * 10 ** (-fall * dt / 20))
 
 
-def _meter_cells(level):
-    """(text, spans): lit cells green to -18 dB, yellow to -6 dB, red above; unlit cells dim."""
+def held_peak(value, since, now, hold, fall=PEAK_FALL):
+    """Where a peak marker stands now: at `value` for `hold` seconds after `since`, then falling."""
+    late = now - since - hold
+    return value if late <= 0 else value * 10 ** (-fall * late / 20)
+
+
+def hold_peak(value, since, peak, now, hold):
+    """(value, since) after a new peak: a peak at or over the marker restarts the hold."""
+    return (peak, now) if peak >= held_peak(value, since, now, hold) else (value, since)
+
+
+def _lit(level):
+    """How many cells a level lights."""
     db = 20 * math.log10(level) if level and level > 0 else -_METER_DB
-    n = max(0, min(_METER, round((db + _METER_DB) / (_METER_DB / _METER))))
-    spans = [(c, c + 1, "ok" if c < 10 else "pending" if c < 14 else "alert") for c in range(n)]
-    return "█" * n + "·" * (_METER - n), spans + [(n, _METER, "dim")]
+    return max(0, min(_METER, round((db + _METER_DB) / (_METER_DB / _METER))))
+
+
+def _zone(cell):
+    return "ok" if cell < 10 else "pending" if cell < 14 else "alert"
+
+
+def _meter_cells(level, hold=None):
+    """(text, spans): lit cells green to -18 dB, yellow to -6 dB, red above; unlit cells dim.
+    hold, when given, puts a marker (▌) in its zone's colour on the cell it reaches, above the bar."""
+    n = _lit(level)
+    text = list("█" * n + "·" * (_METER - n))
+    spans = [(c, c + 1, _zone(c)) for c in range(n)] + [(n, _METER, "dim")]
+    m = _lit(hold) - 1 if hold else -1
+    if m >= n:
+        text[m] = "▌"
+        spans.append((m, m + 1, _zone(m)))
+    return "".join(text), spans
 
 
 _BAR = 24          # cells for 0–150%
@@ -1105,7 +1139,8 @@ def _render_mixer(cv, st, mx, body_h):
         c0 = len(head)
         spans = [(c0 + a, c0 + b, r) for a, b, r in spans]
         if (section, row.id) in metered:
-            cells, cell_spans = _meter_cells(levels.get((section, row.id), 0.0))
+            level = levels.get((section, row.id), 0.0)
+            cells, cell_spans = _meter_cells(*(level if isinstance(level, tuple) else (level,)))
             m0 = c0 + len(bar) + 2
             bar += "  " + cells
             spans += [(m0 + a, m0 + b, r) for a, b, r in cell_spans]

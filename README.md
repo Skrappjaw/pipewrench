@@ -169,6 +169,8 @@ PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata 
 - **Meter frame rate** (Display): 5–60 fps for the Mixer's meters; default 10. 60 fps costs pwctl about
   22% CPU with 11 meters, against about 9% at 10 fps.
 - **Meter fall** (Display): 10, 20, 40 or 80 dB a second after a peak; default 20.
+- **Peak hold** (Display): off, 0.5, 1, 1.5, 2 or 3 s; default 1.5. A `▌` marker hangs at the last peak,
+  then falls 20 dB a second.
 - Both are saved with the theme in `~/.config/pwctl/ui.json`.
 - **Theme** (the Display section) is pwctl's own: dark, light, or crowbar (orange, after Mint-Y-Dark-Orange; needs 256 colours). ←→ switches it at once, and it's kept in
   `~/.config/pwctl/ui.json`. The colour roles are described in `docs/ui-conventions.md`.
