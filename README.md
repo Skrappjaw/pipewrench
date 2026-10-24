@@ -43,7 +43,7 @@ PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata 
   `clock.allowed-rates`, applies with a warning.
 - Below the rows: the allowed rates and the defaults (`clock.rate`, `clock.quantum`).
 - These settings are runtime only. A PipeWire restart clears them.
-- **Theme** (the last row) is pwctl's own: dark, light, or orange (Mint-Y-Dark-Orange; needs 256 colours). ←→ switches it at once, and it's kept in
+- **Theme** (the last row) is pwctl's own: dark, light, or crowbar (orange, after Mint-Y-Dark-Orange; needs 256 colours). ←→ switches it at once, and it's kept in
   `~/.config/pwctl/ui.json`. The colour roles are described in `docs/ui-conventions.md`.
 
 | Key | Mouse | Action |

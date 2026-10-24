@@ -33,8 +33,8 @@ THEMES = {
               "title": ("blue", None, "bold"),
               "ok": ("green", None, "bold"), "pending": ("magenta", None, "bold"), "alert": ("red", None, "bold"),
               "chip": ("white", "black", "bold")},
-    # Linux Mint's Mint-Y-Dark-Orange (gtk-3.0 colours); exact hex where the terminal allows.
-    "orange": {"screen": ("#dedee0", "#2e2e33", ""),
+    # Crowbar: Linux Mint's Mint-Y-Dark-Orange (gtk-3.0 colours); exact hex where the terminal allows.
+    "crowbar": {"screen": ("#dedee0", "#2e2e33", ""),
                "normal": (None, None, ""), "dim": (None, None, "dim"),
                "selected": ("#000000", "#ff7139", ""), "anchor": ("#ff7139", "#45454b", ""),
                "title": ("#ff7139", None, "bold"),
@@ -42,7 +42,7 @@ THEMES = {
                "chip": ("#2e2e33", "#dedee0", "")},
 }
 THEME_NAMES = list(THEMES)
-THEME_MIN_COLOURS = {"orange": 256}  # below this the theme falls back to dark
+THEME_MIN_COLOURS = {"crowbar": 256}  # below this the theme falls back to dark
 
 
 def hex_rgb(colour):
@@ -74,6 +74,7 @@ def load_ui(path):
     except (OSError, ValueError):
         ui = {}
     theme = ui.get("theme") if isinstance(ui, dict) else None
+    theme = {"orange": "crowbar"}.get(theme, theme)  # renamed 2026-10-24
     return {"theme": theme if theme in THEMES else "dark"}
 
 

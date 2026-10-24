@@ -196,12 +196,12 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
 
 
 @pytest.mark.parametrize("term", ["xterm-256color", "xterm"])  # exact or nearest colours; dark fallback
-def test_orange_theme_starts(tmp_path, term):
+def test_crowbar_theme_starts(tmp_path, term):
     (tmp_path / "pwctl").mkdir()
-    (tmp_path / "pwctl" / "ui.json").write_text('{"theme": "orange"}')
+    (tmp_path / "pwctl" / "ui.json").write_text('{"theme": "orange"}')  # the old name still loads
     app = Pty(tmp_path, term)
     try:
-        app.expect("needs 256 colours" if term == "xterm" else "orange")
+        app.expect("needs 256 colours" if term == "xterm" else "crowbar")
         app.send("q")
         assert app.wait_exit() == 0
     finally:
