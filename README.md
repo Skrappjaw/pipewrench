@@ -23,6 +23,10 @@ Needs PipeWire's command-line tools: `pw-metadata`, `pw-top`, `pw-dump`, `pw-cat
 **Basic** (everyday audio): Mixer, Devices. **Advanced** (engineering): Patch, Settings (clock and
 presets), Top. pwctl opens on the Mixer.
 
+A **now-playing bar** sits above the keys on every tab. It shows the media player that's playing (MPRIS,
+via `busctl`): `.` play/pause, `/` stop, `<` `>` previous/next, `-` `+` its volume. Notes:
+`docs/media-bar-plan.md`.
+
 Switch views with `Tab`, the number keys `1`–`5`, or a click on the tab bar. `q` quits from any view.
 Every view lists its keys the same way: a boxed legend at the bottom, each key a bold inverted chip with
 what it does beside it, starting with Enter wherever Enter acts. The line under the box carries

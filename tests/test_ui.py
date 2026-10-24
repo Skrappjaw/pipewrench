@@ -422,7 +422,7 @@ def test_no_button_rows(tab):
 def test_multi_key_chips_have_no_hit():
     _, hits = screen(UIState())
     keys = {t[1] for *_, t in hits if t[0] == "key"}
-    assert keys == {"enter", "esc", "s", "R", "q"}  # not ↑↓, ←→ or Tab/1-n
+    assert keys == {"enter", "esc", "s", "R", "q"} | {".", "/", "<", ">", "-", "+"}  # not ↑↓, ←→ or Tab/1-n
 
 
 def test_meter_frame_rate_steps_and_saves():

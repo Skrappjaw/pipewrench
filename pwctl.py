@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pwcore as pc  # noqa: E402
 import pwconfig as pcfg  # noqa: E402
 import pwinventory as pi  # noqa: E402
+import pwmedia as pm  # noqa: E402
 import pwpatch as pp  # noqa: E402
 
 SETTERS = {"rate": "clock.force-rate", "buf": "clock.force-quantum", "min": "clock.min-quantum",
@@ -626,6 +627,7 @@ class Tui:
         self.patch = None
         self.mixer = None
         self.meters = Meters()
+        self.media, self.media_at = None, 0.0  # the player the bar shows, and when it was read
         self.lock = threading.Lock()
         self.proc = None
         self.hits = []
@@ -659,6 +661,44 @@ class Tui:
         if last:
             with self.lock:
                 self.block = last
+
+    def _media_poll(self):
+        """Every second: the MPRIS players, and the one the bar shows. busctl missing just means no bar."""
+        while True:
+            try:
+                rc, text = self.runner(pm.LIST_CMD)
+                players = []
+                for name in pm.parse_names(text) if rc == 0 else []:
+                    rc, text = self.runner(pm.props_cmd(name))
+                    if rc == 0 and (p := pm.parse_player(name, text)):
+                        players.append(p)
+                picked = pm.pick(players, self.media.name if self.media else None)
+            except (OSError, subprocess.SubprocessError):
+                picked = None
+            with self.lock:
+                self.media, self.media_at = picked, time.monotonic()
+            time.sleep(1.0)
+
+    def _media_view(self):
+        with self.lock:
+            p, at = self.media, self.media_at
+        if p is None:
+            return {"player": None}
+        moved = (time.monotonic() - at) * 1_000_000 if p.status == "Playing" else 0
+        return {"player": p, "position": min(p.length or p.position + moved, p.position + moved)}
+
+    def _media_stream(self, player):
+        """The player's PipeWire playback stream, found through its process tree."""
+        rc, text = self.runner(pm.pid_cmd(player.name))
+        dump = _dump(self.runner)
+        streams = [r for r in pi.streams(dump) if r.direction == "out"]
+
+        def parent_of(pid):
+            try:
+                return int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[1])
+            except (OSError, ValueError, IndexError):
+                return None
+        return pm.stream_for(pm.parse_pid(text) if rc == 0 else None, streams, parent_of)
 
     def _refresh(self):
         try:
@@ -725,6 +765,7 @@ class Tui:
         c.mouseinterval(150)
         self._apply_theme(scr)
         threading.Thread(target=self._pwtop, daemon=True).start()
+        threading.Thread(target=self._media_poll, daemon=True).start()
         self._refresh()
         last_refresh = time.monotonic()
         while True:
@@ -842,7 +883,7 @@ class Tui:
         with self.lock:
             block = self.block
         lines, self.hits = pc.render_screen(self.st, self.current, block, self.presets, w, h, self.devices,
-                                            self.patch, self.mixer)
+                                            self.patch, self.mixer, self._media_view())
         scr.erase()
         for y, (text, style) in enumerate(lines):
             try:
@@ -918,6 +959,21 @@ class Tui:
                 self.st.message = f"meters: {self.st.meter_fps} fps, fall {self.st.meter_fall} dB/s, peak hold {hold}"
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
+            elif kind in ("media", "media_volume"):
+                with self.lock:
+                    player = self.media
+                if player is None:
+                    self.st.message = self.st.failed = "no media player found"
+                elif kind == "media":
+                    _run(self.runner, pm.control_cmd(player.name, action[1]))
+                    self.st.message = f"{player.label}: {action[1]}"
+                else:
+                    stream = self._media_stream(player)
+                    if stream is None or stream.volume is None:
+                        self.st.message = self.st.failed = f"{player.label} has no PipeWire stream to set yet"
+                    else:
+                        _run(self.runner, pi.volume_cmd(stream, action[1]))
+                        self.st.message = f"{player.label} volume {action[1]}"
             elif kind == "mix_cmd":
                 _run(self.runner, action[1])
                 verb = {"set-default": "default set", "set-volume": "volume", "set-mute": "mute toggled"}

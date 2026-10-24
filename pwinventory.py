@@ -70,6 +70,7 @@ class Row:
     inputs: tuple = ()        # who plays into it (apps or devices)
     outputs: tuple = ()       # who reads from it: recorders, or an output's monitor
     serial: int = None        # object.serial, what pw-record --target takes
+    pid: int = None           # application.process.id (app streams), to find a media player's stream
 
 
 @dataclass
@@ -204,7 +205,7 @@ def streams(dump):
         volume, mute = _volume(info)
         rows += [Row(id=o["id"], name=p.get("node.name", str(o["id"])), label=display_name(p), direction=d,
                      kind="app", state=info.get("state"), volume=volume, mute=mute, inputs=ins, outputs=outs,
-                     serial=p.get("object.serial"))
+                     serial=p.get("object.serial"), pid=p.get("application.process.id"))
                  for d in directions]
     return sorted(rows, key=lambda r: natural_key(r.label))
 

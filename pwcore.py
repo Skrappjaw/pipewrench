@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pwinventory as pi
+import pwmedia as pm
 import pwpatch as pp
 
 READ_CMD = ["pw-metadata", "-n", "settings", "0"]
@@ -413,6 +414,12 @@ class UIState:
     peak_hold: float = 1.5       # seconds; 0 is off
 
 
+# The now-playing bar's keys work on every tab; no tab uses these characters.
+MEDIA_KEYS = {".": ("media", "play/pause"), "/": ("media", "stop"), "<": ("media", "previous"),
+              ">": ("media", "next"), "-": ("media_volume", "-5%"), "+": ("media_volume", "+5%"),
+              "=": ("media_volume", "+5%")}
+
+
 def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
     """Return (new_state, actions). Nothing touches PipeWire until an action is executed.
 
@@ -437,6 +444,8 @@ def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
     if key.isdigit() and 1 <= int(key) <= len(TABS):
         st.tab = TABS[int(key) - 1]
         return st, []
+    if key in MEDIA_KEYS:
+        return st, [MEDIA_KEYS[key]]
     if st.tab == "mixer":
         return _key_mixer(st, key, mixer)
     if st.tab == "devices":
@@ -774,7 +783,7 @@ def _confirm_question(confirm, devices=None):
             "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now."}[kind]
 
 
-def render_screen(st, current, block, presets, width, height, devices=None, patch=None, mixer=None):
+def render_screen(st, current, block, presets, width, height, devices=None, patch=None, mixer=None, media=None):
     cv = _Canvas(width)
     text, spans = " ", []
     for tab in TABS:
@@ -787,7 +796,7 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
         cv.hit(row, c0, c1, ("tab", tab))
     cv.add("─" * width, "dim")
     footer, chips = _key_box(legend(st), width)
-    body_h = height - len(cv.lines) - 1 - len(footer)
+    body_h = height - len(cv.lines) - 2 - len(footer)  # the now-playing bar and the status line
     if st.tab == "mixer":
         _render_mixer(cv, st, mixer, body_h)
     elif st.tab == "devices":
@@ -797,11 +806,12 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     else:
         {"settings": _render_settings, "top": _render_top}[st.tab](
             cv, st, current, block, presets, body_h)
-    body_end = height - 1 - len(footer)
+    body_end = height - 2 - len(footer)
     cv.lines = cv.lines[:body_end]
     cv.hits = [h for h in cv.hits if h[0] < body_end]
     while len(cv.lines) < body_end:
         cv.add("")
+    _media_bar(cv, media)
     top = len(cv.lines)
     for text, style in footer:
         cv.add(text, style)
@@ -813,6 +823,44 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
         style = ("alert" if st.message == st.failed else "ok") if st.message else "dim"
         cv.add(f" {st.message}" if st.message else f" {HINTS.get(st.tab, '')}", style)
     return cv.lines, cv.hits
+
+
+_MEDIA_CHIPS = [(".", "play"), ("/", "stop"), ("<", "prev"), (">", "next"), ("-", None), ("+", "vol")]
+_STATUS = {"Playing": ("▶", "ok"), "Paused": ("❚❚", "pending"), "Stopped": ("■", "dim")}
+
+
+def _media_bar(cv, media):
+    """One line above the keys on every tab: what's playing, and its keys as clickable chips.
+    media: {"player": pwmedia.Player or None, "position": microseconds now}. When space runs short the
+    song is cut first, then the time; the keys always fit."""
+    right, chips, joined = "", [], False
+    for k, slug in _MEDIA_CHIPS:
+        gap = "" if not right or joined else "  "
+        c0 = len(right) + len(gap)
+        right += f"{gap} {k} " + (f" {slug}" if slug else "")
+        chips.append((c0, c0 + 3, k))
+        joined = slug is None  # "- +" read as one pair
+    player = (media or {}).get("player")
+    room = cv.width - len(right) - 3
+    if player is None:
+        left, spans = "  ♪ nothing playing", [(2, 19, "dim")]
+    else:
+        glyph, role = _STATUS.get(player.status, ("■", "dim"))
+        head = f"  {glyph} {player.label} · "
+        song = " — ".join(x for x in (player.title, player.artist) if x) or "untitled"  # title first: it survives a cut
+        when = f"   {pm.clock(media.get('position', player.position))} / {pm.clock(player.length)}" if player.length else ""
+        if room - len(head) - len(when) < 8:
+            when = ""
+        left = head + _fit(song, max(1, room - len(head) - len(when))) + when
+        spans = [(2, 2 + len(glyph), role), (3 + len(glyph), len(head) - 3, "title")]
+    if room < 12:  # too narrow for both: keys win
+        left, spans = "", []
+    left = left[:max(0, room)]
+    c0 = cv.width - len(right) - 1
+    row = cv.add(left.ljust(c0) + right,
+                 ("normal", [sp for sp in spans if sp[1] <= len(left)] + [(c0 + a, c0 + b, "chip") for a, b, _ in chips]))
+    for a, b, k in chips:
+        cv.hit(row, c0 + a, c0 + b, ("key", k))
 
 
 def _render_settings(cv, st, current, block, presets, body_h):
