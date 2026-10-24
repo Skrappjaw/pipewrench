@@ -1,8 +1,8 @@
 # pwctl
 
 A terminal replacement for PipeControl, for PipeWire on Linux Mint. It changes the sample rate and
-buffer size live, shows `pw-top`, keeps labelled presets, and splits the
-BOSS GCS-8 into named stereo devices that every app can pick.
+buffer size live, shows `pw-top`, keeps labelled presets, and lists every audio device with
+defaults, volume, card profiles, labels and persistent buses.
 
 Standard library Python only. The UI is curses, with keyboard and mouse.
 
@@ -76,51 +76,59 @@ Preset names are 1–32 letters, digits, `-` or `_`.
 
 ### 4 Devices
 
-Splits the GCS-8 into its Windows driver layout: 10 stereo inputs and 7 stereo outputs. Each one is
-a named PipeWire device, plus a few mixing buses. These live in a pwctl-generated PipeWire config
-file, so they exist at every login with fixed node names, and each app remembers its pick.
+An inventory of every audio card, sink, source and bus on the system, read from `pw-dump`.
 
-Each row shows:
-- **status:** `ok` (running), `missing` (in the model but not in PipeWire), `off` (turned off in the
-  model) or `?` (`pw-dump` unavailable)
-- **label:** what apps show
-- **channels:** e.g. `AUX8/9`
-- **node name:** fixed
+- **Layout:** hardware cards first (in name order), each with its active profile. Then
+  **Virtual**: buses and other null sinks, and loopbacks.
+  - Hardware means a node with a device API (`alsa`, `bluez5`); everything else is virtual.
+  - A card whose profile is `off` still shows, so you can switch it on.
+- **Each row shows:**
+  - ★ on the default output and input
+  - direction: out / in / duplex
+  - label, state, volume (wpctl's scale, so 100% is unity) and node id
+- **Tags:**
+  - `pwctl`: the bus comes from pwctl's drop-in
+  - `made outside pwctl`: a live bus with the same name as one in `devices.json`, e.g. one made by a
+    script; applying would make a second
+  - `hidden`
+  - `label → …`: a label saved but not yet applied
+- **Pending buses** (in `devices.json`, not running yet) are listed at the end.
+- **Order within a card:** outputs, then inputs, each in natural `node.name` order. A split
+  multichannel interface such as the BOSS GCS-8 (see github.com/Skrappjaw/gcs-8-linux) therefore
+  reads in channel order.
 
-Inputs, outputs and buses are grouped. Under the buttons, a note says whether the config on disk
-matches `devices.json`, and a two-line key legend is always shown.
+Two kinds of keys:
 
-| Key | Mouse | Action |
-|---|---|---|
-| ↑ ↓ | click a row, or wheel | select |
-| Enter | double-click a row | rename (label only; the node name never changes) |
-| Space | | turn a pair on or off |
-| a | [Add bus] | add a bus; asks for a name |
-| d | | delete the selected bus, after y/n (pairs can only be turned off) |
-| p | [Preview] | show the diff of the config file in `$PAGER` (default `less`) |
-| A | [Apply] | write the config file and restart PipeWire, after y/n, then check |
-| t | [Test] | play a 1-second quiet noise burst on the selected output pair |
+| Act at once | |
+|---|---|
+| d | make the selected device the default output or input |
+| ← → | volume −5% / +5% |
+| Space | mute toggle |
+| p | switch the card's profile (prompts with the list; on a card heading or any of its rows) |
+| t | play a 1-second quiet noise burst on an output |
 
-Edits save to `devices.json` straight away. **Nothing reaches PipeWire until `A` is confirmed.**
-Apply restarts `pipewire`, `pipewire-pulse` and `wireplumber`, which interrupts audio for a moment.
+| Edit `devices.json` (applied with A) | |
+|---|---|
+| Enter | label the device (empty clears). Apps show the label; the node name never changes, so they keep their picks |
+| h | hide or unhide the row or card (pwctl only, saved at once) |
+| a / x | add a bus / delete a bus that's in `devices.json` |
+| v | preview the generated files in `$PAGER` |
+| A | write the generated files and restart, after y/n |
 
-Default pairs (from the GCS-8 Windows driver, `RDIF1240.INF`):
+View toggles: **H** shows hidden rows (dimmed), **m** adds a "(monitor)" input per output, as
+capture apps such as OBS see them.
 
-| Inputs | AUX | Outputs | AUX |
-|---|---|---|---|
-| GCS-8 MAIN | 0/1 | GCS-8 CH USB | 0/1 |
-| GCS-8 MONITOR | 2/3 | GCS-8 MAIN-AUX | 2/3 |
-| GCS-8 CH 1 (Guitar) | 4/5 | GCS-8 CH 1-AUX | 4/5 |
-| GCS-8 CH 2 (Mic) | 6/7 | GCS-8 CH 2-AUX | 6/7 |
-| GCS-8 CH 3 | 8/9 | GCS-8 CH 3-AUX (Music) | 8/9 |
-| GCS-8 CH 4 | 10/11 | GCS-8 CH 4-AUX (Voip) | 10/11 |
-| GCS-8 CH USB | 12/13 | GCS-8 CH SOUND PAD | 12/13 |
-| GCS-8 CH MOBILE (Phone) | 14/15 | | |
-| GCS-8 CH BLUETOOTH | 16/17 | | |
-| GCS-8 CH SOUND PAD | 18/19 | | |
+**Apply restarts only what it must:**
+- **WirePlumber**, when only labels changed
+- **PipeWire**, when buses or the clock changed
 
-Default buses: SYSTEM and GAME. The config also sets `default.clock.rate = 48000`, and leaves the
-buffer size to presets.
+After the restart it checks that every bus exists and every label shows.
+
+Mouse:
+- click selects; double-click edits the label; the wheel moves the selection
+- buttons for Default, Mute, Label, Profile, Add bus and Apply
+
+The key legend is always on screen.
 
 ## Command line
 
@@ -135,13 +143,22 @@ pwctl preset save NAME [LABEL]       save the current settings
 pwctl preset apply NAME
 pwctl preset delete NAME
 
-pwctl devices [list]                 pairs and buses with live status
-pwctl devices preview                diff of the config file against what's on disk
-pwctl devices apply                  show the diff, ask, write, restart PipeWire, check
-pwctl devices rollback               ask, restore the previous config (or remove it), restart
-pwctl devices check                  confirm every expected node is running on the right AUX pair
-pwctl devices test PAIR              noise burst on an output pair, e.g. `test ch3aux`
+pwctl devices [list] [--hidden] [--monitors]   every card, device and bus
+pwctl devices default DEV            make DEV the default output or input
+pwctl devices volume DEV STEP        +5%, -5%, 50% or 0.5
+pwctl devices mute DEV               toggle
+pwctl devices profile CARD PROFILE   by index or name, e.g. `profile GCS-8 HiFi` (asks first)
+pwctl devices test DEV               noise burst on an output, to find it by ear
+pwctl devices label DEV TEXT | label DEV --clear
+pwctl devices hide NAME | unhide NAME   a device or a whole card, in pwctl only
+pwctl devices bus add NAME [LABEL] | bus delete NAME
+pwctl devices preview                diff of the generated files against what's on disk
+pwctl devices apply                  show the diff, ask, write, restart what's needed, check
+pwctl devices rollback               ask, restore the previous files (or remove them), restart
 ```
+
+DEV is a node id, an exact `node.name`, or a label that matches exactly one device. CARD is a card id,
+name or label.
 
 Exit codes: 0 ok; 1 a PipeWire command failed, a check found problems or you answered no;
 2 bad input.
@@ -151,60 +168,56 @@ Exit codes: 0 ok; 1 a PipeWire command failed, a check found problems or you ans
 | Path | Written by | What |
 |---|---|---|
 | `~/.config/pwctl/presets.json` | Presets view, `preset save/delete` | presets |
-| `~/.config/pwctl/devices.json` | Devices view, `devices apply` | the devices model: the source of truth |
-| `~/.config/pipewire/pipewire.conf.d/50-pwctl-devices.conf` | `devices apply` only | the generated PipeWire config file ("drop-in") |
-| `…/50-pwctl-devices.conf.bak` | `devices apply` | the previous config file, used by rollback |
+| `~/.config/pwctl/devices.json` | Devices view, `devices label/hide/bus` | buses, labels, hidden rows, clock: the source of truth |
+| `~/.config/pipewire/pipewire.conf.d/50-pwctl-devices.conf` | `devices apply` | the buses and clock, as a PipeWire drop-in |
+| `~/.config/wireplumber/main.lua.d/51-pwctl-labels.lua` | `devices apply` | labels as WirePlumber 0.4 rules |
+| `~/.config/wireplumber/wireplumber.conf.d/51-pwctl-labels.conf` | `devices apply` | the same on WirePlumber 0.5+ |
+| `….bak` next to each generated file | `devices apply` | the previous version, used by rollback |
 
-The drop-in starts with a "Generated by pwctl" header. pwctl refuses to overwrite or roll back a
-file at that path without the header.
+- Both generated files start with a "Generated by pwctl" header. pwctl refuses to overwrite or roll
+  back a file without it.
+- A generated file is only created when there's something to put in it.
 
-`devices.json` shape:
+`devices.json`:
 
 ```json
 {
-  "device": {"out": "alsa_output.usb-BOSS_GCS-8-01.pro-output-0",
-             "in": "alsa_input.usb-BOSS_GCS-8-01.pro-input-0"},
+  "version": 2,
   "clock_rate": 48000,
-  "pairs": [{"id": "ch2", "dir": "in", "aux": 6, "label": "GCS-8 CH 2 (Mic)", "enabled": true}],
-  "buses": [{"name": "SYSTEM", "label": "SYSTEM"}]
+  "buses": [{"name": "OBS", "label": "OBS feed"}],
+  "labels": {"alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_6_7__source": "GCS-8 CH 2 (Mic)"},
+  "hidden": ["alsa_card.usb-046d_HD_Pro_Webcam_C920_0123ABCD-02"]
 }
 ```
 
-Validation rules:
-- `aux` is even and in range: 14 output channels, 20 input.
-- No two pairs in one direction share an id, channels or a label.
-- Labels have no quotes, backslashes or newlines.
-- Bus names are 1–32 letters, digits, `-` or `_`.
-- `clock_rate` is one of the Settings rates, or `null` to leave it out.
+- **Validation:**
+  - bus names are 1–32 letters, digits, `-` or `_`
+  - labels have no quotes, backslashes or newlines
+  - `clock_rate` is one of the Settings rates, or `null` to leave the clock alone
+- **Older files:** a version 1 file (from the GCS-8 loopback-pair design) loses its pairs on load and
+  keeps its buses and clock.
 
-## How the devices work
+## How the generated files work
 
-Each pair is one `libpipewire-module-loopback`:
-- **Output pair:** a stereo `Audio/Sink` that apps play into. Its other side plays to the GCS-8 on
-  the pair's two AUX channels.
-- **Input pair:** captures two AUX channels from the GCS-8 and presents them as a stereo
-  `Audio/Source`.
-- **Hardware side:** `stream.dont-remix` and `node.passive` are set, so the channels are passed
-  straight through and the loopback doesn't keep the device awake on its own.
+- **Buses:** each one is a `support.null-audio-sink` with `media.class = Audio/Duplex` and
+  `object.linger`, created by PipeWire at start-up from the drop-in. Its node name is the bus name.
+- **Labels:** WirePlumber rules that set `node.description` for a matching `node.name` when the
+  device appears.
+  - ALSA devices use `alsa_monitor.rules` (0.4) or `monitor.alsa.rules` (0.5+).
+  - Bluetooth devices use the bluez equivalents.
+  - pwctl reads the version from `wireplumber --version`.
 
-Each bus is a `support.null-audio-sink` with `media.class = Audio/Duplex` and `object.linger`, the
-same kind of device `start_audio.sh` made with `pactl`, but persistent.
-
-Node names:
-- **Pairs:** `pwctl.gcs8.<in|out>.<id>`, with `.hw` on the hardware side. They never depend on the
-  label.
-- **Buses:** the bus name itself, so apps that remember today's `SYSTEM` keep it.
-
-Before the full set goes live, `docs/hand-check.md` proves the mechanism with one pair in each
-direction.
+pwctl no longer makes devices of its own for a particular interface. Device-specific splits belong
+in ALSA UCM profiles, which work for every app and distribution; the GCS-8 one is at
+github.com/Skrappjaw/gcs-8-linux.
 
 ## Environment
 
 | Variable | Effect |
 |---|---|
 | `PWCTL_PRESETS` | use this presets file instead of the default |
-| `PWCTL_DEVICES` | use this devices file instead of the default (the hand check uses it) |
-| `XDG_CONFIG_HOME` | base for both config files and the drop-in |
+| `PWCTL_DEVICES` | use this devices file instead of the default |
+| `XDG_CONFIG_HOME` | base for both config files and the generated files |
 | `PWCTL_FIXTURES` | read from recorded output in that folder and drop all writes (demo and tests) |
 | `PAGER` | pager for the Devices preview |
 
@@ -214,7 +227,8 @@ direction.
 |---|---|
 | `pwctl.py` | entry point: CLI dispatch, the subprocess runner, the curses `Tui` |
 | `pwcore.py` | pure logic: settings metadata, `pw-top` parsing, presets, the UI state machine and screen rendering |
-| `pwdevices.py` | pure logic for Devices: discovery, model, config generation, apply/rollback, checks |
+| `pwinventory.py` | pure logic: the device inventory from `pw-dump`, lookups, wpctl command builders |
+| `pwconfig.py` | pure logic: `devices.json`, the generated drop-in and label rules, apply/rollback safety |
 
 The pure modules never run commands. Callers pass a `runner(argv) -> (rc, output)`, which is how
 the tests replace PipeWire.
@@ -242,41 +256,56 @@ the tests replace PipeWire.
   - `render_screen(st, current, block, presets, width, height, devices)` → `(lines, hits)`: lines
     with styles, plus a hit map for the mouse
 
-### pwdevices.py
+### pwinventory.py
 
-- **Discovery:**
-  - `read_dump(run)`, `nodes(dump)`
-  - `find_hw(dump)`: the GCS-8 pro output and input nodes, with their channel counts
-- **Model:**
-  - `default_model()`, `validate_model(m, channels)`
-  - `devices_path()`, `load_model`, `save_model`
-  - `pair_node_name(p)`
-- **Edits** (each returns a new, validated model):
-  - `dev_items(m)`
-  - `set_label(m, item, label)`, `toggle_pair(m, dir, id)`
-  - `add_bus(m, name)`, `delete_bus(m, name)`
-- **Config file:**
-  - `render_pair(p, m)`, `render_bus(b)`, `render_dropin(m)`
-- **Apply:**
-  - `dropin_path()`, `check_ours(path)`
-  - `diff_dropin(path, text)`: unified diff against what's on disk
-  - `write_dropin(path, text)`: atomic, keeps `.bak`, returns False when unchanged
-  - `rollback_dropin(path)`
-  - `RESTART_CMD`
+- **Reading:**
+  - `read_dump(run)`
+  - `inventory(dump)`: an `Inventory` of `Card`s (with `Profile`s and their `Row`s), `virtual`
+    rows and the configured `defaults`. App streams are left out.
+- **Lookup:**
+  - `Inventory.find(key)`: a row by id, `node.name`, or a label that matches exactly one row
+  - `Inventory.find_card(key)`
+- **Display:**
+  - `monitor_rows(rows)`: one "(monitor)" input per output
+  - `view(inv, hidden, show_hidden, monitors)`: headings and rows, as the CLI lists them
+- **Commands:**
+  - `default_cmd(row)`, `mute_cmd(row)`
+  - `volume_cmd(row, step)`: `+5%`, `-5%`, `50%` or `0.5`, up to 150%
+  - `profile_cmd(card, profile)`: by index or name
+
+### pwconfig.py
+
+- **devices.json:**
+  - `default_config()`, `validate_config(c)`, `migrate(c)`
+  - `config_path()`, `load_config`, `save_config`
+- **Edits** (each returns a new, validated config):
+  - `set_label(c, name, label)`
+  - `add_bus`, `delete_bus`, `toggle_hidden`
+- **Generated files:**
+  - `render_dropin(c)`, `dropin_path()`
+  - `render_labels(c, version)`, `labels_path(version)`, `wireplumber_version(run)`
+- **Safety:**
+  - `check_ours(path)`
+  - `diff_generated(path, text)`
+  - `write_generated(path, text)`: atomic, keeps `.bak`, returns False when unchanged
+  - `rollback_generated(path)`
 - **Checks:**
-  - `check_applied(m, dump)`: problems, or `[]` when everything is running on the right channels
-  - `pair_status(m, dump)`: node name → running
+  - `bus_conflicts(c, live_names, applied_text)`: buses that exist live but aren't pwctl's
+  - `check_applied(c, live)`: missing buses and labels not showing, after an apply
+- **Restart commands:** `RESTART_PIPEWIRE`, `RESTART_WIREPLUMBER`
 
 ### pwctl.py
 
 - `main(argv, runner, out, err, execvp, ask)`: no arguments starts the UI; otherwise runs a command.
   `ask` is the y/n prompt, which tests replace.
 - `_devices(...)`: the `devices` subcommands.
-- `_problems(m, runner, settle)`: re-checks while PipeWire comes back from a restart.
-- `_test_pair(runner, m, id)`, `write_noise(path)`: the test burst.
-- `Tui`: the curses loop, plus a background `pw-top` reader. It refreshes every second; on the
-  Devices tab it also re-reads `pw-dump` and `devices.json`. It carries out the actions the state
-  machine returns.
+- `_generated(runner, c, version)`: the generated files that differ from disk, each with the
+  restart it needs.
+- `_settled_problems(c, runner)`: re-checks while PipeWire or WirePlumber comes back.
+- `_play_noise(runner, row)`, `write_noise(path)`: the test burst.
+- `Tui`: the curses loop, plus a background `pw-top` reader.
+  - It refreshes every second; on the Devices tab it also re-reads `pw-dump` and `devices.json`.
+  - It carries out the actions the state machine returns.
 
 ## Tests
 
@@ -289,11 +318,13 @@ PWCTL_LIVE=1 python3 -m pytest tests/test_live.py # read-only checks against the
 |---|---|
 | `test_core.py`, `test_presets.py` | settings parsing, ordering, validation, presets |
 | `test_ui.py` | Settings, Top and Presets keys, mouse and rendering |
-| `test_cli.py` | v1 commands |
-| `test_devices.py` | discovery, model, config generation (golden files in `tests/fixtures/golden/`, plus a `spa-json-dump` parse), apply/rollback, checks, edits |
+| `test_cli.py` | settings and preset commands |
+| `test_inventory.py` | cards, rows, grouping, order, defaults, volume, lookup, monitors, hidden (fixture: a trimmed live `pw-dump`) |
+| `test_config.py` | `devices.json` v2, migration, edits, generated files (golden files in `tests/fixtures/golden/`), backups, rollback, checks |
+| `test_commands.py` | wpctl command builders, bus clash check |
 | `test_devices_cli.py` | `pwctl devices …` with a fake runner; restarts are recorded, never run |
 | `test_devices_ui.py` | Devices tab keys, mouse, rendering, scrolling, key legend |
 | `test_tui_smoke.py` | the real curses UI in a pty against fixtures |
 | `test_live.py` | opt-in; writes back only the values already set |
 
-The plan and history are in `docs/devices-plan.md`; current state is in `HANDOFF.md`.
+The design is in `docs/devices-v2-plan.md`; current state is in `HANDOFF.md`.
