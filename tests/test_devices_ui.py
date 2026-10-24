@@ -187,14 +187,18 @@ def click(st, target, event="click"):
     return pc.handle_mouse(st, hits, row, c0, event, CUR, [], devices=dv())
 
 
-def test_buttons_land_on_labels():
+def test_apply_is_a_chip():
     lines, hits = screen(pc.UIState(tab="devices"))
-    for target, label in (("dev_default", "[Default]"), ("dev_mute", "[Mute]"), ("dev_label", "[Actions]"),
-                          ("dev_profile", "[Profile]"), ("dev_add_bus", "[Add bus]"), ("dev_apply", "[Apply]")):
-        r, c0, c1 = hit_for(hits, ("button", target))
-        assert lines[r][0][c0:c1] == label
-    _, actions = click(pc.UIState(tab="devices"), ("button", "dev_apply"))
+    r, c0, c1 = hit_for(hits, ("key", "A"))
+    assert lines[r][0][c0:c1] == " A "
+    _, actions = click(pc.UIState(tab="devices"), ("key", "A"))
     assert actions == [("dev_apply",)]
+
+
+def test_note_follows_the_list_after_one_blank_line():
+    text = [t for t, _ in screen(pc.UIState(tab="devices"))[0]]
+    note = next(i for i, t in enumerate(text) if "generated files" in t or "not written yet" in t)
+    assert text[note - 1].strip() == "" and text[note - 2].strip()
 
 
 def test_rows_show_connections():

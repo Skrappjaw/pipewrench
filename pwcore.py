@@ -24,20 +24,20 @@ THEMES = {
     "dark": {"screen": (None, None, ""),
              "normal": (None, None, ""), "dim": (None, None, "dim"),
              "selected": ("black", "cyan", ""), "anchor": ("white", "blue", ""),
-             "title": ("cyan", None, "bold"), "button": ("green", None, "bold"),
+             "title": ("cyan", None, "bold"),
              "ok": ("green", None, "bold"), "pending": ("yellow", None, "bold"), "alert": ("red", None, "bold"),
              "chip": ("black", "white", "")},
     "light": {"screen": ("black", "brightwhite", ""),
               "normal": (None, None, ""), "dim": (None, None, "dim"),
               "selected": ("black", "cyan", ""), "anchor": ("white", "blue", ""),
-              "title": ("blue", None, "bold"), "button": ("green", None, "bold"),
+              "title": ("blue", None, "bold"),
               "ok": ("green", None, "bold"), "pending": ("magenta", None, "bold"), "alert": ("red", None, "bold"),
               "chip": ("white", "black", "bold")},
     # Linux Mint's Mint-Y-Dark-Orange (gtk-3.0 colours); exact hex where the terminal allows.
     "orange": {"screen": ("#dedee0", "#2e2e33", ""),
                "normal": (None, None, ""), "dim": (None, None, "dim"),
                "selected": ("#000000", "#ff7139", ""), "anchor": ("#ff7139", "#45454b", ""),
-               "title": ("#ff7139", None, "bold"), "button": ("#ff7139", None, "bold"),
+               "title": ("#ff7139", None, "bold"),
                "ok": ("#73d216", None, "bold"), "pending": ("#f6d32d", None, "bold"), "alert": ("#fc4138", None, "bold"),
                "chip": ("#2e2e33", "#dedee0", "")},
 }
@@ -586,12 +586,6 @@ def _key_devices(st, key, devices):
     return st, []
 
 
-_MOUSE_BUTTONS = {"apply": "enter", "revert": "esc", "restart": "R", "preset_apply": "enter",
-                  "preset_save": "s", "preset_edit": "e", "preset_delete": "d",
-                  "dev_default": "d", "dev_mute": " ", "dev_label": "enter", "dev_profile": "p",
-                  "dev_add_bus": "a", "dev_apply": "A"}
-
-
 def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=None):
     """Map a mouse event onto the same keys the keyboard uses."""
     if st.confirm:
@@ -609,8 +603,8 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
     elif kind == "arrow":
         st = dataclasses.replace(st, cursor=target[1])
         keys = ["right" if target[2] > 0 else "left"] if event in ("click", "double") else []
-    elif kind == "button":
-        keys = [_MOUSE_BUTTONS[target[1]]] if event in ("click", "double") else []
+    elif kind == "key":  # a legend chip
+        keys = [target[1]] if event in ("click", "double") else []
     elif kind == "preset":
         st = dataclasses.replace(st, preset_cursor=target[1])
         keys = ["enter"] if event == "double" else []
@@ -653,7 +647,7 @@ LEGENDS = {
     "presets": [("Enter", "apply"), ("↑↓", "select"), ("s", "save current"), ("e", "edit label"),
                 ("d", "delete")] + TAB_KEYS,
     "devices": [("Enter", "actions"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"), ("d", "default"),
-                ("m", "monitors"), ("H", "show hidden"), ("R", "restart WirePlumber")] + TAB_KEYS,
+                ("m", "monitors"), ("H", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
     "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
     "patch cols": [("Enter", "connect/disconnect"), ("↑↓", "select"), ("←→", "column"), ("p", "ports"),
                    ("g", "grid view"), ("m", "monitors")] + TAB_KEYS,
@@ -669,8 +663,8 @@ HINTS = {"devices": "buses and volume act at once · new labels show after a Wir
 
 
 def _key_box(items, width):
-    """The key legend as a box: each key a chip (drawn bold and inverted) with its slug beside it, flowed
-    onto as many lines as the width needs. Item lines carry ("keys", [(col0, col1), ...]) for the chips."""
+    """The key legend as a box: each key a chip with its slug beside it, flowed onto as many lines as the
+    width needs. Returns (lines, chips): chips are (box line, col0, col1, key) for chips one key presses."""
     inner = max(10, width - 4)
     rows, cur, spans = [], "", []
     for key, slug in items:
@@ -680,14 +674,20 @@ def _key_box(items, width):
             cur, spans, gap = "", [], ""
         c0 = len(cur) + len(gap)
         cur += f"{gap} {key}  {slug}"
-        spans.append((c0, c0 + len(key) + 2))
+        spans.append((c0, c0 + len(key) + 2, key))
     if cur:
         rows.append((cur, spans))
-    lines = [("┌─ Keys " + "─" * max(0, width - 9) + "┐", "dim")]
+    lines, chips = [("┌─ Keys " + "─" * max(0, width - 9) + "┐", "dim")], []
     for text, sp in rows:
-        lines.append(("│ " + text.ljust(inner) + " │", ("normal", [(c0 + 2, c1 + 2, "chip") for c0, c1 in sp])))
+        lines.append(("│ " + text.ljust(inner) + " │", ("normal", [(c0 + 2, c1 + 2, "chip") for c0, c1, _ in sp])))
+        chips += [(len(lines) - 1, c0 + 2, c1 + 2, _chip_key(k)) for c0, c1, k in sp if _chip_key(k)]
     lines.append(("└" + "─" * max(0, width - 2) + "┘", "dim"))
-    return lines
+    return lines, chips
+
+
+def _chip_key(label):
+    """The key a click on a chip presses; None for chips that name several (↑↓, Tab/1-5)."""
+    return {"Enter": "enter", "Esc": "esc", "Space": " "}.get(label) or (label if len(label) == 1 else None)
 
 
 def legend(st):
@@ -724,16 +724,6 @@ class _Canvas:
             self.hits.append((row, c0, min(c1, self.width), target))
 
 
-def _buttons(cv, labels):
-    text, spans = "  ", []
-    for target, label in labels:
-        spans.append((len(text), len(text) + len(label) + 2, target))
-        text += f"[{label}]  "
-    row = cv.add(text.rstrip(), "button")
-    for c0, c1, target in spans:
-        cv.hit(row, c0, c1, ("button", target))
-
-
 def _confirm_question(confirm, devices=None):
     kind, arg = confirm[0], (confirm[1] if len(confirm) > 1 else None)
     if kind == "dev_profile":
@@ -757,7 +747,7 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     for c0, c1, tab in spans:
         cv.hit(row, c0, c1, ("tab", tab))
     cv.add("─" * width, "dim")
-    footer = _key_box(legend(st), width)
+    footer, chips = _key_box(legend(st), width)
     body_h = height - len(cv.lines) - 1 - len(footer)
     if st.tab == "devices":
         _render_devices(cv, st, devices, body_h)
@@ -771,8 +761,11 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     cv.hits = [h for h in cv.hits if h[0] < body_end]
     while len(cv.lines) < body_end:
         cv.add("")
+    top = len(cv.lines)
     for text, style in footer:
         cv.add(text, style)
+    for n, c0, c1, k in chips:
+        cv.hit(top + n, c0, c1, ("key", k))
     if st.confirm:
         cv.add(f" {_confirm_question(st.confirm, devices)} y/n", "alert")
     else:
@@ -802,8 +795,6 @@ def _render_settings(cv, st, current, block, presets, body_h):
     cv.hit(row, arrow_l, arrow_l + 1, ("arrow", THEME_ROW, -1))
     cv.hit(row, arrow_l + 1, arrow_r, ("setting", THEME_ROW))
     cv.hit(row, arrow_r, arrow_r + 1, ("arrow", THEME_ROW, +1))
-    cv.add("")
-    _buttons(cv, [("apply", "Apply"), ("revert", "Revert"), ("restart", "Restart WirePlumber")])
     cv.add("")
     allowed = current.get("clock.allowed-rates")
     allowed = ", ".join(map(str, allowed)) if isinstance(allowed, list) else "?"
@@ -839,15 +830,12 @@ def _render_top(cv, st, current, block, presets, body_h):
 
 def _render_presets(cv, st, current, block, presets, body_h):
     if not presets:
-        cv.add("  no presets yet; press s (or click Save current) to save the current settings", "dim")
+        cv.add("  no presets yet; press s to save the current settings", "dim")
     for i, p in enumerate(presets):
         sel = i == min(st.preset_cursor, len(presets) - 1)
         line = f"{'> ' if sel else '  '}{p['name']:<16} {p['label']:<28} {summarize_preset(p)}"
         row = cv.add(line, "selected" if sel else "normal")
         cv.hit(row, 0, cv.width, ("preset", i))
-    cv.add("")
-    _buttons(cv, [("preset_apply", "Apply"), ("preset_save", "Save current"),
-                  ("preset_edit", "Edit label"), ("preset_delete", "Delete")])
 
 
 # Always on screen in the Devices tab; the bottom help line is too narrow and gives way to messages.
@@ -909,7 +897,7 @@ def _render_devices(cv, st, devices, body_h):
             title = obj.label if kind in ("row", "card") else obj["name"]
             lines += _menu_lines(devices, st, title)
             menu_at = len(lines) - 1
-    room = max(1, body_h - 3)  # blank line, buttons and note sit below
+    room = max(1, body_h - 2)  # blank line and note sit below
     at = menu_at if menu_at is not None else next((n for n, line in enumerate(lines) if line[1] == "selected"), 0)
     start = 0 if at < room else at - room + 1
     for text, style, idx in lines[start:start + room]:
@@ -919,8 +907,6 @@ def _render_devices(cv, st, devices, body_h):
         elif idx is not None:
             cv.hit(row, 0, cv.width, ("device", idx))
     cv.add("")
-    _buttons(cv, [("dev_default", "Default"), ("dev_mute", "Mute"), ("dev_label", "Actions"),
-                  ("dev_profile", "Profile"), ("dev_add_bus", "Add bus"), ("dev_apply", "Apply")])
     if devices["dirty"]:
         cv.add("  * label or clock changes not written yet; A writes them (no restart)", "pending")
     else:

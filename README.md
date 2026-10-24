@@ -50,9 +50,9 @@ PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata 
 |---|---|---|
 | ↑ ↓ | click a row | select a setting |
 | ← → | click ◀ ▶, or the wheel over a row | step the value (pending) |
-| Enter | [Apply], or double-click a row | write all pending values |
-| Esc | [Revert] | drop pending values |
-| R | [Restart WirePlumber] | restart WirePlumber, after y/n |
+| Enter | its chip, or double-click a row | write all pending values |
+| Esc | its chip | drop pending values |
+| R | its chip | restart WirePlumber, after y/n |
 
 ### 2 Top
 
@@ -71,10 +71,10 @@ log level). They're stored in `~/.config/pwctl/presets.json`.
 | Key | Mouse | Action |
 |---|---|---|
 | ↑ ↓ | click a row | select a preset |
-| Enter | [Apply], or double-click | write the preset's values (ordered as in Settings) |
-| s | [Save current] | save the current settings; asks for a name, then a label |
-| e | [Edit label] | relabel the selected preset |
-| d | [Delete] | delete it, after y/n |
+| Enter | its chip, or double-click | write the preset's values (ordered as in Settings) |
+| s | its chip | save the current settings; asks for a name, then a label |
+| e | its chip | relabel the selected preset |
+| d | its chip | delete it, after y/n |
 
 Preset names are 1–32 letters, digits, `-` or `_`.
 
@@ -140,7 +140,7 @@ for one) don't reconnect. So:
 
 Mouse:
 - click selects; double-click edits the label; the wheel moves the selection
-- buttons for Default, Mute, Label, Profile, Add bus and Apply
+- click a key chip in the legend to press that key
 
 The key legend is always on screen.
 

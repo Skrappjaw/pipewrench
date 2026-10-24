@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -234,8 +235,8 @@ def test_hitmap_lands_on_drawn_glyphs(width):
         assert text_at(lines, r, c0) == "◀"
         r, c0, _ = hit_for(hits, ("arrow", i, +1))
         assert text_at(lines, r, c0) == "▶"
-    r, c0, c1 = hit_for(hits, ("button", "apply"))
-    assert lines[r][0][c0:c1] == "[Apply]"
+    r, c0, c1 = hit_for(hits, ("key", "enter"))
+    assert lines[r][0][c0:c1] == " Enter "  # a chip's hit covers just the chip
     r, c0, c1 = hit_for(hits, ("tab", "top"))
     assert "Top" in lines[r][0][c0:c1]
 
@@ -272,12 +273,12 @@ def test_wheel_over_row_steps_value():
     assert st.pending == {}
 
 
-def test_apply_and_revert_buttons():
+def test_apply_and_revert_chips():
     st, _ = key(pc.UIState(), "down", "down", "down", "right")
     _, hits = screen(st)
-    _, actions = click(st, hits, ("button", "apply"))
+    _, actions = click(st, hits, ("key", "enter"))
     assert actions == key(st, "enter")[1]
-    st2, actions = click(st, hits, ("button", "revert"))
+    st2, actions = click(st, hits, ("key", "esc"))
     assert st2.pending == {} and actions == []
 
 
@@ -288,10 +289,10 @@ def test_double_click_row_applies():
     assert actions == [("set_many", [("clock.force-quantum", 256)])]
 
 
-def test_restart_button_needs_confirmation():
+def test_restart_chip_needs_confirmation():
     st = pc.UIState()
     _, hits = screen(st)
-    st, actions = click(st, hits, ("button", "restart"))
+    st, actions = click(st, hits, ("key", "R"))
     assert actions == [] and st.confirm == ("restart",)
 
 
@@ -309,9 +310,9 @@ def test_presets_mouse():
     assert st.preset_cursor == 1 and actions == []
     _, actions = click(st, hits, ("preset", 0), event="double")
     assert actions == [("apply_preset", "tracking")]
-    _, actions = click(st, hits, ("button", "preset_save"))
+    _, actions = click(st, hits, ("key", "s"))
     assert actions == [("prompt_save",)]
-    st2, actions = click(st, hits, ("button", "preset_delete"))
+    st2, actions = click(st, hits, ("key", "d"))
     assert actions == [] and st2.confirm == ("delete", "mix")
 
 
@@ -391,3 +392,18 @@ def test_orange_theme_is_mint_y_dark_orange():
     o = pc.THEMES["orange"]
     assert o["selected"][1] == "#ff7139" and o["screen"][1] == "#2e2e33"
     assert pc.load_ui is not None and "orange" in pc.THEME_NAMES
+
+
+# --- no button rows; the legend's chips take the mouse --------------------------------------
+
+@pytest.mark.parametrize("tab", ["settings", "presets", "devices", "patch"])
+def test_no_button_rows(tab):
+    lines, hits = screen(pc.UIState(tab=tab))
+    assert not any(t[0] == "button" for *_, t in hits)
+    assert not any(re.search(r"\[[A-Z][a-z]+( [a-z]+)*\]", text) for text, _ in lines[1:])
+
+
+def test_multi_key_chips_have_no_hit():
+    _, hits = screen(pc.UIState())
+    keys = {t[1] for *_, t in hits if t[0] == "key"}
+    assert keys == {"enter", "esc", "R", "q"}  # not ↑↓, ←→ or Tab/1-5

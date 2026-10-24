@@ -687,7 +687,7 @@ class Tui:
 
     # Without colour the roles fall back to attributes; the > and * markers carry the rest.
     _PLAIN = {"selected": "reverse bold", "anchor": "underline", "chip": "reverse", "title": "bold",
-              "button": "bold", "alert": "bold", "pending": "bold", "dim": "dim"}
+              "alert": "bold", "pending": "bold", "dim": "dim"}
 
     def _apply_theme(self, scr):
         """Curses attributes for each colour role of the current theme (pc.THEMES)."""
