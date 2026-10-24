@@ -962,8 +962,14 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
             j = right[n]
             mark = "> " if j == st.patch_dst and st.patch_side == "dst" else "  "
             rt = f"{mark}{_STATE_MARK[g.state(s, g.dests[j])].replace('·', ' ')} {_fit(g.dests[j].label, half - 4)}"
-        selected = (n < len(left) and left[n] == st.patch_src and st.patch_side == "src")
-        row = cv.add(f"{lt:<{half}}│ {rt}", "selected" if selected else "normal")
+        # The cursor's highlight covers only its own column.
+        if st.patch_side == "src" and n < len(left) and left[n] == st.patch_src:
+            style = ("selected", [(0, half)])
+        elif st.patch_side == "dst" and n < len(right) and right[n] == st.patch_dst:
+            style = ("selected", [(half + 2, cv.width)])
+        else:
+            style = "normal"
+        row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), style)
         if n < len(left):
             cv.hit(row, 0, half, ("patch_src", left[n]))
         if n < len(right):

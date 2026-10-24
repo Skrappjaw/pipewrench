@@ -721,10 +721,11 @@ class Tui:
         scr.erase()
         for y, (text, style) in enumerate(lines):
             try:
-                if isinstance(style, tuple):  # a key-legend line: chips drawn bold and inverted
+                if isinstance(style, tuple):  # (kind, spans): key chips bold-inverted, a "selected" span inverted
                     scr.addstr(y, 0, text, self.styles["normal"])
+                    attr = self.styles["selected"] if style[0] == "selected" else self.curses.A_REVERSE | self.curses.A_BOLD
                     for c0, c1 in style[1]:
-                        scr.addstr(y, c0, text[c0:c1], self.curses.A_REVERSE | self.curses.A_BOLD)
+                        scr.addstr(y, c0, text[c0:c1], attr)
                 else:
                     scr.addstr(y, 0, text[:w - 1] if y == h - 1 else text, self.styles.get(style, 0))
             except self.curses.error:

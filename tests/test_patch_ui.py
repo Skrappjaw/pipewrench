@@ -79,6 +79,15 @@ def test_columns_mark_targets_of_selected_source():
     assert "Discord → GCS-8 CH 4-AUX" in text  # the status line for the selected pair
 
 
+def test_highlight_covers_only_the_active_column():
+    def spans(st):
+        return [style[1] for _, style in screen(st)[0] if isinstance(style, tuple) and style[0] == "selected"]
+    (src,), = spans(at("Discord"))
+    assert src[0] == 0 and src[1] < 60  # left column only
+    (dst,), = spans(at("Discord", "GCS-8 CH 4-AUX", patch_side="dst"))
+    assert dst[0] > 40 and dst[1] == 100  # right column only
+
+
 def test_monitors_hidden_until_m():
     assert "(monitor)" not in body(screen(pc.UIState(tab="patch"))[0])
     st, _ = key(pc.UIState(tab="patch"), "m")
