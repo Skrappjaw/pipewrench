@@ -161,7 +161,8 @@ How it works:
 |---|---|
 | ↑ ↓ / ← → | columns: select / switch column. Grid: source / destination |
 | Enter | connect or disconnect the selected pair (on a source in columns: move to the destinations) |
-| p | port matrix for the selected pair: ↑↓ source port, ←→ destination port, Enter links/unlinks; `p`/Esc back |
+| → (columns) | move to the destinations, landing on one the source already feeds |
+| p | port matrix for the chosen source and destination (on the source side it moves you to the destinations first): ↑↓ source port, ←→ destination port, Enter links/unlinks; `p`/Esc back |
 | g | switch between columns and grid |
 | m | show or hide output monitors |
 

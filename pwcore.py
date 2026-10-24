@@ -815,6 +815,11 @@ def _key_patch(st, key, g):
             st.patch_ports = False
         return st, []
     if key == "p":
+        if st.patch_view == "cols" and st.patch_side == "src":
+            # Ports belong to a pair the user chose: source, then destination, then port.
+            _enter_dests(g, st, s)
+            st.message = "choose a destination, then press p"
+            return st, []
         st.patch_ports, st.patch_port_row, st.patch_port_col = True, 0, 0
         return st, []
     step = {"up": -1, "down": 1}.get(key)
@@ -826,18 +831,28 @@ def _key_patch(st, key, g):
         elif key == "enter":
             return _toggle(g, st, s, d)
         return st, []
-    if key in ("left", "right"):
-        st.patch_side = "dst" if key == "right" else "src"
+    if key == "left":
+        st.patch_side = "src"
+    elif key == "right" and st.patch_side == "src":
+        _enter_dests(g, st, s)
     elif step and st.patch_side == "src":
         st.patch_src = max(0, min(len(srcs) - 1, st.patch_src + step))
     elif step:
         st.patch_dst = max(0, min(len(g.dests) - 1, st.patch_dst + step))
     elif key == "enter":
         if st.patch_side == "src":
-            st.patch_side = "dst"
+            _enter_dests(g, st, s)
         else:
             return _toggle(g, st, s, d)
     return st, []
+
+
+def _enter_dests(g, st, s):
+    """Move to the destination column, landing on something the source already feeds."""
+    st.patch_side = "dst"
+    targets = g.targets(s)
+    if targets and g.dests[st.patch_dst] not in targets:
+        st.patch_dst = g.dests.index(targets[0])
 
 
 def _window(n, cursor, room):

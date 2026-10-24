@@ -242,3 +242,29 @@ def test_click_grid_cell():
     st = pc.UIState(tab="patch", patch_view="grid")
     st, _ = click(st, ("patch_cell", si("Discord"), di("GCS-8 CH 4-AUX")))
     assert (st.patch_src, st.patch_dst) == (si("Discord"), di("GCS-8 CH 4-AUX"))
+
+
+# --- journey: source, then destination, then port ----------------------------------------
+
+def test_p_on_the_source_side_asks_for_a_destination_first():
+    st, actions = key(at("Discord", "GCS-8 CH USB"), "p")
+    assert not st.patch_ports and actions == []
+    assert st.patch_side == "dst" and "destination" in st.message
+
+
+def test_moving_to_destinations_lands_on_the_first_target():
+    st, _ = key(at("Discord", "GCS-8 CH USB"), "right")
+    assert st.patch_side == "dst" and st.patch_dst == di("GCS-8 CH 4-AUX")
+    st, _ = key(at("Discord", "GCS-8 CH USB"), "enter")
+    assert st.patch_dst == di("GCS-8 CH 4-AUX")
+
+
+def test_unconnected_source_keeps_the_destination_cursor():
+    st, _ = key(at("GCS-8 CH 1", "GCS-8 CH 3-AUX"), "right")
+    assert st.patch_dst == di("GCS-8 CH 3-AUX")
+
+
+def test_full_journey_opens_ports_for_the_chosen_pair():
+    st, _ = key(at("GCS-8 CH 1", "Discord"), "enter", "down", "p")   # source, move to dests, pick, ports
+    assert st.patch_ports
+    assert f"Ports: GCS-8 CH 1 → {G.dests[di('Discord') + 1].label}" in body(screen(st)[0])
