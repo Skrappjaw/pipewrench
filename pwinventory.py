@@ -163,9 +163,10 @@ def is_meter(props):
 
 
 def meter_cmd(serial, monitor):
-    """A pw-record that streams a node's audio as raw stereo f32 on stdout; monitor reads a sink's output."""
+    """A pw-record that streams a node's audio as raw stereo f32 on stdout; monitor reads a sink's output.
+    stdbuf -o0: into a pipe, pw-record otherwise holds 4 KB back, which at 3 kHz is a write every 170 ms."""
     props = "{ node.name = " + METER_NAME + ", node.dont-reconnect = true" + (", stream.capture.sink = true" if monitor else "") + " }"
-    return ["pw-record", "--target", str(serial), "--rate", str(METER_RATE), "--channels", "2", "--format", "f32",
+    return ["stdbuf", "-o0", "pw-record", "--target", str(serial), "--rate", str(METER_RATE), "--channels", "2", "--format", "f32",
             "-P", props, "-"]
 
 

@@ -564,6 +564,7 @@ class Meters:
 
     def __init__(self):
         self.procs, self.levels, self.lock = {}, {}, threading.Lock()  # levels: key -> (level, when)
+        self.fall = 20  # dB a second; the Tui keeps it in step with Settings
 
     def sync(self, targets):
         for key in set(self.procs) - set(targets):
@@ -578,17 +579,24 @@ class Meters:
                 threading.Thread(target=self._read, args=(key, p), daemon=True).start()
 
     def _read(self, key, p):
-        chunk = pi.METER_RATE * 8 // 20  # 50 ms of stereo f32
-        while data := p.stdout.read(chunk):
-            peak = max(map(abs, array.array("f", data[:len(data) // 4 * 4])), default=0.0)
+        fd, rest = p.stdout.fileno(), b""
+        while data := os.read(fd, 65536):  # each write as it lands, not a fixed-size wait
+            data, cut = rest + data, (len(rest) + len(data)) // 4 * 4
+            data, rest = data[:cut], data[cut:]
+            peak = max(map(abs, array.array("f", data)), default=0.0)
             now = time.monotonic()
             with self.lock:
                 level, when = self.levels.get(key, (0.0, now))
-                self.levels[key] = (pc.meter_level(level, peak, now - when), now)
+                self.levels[key] = (pc.meter_level(level, peak, now - when, self.fall), now)
+        p.wait()  # its target went away: reap it, so it doesn't linger as <defunct>
 
     def _stop(self, key):
         p = self.procs.pop(key)
         p.terminate()
+        try:
+            p.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            p.kill()
         with self.lock:
             self.levels.pop(key, None)
 
@@ -600,7 +608,7 @@ class Meters:
         """Levels now, falling since their last chunk (a suspended node sends none)."""
         now = time.monotonic()
         with self.lock:
-            return {k: pc.meter_level(level, 0.0, now - when) for k, (level, when) in self.levels.items()}
+            return {k: pc.meter_level(level, 0.0, now - when, self.fall) for k, (level, when) in self.levels.items()}
 
 
 class Tui:
@@ -820,6 +828,7 @@ class Tui:
     def _sync_meters(self):
         metering = self.st.tab == "mixer" and self.st.meters and self.mixer and not os.environ.get("PWCTL_FIXTURES")
         targets = pc.meter_targets(self.mixer, self.st.mix_cursor) if metering else {}
+        self.meters.fall = self.st.meter_fall
         self.meters.sync(targets)
         if self.mixer:
             self.mixer["metered"], self.mixer["levels"] = targets, self.meters.snapshot()
@@ -897,12 +906,12 @@ class Tui:
                 self.st.message = "WirePlumber restarted" if rc == 0 else f"restart failed: {out.strip()}"
                 self.st.failed = "" if rc == 0 else self.st.message
             elif kind == "set_theme":
-                pc.save_ui(pc.ui_path(), {"theme": self.st.theme, "meter_fps": self.st.meter_fps})
+                pc.save_ui(pc.ui_path(), pc.ui_prefs(self.st))
                 self.st.message = f"theme: {action[1]}"
                 self._apply_theme(scr)  # may replace the message: a theme the terminal can't show
             elif kind == "save_ui":
-                pc.save_ui(pc.ui_path(), {"theme": self.st.theme, "meter_fps": self.st.meter_fps})
-                self.st.message = f"meters redraw at {self.st.meter_fps} fps"
+                pc.save_ui(pc.ui_path(), pc.ui_prefs(self.st))
+                self.st.message = f"meters: {self.st.meter_fps} fps, fall {self.st.meter_fall} dB/s"
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
             elif kind == "mix_cmd":

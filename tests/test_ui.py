@@ -366,13 +366,13 @@ def test_every_theme_defines_every_role():
 
 def test_ui_file_round_trips_and_tolerates_junk(tmp_path):
     p = tmp_path / "pwctl" / "ui.json"
-    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10}
-    pc.save_ui(p, {"theme": "light", "meter_fps": 20})
-    assert pc.load_ui(p) == {"theme": "light", "meter_fps": 20}
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20}
+    pc.save_ui(p, {"theme": "light", "meter_fps": 20, "meter_fall": 80})
+    assert pc.load_ui(p) == {"theme": "light", "meter_fps": 20, "meter_fall": 80}
     p.write_text("{not json")
-    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10}
-    p.write_text('{"theme": "neon", "meter_fps": 60}')
-    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10}
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20}
+    p.write_text('{"theme": "neon", "meter_fps": 120}')
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20}
 
 
 def test_failed_messages_are_red_and_others_green():
@@ -429,10 +429,22 @@ def test_meter_frame_rate_steps_and_saves():
     st = UIState(cursor=pc.FPS_ROW)
     st, actions = key(st, "right")
     assert st.meter_fps == 15 and actions == [("save_ui",)]
-    st, _ = key(st, "right", "right", "right")
-    assert st.meter_fps == 20  # stops at the top; nothing new past 20
-    st, _ = key(st, *["left"] * 6)
+    st, _ = key(st, *["right"] * 8)
+    assert st.meter_fps == 60  # stops at the top
+    st, _ = key(st, *["left"] * 8)
     assert st.meter_fps == 5
     text = "\n".join(t for t, _ in screen(st, height=40)[0])
     assert "Meter frame rate" in text and "5 fps" in text
     assert text.index("Theme") < text.index("Meter frame rate") < text.index("Presets")
+
+
+def test_meter_fall_steps_and_saves():
+    st = UIState(cursor=pc.FALL_ROW)
+    st, actions = key(st, "right")
+    assert st.meter_fall == 40 and actions == [("save_ui",)]
+    st, _ = key(st, *["left"] * 6)
+    assert st.meter_fall == 10
+    assert pc.ui_prefs(st) == {"theme": "dark", "meter_fps": 10, "meter_fall": 10}
+    text = "\n".join(t for t, _ in screen(st, height=40)[0])
+    assert "Meter fall" in text and "10 dB/s" in text
+    assert text.index("Meter frame rate") < text.index("Meter fall") < text.index("Presets")

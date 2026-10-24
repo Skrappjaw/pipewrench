@@ -43,7 +43,8 @@ THEMES = {
                "chip": ("#2e2e33", "#dedee0", "")},
 }
 THEME_NAMES = list(THEMES)
-METER_FPS = [5, 10, 15, 20]  # meters get new audio every 50 ms, so past 20 fps nothing changes
+METER_FALL = [10, 20, 40, 80]  # dB a second: slow, VU-like, through fast
+METER_FPS = [5, 10, 15, 20, 30, 45, 60]  # new audio lands once per graph cycle (21 ms at 1024/48k); falls redraw every frame
 THEME_MIN_COLOURS = {"crowbar": 256}  # below this the theme falls back to dark
 
 
@@ -77,8 +78,15 @@ def load_ui(path):
         ui = {}
     theme = ui.get("theme") if isinstance(ui, dict) else None
     theme = {"orange": "crowbar"}.get(theme, theme)  # renamed 2026-10-24
-    fps = ui.get("meter_fps") if isinstance(ui, dict) else None
-    return {"theme": theme if theme in THEMES else "dark", "meter_fps": fps if fps in METER_FPS else 10}
+    ui = ui if isinstance(ui, dict) else {}
+    return {"theme": theme if theme in THEMES else "dark",
+            "meter_fps": ui.get("meter_fps") if ui.get("meter_fps") in METER_FPS else 10,
+            "meter_fall": ui.get("meter_fall") if ui.get("meter_fall") in METER_FALL else 20}
+
+
+def ui_prefs(st):
+    """What ui.json keeps, from the live state."""
+    return {"theme": st.theme, "meter_fps": st.meter_fps, "meter_fall": st.meter_fall}
 
 
 def save_ui(path, ui):
@@ -398,6 +406,7 @@ class UIState:
     failed: str = ""             # the message is drawn red while it still equals this
     theme: str = "dark"
     meter_fps: int = 10
+    meter_fall: int = 20         # dB a second
 
 
 def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
@@ -436,7 +445,8 @@ def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
 # Settings is one list: the clock rows, then Display (pwctl's own rows; they apply at once), then presets.
 THEME_ROW = len(SETTINGS)
 FPS_ROW = THEME_ROW + 1
-PRESETS_ROW = FPS_ROW + 1  # the first preset
+FALL_ROW = FPS_ROW + 1
+PRESETS_ROW = FALL_ROW + 1  # the first preset
 
 
 def _key_settings(st, key, current, presets):
@@ -446,8 +456,10 @@ def _key_settings(st, key, current, presets):
         return st, [("prompt_save",)]
     if st.cursor >= PRESETS_ROW and key in ("enter", "e", "d", "left", "right"):
         return _key_preset_row(st, key, presets[st.cursor - PRESETS_ROW]["name"])
-    if key in ("left", "right") and st.cursor == FPS_ROW:
-        st.meter_fps = METER_FPS[max(0, min(len(METER_FPS) - 1, METER_FPS.index(st.meter_fps) + (1 if key == "right" else -1)))]
+    if key in ("left", "right") and st.cursor in (FPS_ROW, FALL_ROW):
+        name, choices = ("meter_fps", METER_FPS) if st.cursor == FPS_ROW else ("meter_fall", METER_FALL)
+        n = max(0, min(len(choices) - 1, choices.index(getattr(st, name)) + (1 if key == "right" else -1)))
+        setattr(st, name, choices[n])
         return st, [("save_ui",)]
     if key in ("up", "down"):
         st.cursor = max(0, min(last, st.cursor + (1 if key == "down" else -1)))
@@ -826,6 +838,7 @@ def _render_settings(cv, st, current, block, presets, body_h):
     cv.add("  Display", "title")
     _display_row(cv, st, THEME_ROW, "Theme", st.theme, "applies at once")
     _display_row(cv, st, FPS_ROW, "Meter frame rate", f"{st.meter_fps} fps", "how often Mixer meters redraw")
+    _display_row(cv, st, FALL_ROW, "Meter fall", f"{st.meter_fall} dB/s", "how fast a meter drops after a peak")
     cv.add("")
     cv.add("  Presets", "title")
     _render_presets(cv, st, presets)
@@ -1029,9 +1042,9 @@ def meter_targets(mx, cursor):
     return {k: target for _, _, k, target in sorted(picks)[:METER_CAP]}
 
 
-def meter_level(prev, peak, dt):
-    """A peak meter's falling level: jumps up at once, falls 20 dB a second."""
-    return max(peak, prev * 10 ** (-dt))
+def meter_level(prev, peak, dt, fall=20):
+    """A peak meter's level: jumps up at once, then falls `fall` dB a second."""
+    return max(peak, prev * 10 ** (-fall * dt / 20))
 
 
 def _meter_cells(level):

@@ -190,6 +190,8 @@ def test_meters_are_capped():
 def test_meter_level_jumps_up_and_falls_20_db_a_second():
     assert pc.meter_level(0.1, 0.5, 0.05) == 0.5
     assert abs(pc.meter_level(1.0, 0.0, 1.0) - 0.1) < 1e-9
+    assert abs(pc.meter_level(1.0, 0.0, 1.0, fall=40) - 0.01) < 1e-9   # 40 dB in a second
+    assert abs(pc.meter_level(1.0, 0.0, 0.5, fall=80) - 0.01) < 1e-9   # 80 dB/s: 40 dB in half
 
 
 def test_meter_cells_colour_by_level():
@@ -203,7 +205,7 @@ def test_meter_cells_colour_by_level():
 
 def test_meter_cmd_reads_a_monitor_for_outputs():
     cmd = pi.meter_cmd(42, True)
-    assert cmd[:3] == ["pw-record", "--target", "42"] and cmd[-1] == "-"
+    assert cmd[:5] == ["stdbuf", "-o0", "pw-record", "--target", "42"] and cmd[-1] == "-"
     assert "stream.capture.sink = true" in cmd[cmd.index("-P") + 1] and pi.METER_NAME in cmd[cmd.index("-P") + 1]
     assert "stream.capture.sink" not in pi.meter_cmd(42, False)[pi.meter_cmd(42, False).index("-P") + 1]
 
