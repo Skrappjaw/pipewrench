@@ -1,0 +1,1504 @@
+[
+ {
+  "id": 34,
+  "type": "PipeWire:Interface:Metadata",
+  "props": {
+   "client.id": 35,
+   "factory.id": 6,
+   "metadata.name": "default",
+   "module.id": 5,
+   "object.serial": 39
+  },
+  "metadata": [
+   {
+    "subject": 0,
+    "key": "default.configured.audio.sink",
+    "type": "Spa:String:JSON",
+    "value": {
+     "name": "alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_2_3__sink"
+    }
+   },
+   {
+    "subject": 0,
+    "key": "default.configured.audio.source",
+    "type": "Spa:String:JSON",
+    "value": {
+     "name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_6_7__source"
+    }
+   },
+   {
+    "subject": 0,
+    "key": "default.video.source",
+    "type": "Spa:String:JSON",
+    "value": {
+     "name": "v4l2_input.pci-0000_00_14.0-usb-0_3_1.0"
+    }
+   },
+   {
+    "subject": 0,
+    "key": "default.audio.sink",
+    "type": "Spa:String:JSON",
+    "value": {
+     "name": "alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_2_3__sink"
+    }
+   },
+   {
+    "subject": 0,
+    "key": "default.audio.source",
+    "type": "Spa:String:JSON",
+    "value": {
+     "name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_6_7__source"
+    }
+   },
+   {
+    "subject": 207,
+    "key": "target.node",
+    "type": "Spa:Id",
+    "value": -1
+   }
+  ]
+ },
+ {
+  "id": 39,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "[ FL, FR ]",
+    "factory.name": "support.null-audio-sink",
+    "media.class": "Audio/Duplex",
+    "node.description": "SYSTEM Audio/Duplex sink",
+    "node.name": "SYSTEM",
+    "object.id": 39,
+    "object.linger": 1
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     }
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 50,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "[ FL, FR ]",
+    "factory.name": "support.null-audio-sink",
+    "media.class": "Audio/Duplex",
+    "node.description": "MUSIC Audio/Duplex sink",
+    "node.name": "MUSIC",
+    "object.id": 50,
+    "object.linger": 1
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     }
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 52,
+  "type": "PipeWire:Interface:Device",
+  "info": {
+   "state": null,
+   "props": {
+    "device.api": "alsa",
+    "device.bus": "pci",
+    "device.description": "HDA ATI HDMI",
+    "device.name": "alsa_card.pci-0000_03_00.1",
+    "device.nick": "HDA ATI HDMI",
+    "media.class": "Audio/Device",
+    "object.id": 52
+   },
+   "params": {
+    "EnumProfile": [
+     {
+      "index": 0,
+      "name": "off",
+      "description": "Off",
+      "available": "yes"
+     },
+     {
+      "index": 1,
+      "name": "output:hdmi-stereo",
+      "description": "Digital Stereo (HDMI) Output",
+      "available": "no"
+     },
+     {
+      "index": 2,
+      "name": "output:hdmi-stereo-extra1",
+      "description": "Digital Stereo (HDMI 2) Output",
+      "available": "yes"
+     },
+     {
+      "index": 3,
+      "name": "output:hdmi-stereo-extra2",
+      "description": "Digital Stereo (HDMI 3) Output",
+      "available": "yes"
+     },
+     {
+      "index": 4,
+      "name": "output:hdmi-stereo-extra3",
+      "description": "Digital Stereo (HDMI 4) Output",
+      "available": "no"
+     },
+     {
+      "index": 5,
+      "name": "output:hdmi-surround",
+      "description": "Digital Surround 5.1 (HDMI) Output",
+      "available": "no"
+     },
+     {
+      "index": 6,
+      "name": "output:hdmi-surround71",
+      "description": "Digital Surround 7.1 (HDMI) Output",
+      "available": "no"
+     },
+     {
+      "index": 7,
+      "name": "output:hdmi-surround-extra3",
+      "description": "Digital Surround 5.1 (HDMI 4) Output",
+      "available": "no"
+     },
+     {
+      "index": 8,
+      "name": "output:hdmi-surround71-extra3",
+      "description": "Digital Surround 7.1 (HDMI 4) Output",
+      "available": "no"
+     },
+     {
+      "index": 9,
+      "name": "pro-audio",
+      "description": "Pro Audio",
+      "available": "unknown"
+     }
+    ],
+    "Profile": [
+     {
+      "index": 0,
+      "name": "off",
+      "description": "Off",
+      "available": "yes"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": 53,
+  "type": "PipeWire:Interface:Device",
+  "info": {
+   "state": null,
+   "props": {
+    "device.api": "alsa",
+    "device.bus": "usb",
+    "device.description": "HD Pro Webcam C920",
+    "device.name": "alsa_card.usb-046d_HD_Pro_Webcam_C920_0123ABCD-02",
+    "device.nick": "HD Pro Webcam C920",
+    "media.class": "Audio/Device",
+    "object.id": 53
+   },
+   "params": {
+    "EnumProfile": [
+     {
+      "index": 0,
+      "name": "off",
+      "description": "Off",
+      "available": "yes"
+     },
+     {
+      "index": 1,
+      "name": "input:analog-stereo",
+      "description": "Analog Stereo Input",
+      "available": "unknown"
+     },
+     {
+      "index": 2,
+      "name": "input:iec958-stereo",
+      "description": "Digital Stereo (IEC958) Input",
+      "available": "unknown"
+     },
+     {
+      "index": 3,
+      "name": "pro-audio",
+      "description": "Pro Audio",
+      "available": "yes"
+     }
+    ],
+    "Profile": [
+     {
+      "index": 0,
+      "name": "off",
+      "description": "Off",
+      "available": "yes"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": 55,
+  "type": "PipeWire:Interface:Device",
+  "info": {
+   "state": null,
+   "props": {
+    "device.api": "alsa",
+    "device.bus": "pci",
+    "device.description": "Built-in Audio",
+    "device.name": "alsa_card.pci-0000_00_1b.0",
+    "device.nick": "HDA Intel PCH",
+    "media.class": "Audio/Device",
+    "object.id": 55
+   },
+   "params": {
+    "EnumProfile": [
+     {
+      "index": 0,
+      "name": "off",
+      "description": "Off",
+      "available": "yes"
+     },
+     {
+      "index": 1,
+      "name": "output:analog-stereo+input:analog-stereo",
+      "description": "Analog Stereo Duplex",
+      "available": "no"
+     },
+     {
+      "index": 2,
+      "name": "output:analog-stereo",
+      "description": "Analog Stereo Output",
+      "available": "no"
+     },
+     {
+      "index": 3,
+      "name": "output:iec958-stereo+input:analog-stereo",
+      "description": "Digital Stereo (IEC958) Output + Analog Stereo Input",
+      "available": "yes"
+     },
+     {
+      "index": 4,
+      "name": "output:iec958-stereo",
+      "description": "Digital Stereo (IEC958) Output",
+      "available": "yes"
+     },
+     {
+      "index": 5,
+      "name": "output:analog-surround-21+input:analog-stereo",
+      "description": "Analog Surround 2.1 Output + Analog Stereo Input",
+      "available": "no"
+     },
+     {
+      "index": 6,
+      "name": "output:analog-surround-41+input:analog-stereo",
+      "description": "Analog Surround 4.1 Output + Analog Stereo Input",
+      "available": "no"
+     },
+     {
+      "index": 7,
+      "name": "output:analog-surround-51+input:analog-stereo",
+      "description": "Analog Surround 5.1 Output + Analog Stereo Input",
+      "available": "no"
+     },
+     {
+      "index": 8,
+      "name": "output:analog-surround-21",
+      "description": "Analog Surround 2.1 Output",
+      "available": "no"
+     },
+     {
+      "index": 9,
+      "name": "output:analog-surround-41",
+      "description": "Analog Surround 4.1 Output",
+      "available": "no"
+     },
+     {
+      "index": 10,
+      "name": "output:analog-surround-51",
+      "description": "Analog Surround 5.1 Output",
+      "available": "no"
+     },
+     {
+      "index": 11,
+      "name": "output:analog-surround-40+input:analog-stereo",
+      "description": "Analog Surround 4.0 Output + Analog Stereo Input",
+      "available": "no"
+     },
+     {
+      "index": 12,
+      "name": "output:analog-surround-50+input:analog-stereo",
+      "description": "Analog Surround 5.0 Output + Analog Stereo Input",
+      "available": "no"
+     },
+     {
+      "index": 13,
+      "name": "output:analog-surround-71+input:analog-stereo",
+      "description": "Analog Surround 7.1 Output + Analog Stereo Input",
+      "available": "no"
+     },
+     {
+      "index": 14,
+      "name": "output:analog-surround-40",
+      "description": "Analog Surround 4.0 Output",
+      "available": "no"
+     },
+     {
+      "index": 15,
+      "name": "output:analog-surround-50",
+      "description": "Analog Surround 5.0 Output",
+      "available": "no"
+     },
+     {
+      "index": 16,
+      "name": "output:analog-surround-71",
+      "description": "Analog Surround 7.1 Output",
+      "available": "no"
+     },
+     {
+      "index": 17,
+      "name": "output:iec958-ac3-surround-51+input:analog-stereo",
+      "description": "Digital Surround 5.1 (IEC958/AC3) Output + Analog Stereo Input",
+      "available": "no"
+     },
+     {
+      "index": 18,
+      "name": "output:iec958-ac3-surround-51",
+      "description": "Digital Surround 5.1 (IEC958/AC3) Output",
+      "available": "unknown"
+     },
+     {
+      "index": 19,
+      "name": "input:analog-stereo",
+      "description": "Analog Stereo Input",
+      "available": "no"
+     },
+     {
+      "index": 20,
+      "name": "pro-audio",
+      "description": "Pro Audio",
+      "available": "unknown"
+     }
+    ],
+    "Profile": [
+     {
+      "index": 0,
+      "name": "off",
+      "description": "Off",
+      "available": "yes"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": 68,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "[ FL, FR ]",
+    "factory.name": "support.null-audio-sink",
+    "media.class": "Audio/Duplex",
+    "node.description": "VOIP Audio/Duplex sink",
+    "node.name": "VOIP",
+    "object.id": 68,
+    "object.linger": 1
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     }
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 124,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "[ FL, FR ]",
+    "factory.name": "support.null-audio-sink",
+    "media.class": "Audio/Duplex",
+    "node.description": "VOIP_MIC Audio/Duplex sink",
+    "node.name": "VOIP_MIC",
+    "object.id": 124,
+    "object.linger": 1
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     }
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 193,
+  "type": "PipeWire:Interface:Device",
+  "info": {
+   "state": null,
+   "props": {
+    "device.api": "alsa",
+    "device.bus": "usb",
+    "device.description": "DualShock 4 [CUH-ZCT2x]",
+    "device.name": "alsa_card.usb-Sony_Interactive_Entertainment_Wireless_Controller-00",
+    "device.nick": "Wireless Controller",
+    "media.class": "Audio/Device",
+    "object.id": 193
+   },
+   "params": {
+    "EnumProfile": [
+     {
+      "index": 0,
+      "name": "off",
+      "description": "Off",
+      "available": "yes"
+     },
+     {
+      "index": 1,
+      "name": "output:analog-stereo+input:mono-fallback",
+      "description": "Analog Stereo Output + Mono Input",
+      "available": "unknown"
+     },
+     {
+      "index": 2,
+      "name": "output:analog-stereo",
+      "description": "Analog Stereo Output",
+      "available": "unknown"
+     },
+     {
+      "index": 3,
+      "name": "output:iec958-stereo+input:mono-fallback",
+      "description": "Digital Stereo (IEC958) Output + Mono Input",
+      "available": "unknown"
+     },
+     {
+      "index": 4,
+      "name": "output:iec958-stereo",
+      "description": "Digital Stereo (IEC958) Output",
+      "available": "unknown"
+     },
+     {
+      "index": 5,
+      "name": "pro-audio",
+      "description": "Pro Audio",
+      "available": "yes"
+     },
+     {
+      "index": 6,
+      "name": "input:mono-fallback",
+      "description": "Mono Input",
+      "available": "unknown"
+     }
+    ],
+    "Profile": [
+     {
+      "index": 1,
+      "name": "output:analog-stereo+input:mono-fallback",
+      "description": "Analog Stereo Output + Mono Input",
+      "available": "unknown"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": 143,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 193,
+    "factory.name": "api.alsa.pcm.sink",
+    "media.class": "Audio/Sink",
+    "node.description": "DualShock 4 [CUH-ZCT2x] Analog Stereo",
+    "node.name": "alsa_output.usb-Sony_Interactive_Entertainment_Wireless_Controller-00.analog-stereo",
+    "node.nick": "Wireless Controller",
+    "object.id": 143,
+    "priority.session": 1009
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 162,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 1,
+    "audio.position": "MONO",
+    "device.api": "alsa",
+    "device.id": 193,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "DualShock 4 [CUH-ZCT2x] Mono",
+    "node.name": "alsa_input.usb-Sony_Interactive_Entertainment_Wireless_Controller-00.mono-fallback",
+    "node.nick": "Wireless Controller",
+    "object.id": 162,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 173,
+  "type": "PipeWire:Interface:Device",
+  "info": {
+   "state": null,
+   "props": {
+    "device.api": "alsa",
+    "device.bus": "usb",
+    "device.description": "Rocksmith Guitar Adapter",
+    "device.name": "alsa_card.usb-Hercules_Rocksmith_USB_Guitar_Adapter-00",
+    "device.nick": "Rocksmith USB Guitar Adapter",
+    "media.class": "Audio/Device",
+    "object.id": 173
+   },
+   "params": {
+    "EnumProfile": [
+     {
+      "index": 0,
+      "name": "off",
+      "description": "Off",
+      "available": "yes"
+     },
+     {
+      "index": 1,
+      "name": "pro-audio",
+      "description": "Pro Audio",
+      "available": "yes"
+     },
+     {
+      "index": 2,
+      "name": "input:mono-fallback",
+      "description": "Mono Input",
+      "available": "unknown"
+     }
+    ],
+    "Profile": [
+     {
+      "index": 2,
+      "name": "input:mono-fallback",
+      "description": "Mono Input",
+      "available": "unknown"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": 196,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 1,
+    "audio.position": "MONO",
+    "device.api": "alsa",
+    "device.id": 173,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "Rocksmith Guitar Adapter Mono",
+    "node.name": "alsa_input.usb-Hercules_Rocksmith_USB_Guitar_Adapter-00.mono-fallback",
+    "node.nick": "Rocksmith USB Guitar Adapter",
+    "object.id": 196,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 95,
+  "type": "PipeWire:Interface:Device",
+  "info": {
+   "state": null,
+   "props": {
+    "device.api": "alsa",
+    "device.bus": "usb",
+    "device.description": "GCS-8",
+    "device.name": "alsa_card.usb-BOSS_GCS-8-01",
+    "device.nick": "GCS-8",
+    "media.class": "Audio/Device",
+    "object.id": 95
+   },
+   "params": {
+    "EnumProfile": [
+     {
+      "index": 0,
+      "name": "off",
+      "description": "Off",
+      "available": "yes"
+     },
+     {
+      "index": 1,
+      "name": "HiFi",
+      "description": "Default",
+      "available": "unknown"
+     },
+     {
+      "index": 2,
+      "name": "Direct",
+      "description": "Direct GCS-8",
+      "available": "unknown"
+     },
+     {
+      "index": 3,
+      "name": "pro-audio",
+      "description": "Pro Audio",
+      "available": "yes"
+     }
+    ],
+    "Profile": [
+     {
+      "index": 1,
+      "name": "HiFi",
+      "description": "Default",
+      "available": "unknown"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": 89,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.sink",
+    "media.class": "Audio/Sink",
+    "node.description": "GCS-8 CH SOUND PAD",
+    "node.name": "alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_12_13__sink",
+    "node.nick": "GCS-8",
+    "object.id": 89,
+    "priority.session": 1000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       0.063997,
+       0.063997
+      ],
+      "softMute": false,
+      "softVolumes": [
+       0.063997,
+       0.063997
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 115,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "running",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.sink",
+    "media.class": "Audio/Sink",
+    "node.description": "GCS-8 CH 4-AUX",
+    "node.name": "alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_10_11__sink",
+    "node.nick": "GCS-8",
+    "object.id": 115,
+    "priority.session": 1000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       0.063997,
+       0.063997
+      ],
+      "softMute": false,
+      "softVolumes": [
+       0.063997,
+       0.063997
+      ]
+     },
+     {}
+    ],
+    "Format": [
+     {
+      "mediaType": "audio",
+      "mediaSubtype": "raw",
+      "format": "F32P",
+      "rate": 48000,
+      "channels": 2,
+      "position": [
+       "FL",
+       "FR"
+      ]
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": 121,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.sink",
+    "media.class": "Audio/Sink",
+    "node.description": "GCS-8 CH 3-AUX",
+    "node.name": "alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_8_9__sink",
+    "node.nick": "GCS-8",
+    "object.id": 121,
+    "priority.session": 1000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       0.063997,
+       0.063997
+      ],
+      "softMute": false,
+      "softVolumes": [
+       0.063997,
+       0.063997
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 122,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.sink",
+    "media.class": "Audio/Sink",
+    "node.description": "GCS-8 CH 2-AUX",
+    "node.name": "alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_6_7__sink",
+    "node.nick": "GCS-8",
+    "object.id": 122,
+    "priority.session": 1000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       0.063997,
+       0.063997
+      ],
+      "softMute": false,
+      "softVolumes": [
+       0.063997,
+       0.063997
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 109,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.sink",
+    "media.class": "Audio/Sink",
+    "node.description": "GCS-8 CH 1-AUX",
+    "node.name": "alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_4_5__sink",
+    "node.nick": "GCS-8",
+    "object.id": 109,
+    "priority.session": 1000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       0.063997,
+       0.063997
+      ],
+      "softMute": false,
+      "softVolumes": [
+       0.063997,
+       0.063997
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 108,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.sink",
+    "media.class": "Audio/Sink",
+    "node.description": "GCS-8 MAIN-AUX",
+    "node.name": "alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_2_3__sink",
+    "node.nick": "GCS-8",
+    "object.id": 108,
+    "priority.session": 1000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       0.063997,
+       0.063997
+      ],
+      "softMute": false,
+      "softVolumes": [
+       0.063997,
+       0.063997
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 106,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.sink",
+    "media.class": "Audio/Sink",
+    "node.description": "GCS-8 CH USB",
+    "node.name": "alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_0_1__sink",
+    "node.nick": "GCS-8",
+    "object.id": 106,
+    "priority.session": 1000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       0.063997,
+       0.063997
+      ],
+      "softMute": false,
+      "softVolumes": [
+       0.063997,
+       0.063997
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 104,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "GCS-8 CH SOUND PAD",
+    "node.name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_18_19__source",
+    "node.nick": "GCS-8",
+    "object.id": 104,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 75,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "GCS-8 CH BLUETOOTH",
+    "node.name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_16_17__source",
+    "node.nick": "GCS-8",
+    "object.id": 75,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 56,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "GCS-8 CH MOBILE",
+    "node.name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_14_15__source",
+    "node.nick": "GCS-8",
+    "object.id": 56,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 134,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "GCS-8 CH USB",
+    "node.name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_12_13__source",
+    "node.nick": "GCS-8",
+    "object.id": 134,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 100,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "GCS-8 CH 4",
+    "node.name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_10_11__source",
+    "node.nick": "GCS-8",
+    "object.id": 100,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 47,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "GCS-8 CH 3",
+    "node.name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_8_9__source",
+    "node.nick": "GCS-8",
+    "object.id": 47,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 96,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "running",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "GCS-8 CH 2",
+    "node.name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_6_7__source",
+    "node.nick": "GCS-8",
+    "object.id": 96,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": [
+     {
+      "mediaType": "audio",
+      "mediaSubtype": "raw",
+      "format": "F32P",
+      "rate": 48000,
+      "channels": 2,
+      "position": [
+       "FL",
+       "FR"
+      ]
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": 110,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "GCS-8 CH 1",
+    "node.name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_4_5__source",
+    "node.nick": "GCS-8",
+    "object.id": 110,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 133,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "GCS-8 MONITOR",
+    "node.name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_2_3__source",
+    "node.nick": "GCS-8",
+    "object.id": 133,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 113,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "suspended",
+   "props": {
+    "audio.channels": 2,
+    "audio.position": "FL,FR",
+    "device.api": "alsa",
+    "device.id": 95,
+    "factory.name": "api.alsa.pcm.source",
+    "media.class": "Audio/Source",
+    "node.description": "GCS-8 MAIN",
+    "node.name": "alsa_input.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_in_GCS8_0_0_1__source",
+    "node.nick": "GCS-8",
+    "object.id": 113,
+    "priority.session": 2000
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0,
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0,
+       1.0
+      ]
+     },
+     {}
+    ],
+    "Format": []
+   }
+  }
+ },
+ {
+  "id": 207,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "state": "running",
+   "props": {
+    "application.name": "WEBRTC VoiceEngine",
+    "media.class": "Stream/Output/Audio",
+    "media.name": "playStream",
+    "node.name": "WEBRTC VoiceEngine",
+    "object.id": 207
+   },
+   "params": {
+    "Props": [
+     {
+      "volume": 1.0,
+      "mute": false,
+      "channelVolumes": [
+       1.0
+      ],
+      "softMute": false,
+      "softVolumes": [
+       1.0
+      ]
+     }
+    ],
+    "Format": [
+     {
+      "mediaType": "audio",
+      "mediaSubtype": "raw",
+      "format": "S16LE",
+      "rate": 48000,
+      "channels": 1,
+      "position": [
+       "MONO"
+      ]
+     }
+    ]
+   }
+  }
+ }
+]
