@@ -1,7 +1,7 @@
 # pwctl
 
 A terminal replacement for PipeControl, for PipeWire on Linux Mint. It changes the sample rate and
-buffer size live, shows `pw-top`, keeps labelled presets, and (on the Devices branch) splits the
+buffer size live, shows `pw-top`, keeps labelled presets, and splits the
 BOSS GCS-8 into named stereo devices that every app can pick.
 
 Standard library Python only. The UI is curses, with keyboard and mouse.
@@ -14,9 +14,7 @@ pwctl                                          # interactive UI
 pwctl status                                   # one-shot commands, see below
 ```
 
-On this machine:
-- `pwctl` → `projects/pwctl/pwctl.py`, the `main` branch (v1).
-- `pwctl-dev` → `.claude/worktrees/devices/pwctl.py`, the `worktree-devices` branch.
+On this machine, `pwctl` → `projects/pwctl/pwctl.py` (branch `main`).
 
 Needs PipeWire's command-line tools: `pw-metadata`, `pw-top`, `pw-dump`, `pw-cat`, plus `systemctl --user`.
 
@@ -76,7 +74,7 @@ log level). They're stored in `~/.config/pwctl/presets.json`.
 
 Preset names are 1–32 letters, digits, `-` or `_`.
 
-### 4 Devices (branch `worktree-devices`)
+### 4 Devices
 
 Splits the GCS-8 into its Windows driver layout: 10 stereo inputs and 7 stereo outputs. Each one is
 a named PipeWire device, plus a few mixing buses. These live in a pwctl-generated PipeWire config
