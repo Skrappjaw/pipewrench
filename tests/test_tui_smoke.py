@@ -154,7 +154,7 @@ def test_devices_rename_is_enter_enter_type_enter(app, tmp_path):
     app.send("\x1bOB")          # -> DualShock output row
     app.send("\r")              # Enter: actions
     app.expect("Rename")
-    app.send("\r")              # Enter: Rename…
+    app.send("\x1bOB\r")        # ↓ Enter: Rename… (Set as system default leads the menu)
     app.expect("new name")
     app.send("Pad\r")           # type, Enter
     app.expect("Restart WirePlumber now")
@@ -181,7 +181,7 @@ def test_devices_rename_empty_restores_the_default(app, tmp_path):
     app.send("\x1bOB")
     app.send("\r")
     app.expect("Rename")
-    app.send("\r")
+    app.send("\x1bOB\r")
     app.expect("empty restores the default")
     app.send("\r")              # empty
     app.expect("Restart WirePlumber now")

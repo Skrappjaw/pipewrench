@@ -589,17 +589,10 @@ def _key_devices(st, key, devices):
     kind, obj = items[st.dev_cursor]
     if key in ("up", "down"):
         st.dev_cursor = max(0, min(len(items) - 1, st.dev_cursor + (1 if key == "down" else -1)))
-    elif key in ("d", "left", "right", " "):
-        if kind != "row":
-            st.message = st.failed = "select a device row first"
-            return st, []
-        try:
-            cmd = {"d": pi.default_cmd, " ": pi.mute_cmd,
-                   "left": lambda r: pi.volume_cmd(r, "-5%"), "right": lambda r: pi.volume_cmd(r, "+5%")}[key](obj)
-        except ValueError as e:
-            st.message = str(e)
-            return st, []
-        return st, [("dev_cmd", cmd)]
+    elif key in ("left", "right", " "):  # pointers for old habits: levels live on the Mixer only
+        st.message = "volume and mute are on the Mixer (1)"
+    elif key == "d":
+        st.message = "Enter → Set as system default"
     elif key == "enter":
         if kind == "addbus":
             return st, [("dev_prompt_bus",)]
@@ -698,8 +691,7 @@ LEGENDS = {
     "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
     "presets": [("Enter", "apply"), ("↑↓", "select"), ("s", "save current"), ("e", "edit label"),
                 ("d", "delete")] + TAB_KEYS,
-    "devices": [("Enter", "actions"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"), ("d", "default"),
-                ("m", "monitors"), ("H", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
+    "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("H", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
     "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
     "mixer menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
     "patch cols": [("Enter", "connect/disconnect"), ("↑↓", "select"), ("←→", "column"), ("p", "ports"),
@@ -712,7 +704,7 @@ LEGENDS = {
 }
 # The status line under the legend: messages, else a short hint (never keys).
 HINTS = {"mixer": "volume and mute act at once · ★ is the default playback or recording device",
-         "devices": "buses and volume act at once · new labels show after a WirePlumber restart",
+         "devices": "buses act at once · new labels show after a WirePlumber restart",
          "patch": "links made here are live only; saved patch sets come with scenes"}
 
 
@@ -1587,8 +1579,8 @@ def dev_menu_items(devices, st):
     hide = ("Unhide" if obj.name in hidden else "Hide", ("hide", obj.name))
     if obj.kind == "monitor":
         return [hide, ("Back", ("back",))]
-    items = [("Rename…", ("rename", obj.name, obj.label)), ("Make default", ("default",)),
-             ("Unmute" if obj.mute else "Mute", ("mute",))]
+    items = [("★ System default", ("back",)) if obj.default else ("Set as system default", ("default",)),
+             ("Rename…", ("rename", obj.name, obj.label))]
     if obj.direction in ("out", "duplex"):
         items.append(("Test sound", ("test", obj.name)))
     items.append(hide)
@@ -1637,9 +1629,9 @@ def _key_menu(st, key, devices):
     obj = target[1]
     if op[0] == "rename":
         return st, [("dev_rename", op[1], op[2])]
-    if op[0] in ("default", "mute"):
+    if op[0] == "default":
         try:
-            return st, [("dev_cmd", (pi.default_cmd if op[0] == "default" else pi.mute_cmd)(obj))]
+            return st, [("dev_cmd", pi.default_cmd(obj))]
         except ValueError as e:
             st.message = str(e)
             return st, []

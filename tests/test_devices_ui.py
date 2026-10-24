@@ -111,25 +111,21 @@ def test_loading_when_devices_missing():
 
 # --- keys: live actions --------------------------------------------------------------
 
-def test_default_volume_mute_on_a_row():
-    st = at(CH2_IN)
-    assert key(st, "d")[1] == [("dev_cmd", ["wpctl", "set-default", "96"])]
-    assert key(st, "right")[1] == [("dev_cmd", ["wpctl", "set-volume", "96", "5%+"])]
-    assert key(st, "left")[1] == [("dev_cmd", ["wpctl", "set-volume", "96", "5%-"])]
-    assert key(st, " ")[1] == [("dev_cmd", ["wpctl", "set-mute", "96", "toggle"])]
+def test_volume_mute_and_d_point_elsewhere_instead_of_acting():
+    for target in (CH2_IN, "GCS-8"):
+        for k in ("left", "right", " "):
+            st, actions = key(at(target), k)
+            assert actions == [] and "Mixer" in st.message, (target, k)
+        st, actions = key(at(target), "d")
+        assert actions == [] and "Set as system default" in st.message and st.dev_menu is None
 
 
-def test_row_actions_on_a_card_heading_explain():
-    st, actions = key(at("GCS-8"), "d")
-    assert actions == [] and st.message
-
-
-def test_monitor_rows_refuse_commands():
+def test_monitor_rows_offer_only_hide():
     st = pc.UIState(tab="devices", dev_monitors=True)
     entries = pc.dev_selectable(dv(), st)
     i = next(i for i, (k, o) in enumerate(entries) if k == "row" and o.kind == "monitor")
-    st, actions = key(pc.UIState(tab="devices", dev_monitors=True, dev_cursor=i), "d")
-    assert actions == [] and "monitor" in st.message
+    st, _ = key(pc.UIState(tab="devices", dev_monitors=True, dev_cursor=i), "enter")
+    assert [label for label, _ in pc.dev_menu_items(dv(), st)] == ["Hide", "Back"]
 
 
 def test_profile_from_card_or_its_row():
@@ -212,8 +208,10 @@ def test_rows_show_connections():
 def test_legend_leads_with_enter_and_fits_80():
     lines, _ = screen(pc.UIState(tab="devices", message="hello"), width=80)
     text = re.sub(r"[ │]+", " ", body(lines))  # chips pad keys with spaces
-    for k in ("↑↓ select", "Enter actions", "←→ volume", "m monitors", "H show hidden", "q quit"):
+    for k in ("↑↓ select", "Enter actions", "m monitors", "H show hidden", "q quit"):
         assert k in text, k
+    for gone in ("←→ volume", "Space mute", "d default"):
+        assert gone not in text, gone
     assert all(len(t.rstrip()) <= 80 for t, _ in lines)
 
 
@@ -238,26 +236,24 @@ def pick(st, d, label):
 
 def test_enter_on_a_hardware_output_opens_its_actions():
     st, d = open_menu(CH3_OUT)
-    assert menu_labels(st, d) == ["Rename…", "Make default", "Mute", "Test sound", "Hide", "Back"]
+    assert menu_labels(st, d) == ["Set as system default", "Rename…", "Test sound", "Hide", "Back"]
     text = body(screen(st, d, height=60)[0])
-    assert "Rename…" in text and "Make default" in text
+    assert "Rename…" in text and "> Set as system default" in text
 
 
-def test_input_has_no_test_sound_and_muted_says_unmute():
-    st, d = open_menu(CH2_IN)
-    assert "Test sound" not in menu_labels(st, d)
-    muted = pc.devices_view(pi.Inventory([pi.Card(1, "c", "Card", [], "on", [pi.Row(5, "n", "Mic", "in", "hardware",
-                            card_id=1, mute=True)])], [], {"sink": None, "source": None}), pcfg.default_config())
-    st2, _ = key(pc.UIState(tab="devices", dev_cursor=1), "enter", devices=muted)
-    assert "Unmute" in menu_labels(st2, muted)
+def test_input_has_no_test_sound_and_the_default_says_so():
+    st, d = open_menu(CH2_IN)  # the default source in this fixture
+    assert menu_labels(st, d) == ["★ System default", "Rename…", "Hide", "Back"]
+    st2, actions = key(st, "enter", devices=d)
+    assert actions == [] and st2.dev_menu is None
 
 
 def test_menu_actions_map_to_the_same_commands():
+    st, d = open_menu(CH3_OUT)
+    ch3 = next(r for r in INV.rows() if r.name == CH3_OUT)
+    st2, actions = key(st, "enter", devices=d)  # Enter, Enter: Set as system default leads the menu
+    assert actions == [("dev_cmd", ["wpctl", "set-default", str(ch3.id)])] and st2.dev_menu is None
     st, d = open_menu(CH2_IN)
-    st2, actions = pick(st, d, "Make default")
-    assert actions == [("dev_cmd", ["wpctl", "set-default", "96"])] and st2.dev_menu is None
-    _, actions = pick(st, d, "Mute")
-    assert actions == [("dev_cmd", ["wpctl", "set-mute", "96", "toggle"])]
     _, actions = pick(st, d, "Hide")
     assert actions == [("dev_hide", CH2_IN)]
     _, actions = pick(open_menu(CH3_OUT)[0], d, "Test sound")
@@ -331,10 +327,10 @@ def test_menu_follows_the_row_not_a_stale_index():
 def test_click_on_a_menu_item_picks_it():
     st, d = open_menu(CH2_IN)
     lines, hits = screen(st, d, height=60)
-    k = menu_labels(st, d).index("Make default")
+    k = menu_labels(st, d).index("Hide")
     row, c0, _ = hit_for(hits, ("dev_menu_item", k))
     _, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, [], devices=d)
-    assert actions == [("dev_cmd", ["wpctl", "set-default", "96"])]
+    assert actions == [("dev_hide", CH2_IN)]
 
 
 def test_click_selects_double_click_opens_actions_wheel_moves():
