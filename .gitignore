@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.env
+
+# vault agent-lockout files (ai-assist/bin/agent-lock.sh); not project content
+.agent-lock
+.agent-log
+
+# Claude Code worktrees and local settings
+.claude/
+
+# atomic-write temp files
+*.tmp

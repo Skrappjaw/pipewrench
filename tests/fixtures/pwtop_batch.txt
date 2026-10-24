@@ -1,0 +1,45 @@
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+C   29      0      0    ---     ---   ---   ---     0                  Dummy-Driver
+C   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+C   39      0      0    ---     ---   ---   ---     0                  SYSTEM
+C   42      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+C   50      0      0    ---     ---   ---   ---     0                  MUSIC
+C   57      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_3_1.0
+C   68      0      0    ---     ---   ---   ---     0                  VOIP
+C  124      0      0    ---     ---   ---   ---     0                  VOIP_MIC
+C  118      0      0    ---     ---   ---   ---     0                  alsa_output.usb-BOSS_GCS-8-01.pro-output-0
+C  116      0      0    ---     ---   ---   ---     0                  alsa_input.usb-BOSS_GCS-8-01.pro-input-0
+C  158      0      0    ---     ---   ---   ---     0                  alsa_input.usb-Hercules_Rocksmith_USB_Guitar_Adapter-00.mono-fallback
+C  168      0      0    ---     ---   ---   ---     0                  WEBRTC VoiceEngine
+C  152      0      0    ---     ---   ---   ---     0                  ALSA plug-in [sunvox]
+C  155      0      0    ---     ---   ---   ---     0                  ALSA plug-in [sunvox]
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+S   29      0      0    ---     ---   ---   ---     0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   42      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   57      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_3_1.0
+R  116    128  48000  76.3us   0.6us  0.03  0.00   43   F32LE 20 48000 alsa_input.usb-BOSS_GCS-8-01.pro-input-0
+R   39      0      0  11.8us   5.3us  0.00  0.00   19     F32P 2 48000  + SYSTEM
+R   50      0      0  20.3us  16.7us  0.01  0.01   31     F32P 2 48000  + MUSIC
+R   68      0      0   8.9us  10.1us  0.00  0.00   20     F32P 2 48000  + VOIP
+R  124      0      0  38.2us   5.5us  0.01  0.00   62     F32P 2 48000  + VOIP_MIC
+R  118      0      0   2.8us  17.9us  0.00  0.01    7   F32LE 14 48000  + alsa_output.usb-BOSS_GCS-8-01.pro-output-0
+R  168   1440  48000   7.9us   8.3us  0.00  0.00    1    S16LE 1 48000  + WEBRTC VoiceEngine
+R  152    227  44100  14.4us  21.6us  0.01  0.01    0    S16LE 2 44100  + ALSA plug-in [sunvox]
+R  158      0      0   0.0us   0.0us  ???   ???     0    S16LE 1 48000 alsa_input.usb-Hercules_Rocksmith_USB_Guitar_Adapter-00.mono-fallback
+R  155      0      0   0.0us   0.0us  ???   ???     0    S16LE 2 44100 ALSA plug-in [sunvox]
+S   ID  QUANT   RATE    WAIT    BUSY   W/Q   B/Q  ERR FORMAT           NAME 
+S   29      0      0    ---     ---   ---   ---     0                  Dummy-Driver
+S   30      0      0    ---     ---   ---   ---     0                  Freewheel-Driver
+S   42      0      0    ---     ---   ---   ---     0                  Midi-Bridge
+S   57      0      0    ---     ---   ---   ---     0                  v4l2_input.pci-0000_00_14.0-usb-0_3_1.0
+R  116    128  48000  76.3us   0.6us  0.03  0.00   43   F32LE 20 48000 alsa_input.usb-BOSS_GCS-8-01.pro-input-0
+R   39      0      0  11.8us   5.3us  0.00  0.00   19     F32P 2 48000  + SYSTEM
+R   50      0      0  20.3us  16.7us  0.01  0.01   31     F32P 2 48000  + MUSIC
+R   68      0      0   8.9us  10.1us  0.00  0.00   20     F32P 2 48000  + VOIP
+R  124      0      0  38.2us   5.5us  0.01  0.00   62     F32P 2 48000  + VOIP_MIC
+R  118      0      0   2.8us  17.9us  0.00  0.01    7   F32LE 14 48000  + alsa_output.usb-BOSS_GCS-8-01.pro-output-0
+R  168   1440  48000   7.9us   8.3us  0.00  0.00    1    S16LE 1 48000  + WEBRTC VoiceEngine
+R  152    227  44100  14.4us  21.6us  0.01  0.01    0    S16LE 2 44100  + ALSA plug-in [sunvox]
+R  158    128  48000  60.3us   0.9us  0.02  0.00    0    S16LE 1 48000 alsa_input.usb-Hercules_Rocksmith_USB_Guitar_Adapter-00.mono-fallback
+R  155    227  44100  18.5us  20.7us  0.01  0.01    2    S16LE 2 44100  + ALSA plug-in [sunvox]
