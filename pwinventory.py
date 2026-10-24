@@ -173,9 +173,19 @@ def _sort(rows):
     return sorted(rows, key=lambda r: (_DIR_ORDER[r.direction], natural_key(r.name)))
 
 
-def _peer_name(props):
-    return props.get("application.name") or props.get("node.description") or props.get("node.nick") \
-        or props.get("node.name") or "?"
+_INTERPRETERS = re.compile(r"^(python[\d.]*|node|java|sh|bash|perl|ruby|wine.*)$")
+
+
+def display_name(props):
+    """What to call a node: an app by its process when that's clearer than the name its audio library
+    gives (Discord rather than 'WEBRTC VoiceEngine'), else its description."""
+    app, binary = props.get("application.name"), props.get("application.process.binary")
+    if app and binary and binary.lower() not in app.lower() and not _INTERPRETERS.match(binary):
+        return binary
+    return app or props.get("node.description") or props.get("node.nick") or props.get("node.name") or "?"
+
+
+_peer_name = display_name
 
 
 def _peers(dump):
