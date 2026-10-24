@@ -21,7 +21,8 @@ Needs PipeWire's command-line tools: `pw-metadata`, `pw-top`, `pw-dump`, `pw-cat
 ## The five views
 
 Switch views with `Tab`, the number keys `1`–`5`, or a click on the tab bar. `q` quits from any view.
-The bottom line shows that view's keys, and gives way to status messages.
+Every view lists its keys the same way: a legend of up to two lines at the bottom, starting with what
+Enter does there. The line under it carries messages and y/n questions.
 
 ### 1 Settings
 

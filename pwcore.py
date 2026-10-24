@@ -566,13 +566,31 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
 
 # --- rendering (view model) --------------------------------------------------
 
-HELP = {
-    "settings": "↑↓ select  ←→ change  Enter apply  Esc revert  R restart WP  Tab switch  q quit",
-    "top": "↑↓ PgUp/PgDn scroll  Tab switch  q quit",
-    "presets": "↑↓ select  Enter apply  s save current  e edit label  d delete  Tab switch  q quit",
-    "devices": "buses and d ←→ Space p act now · labels show after R or next login",
-    "patch": "links made here are live only; saved patch sets come with scenes",
+TABS_QUIT = "        Tab/1-5 tabs  q quit"
+LEGENDS = {
+    "settings": ["  Keys: ↑↓ select  ←→ change  Enter apply  Esc revert  R restart WirePlumber", TABS_QUIT],
+    "top": ["  Keys: ↑↓ PgUp PgDn scroll", TABS_QUIT],
+    "presets": ["  Keys: ↑↓ select  Enter apply  s save current  e edit label  d delete", TABS_QUIT],
+    "devices": ["  Keys: ↑↓ select  Enter actions  ←→ volume  Space mute  d default",
+                "        m monitors  H show hidden  R restart WirePlumber  Tab/1-5 tabs  q quit"],
+    "devices menu": ["  Keys: ↑↓ choose  Enter pick  Esc back"],
+    "patch cols": ["  Keys: ↑↓ select  ←→ column  Enter connect/disconnect  p ports",
+                   "        g grid view  m monitors  Tab/1-5 tabs  q quit"],
+    "patch grid": ["  Keys: ↑↓ source  ←→ destination  Enter connect/disconnect  p ports",
+                   "        g column view  m monitors  Tab/1-5 tabs  q quit"],
+    "patch ports": ["  Keys: ↑↓ source port  ←→ destination port  Enter link/unlink  p or Esc back", TABS_QUIT],
 }
+# The status line under the legend: messages, else a short hint (never keys).
+HINTS = {"devices": "buses and volume act at once · new labels show after a WirePlumber restart",
+         "patch": "links made here are live only; saved patch sets come with scenes"}
+
+
+def legend(st):
+    if st.tab == "devices" and st.dev_menu:
+        return LEGENDS["devices menu"]
+    if st.tab == "patch":
+        return LEGENDS["patch ports" if st.patch_ports else f"patch {st.patch_view}"]
+    return LEGENDS[st.tab]
 
 
 class _Canvas:
@@ -622,7 +640,8 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     for c0, c1, tab in spans:
         cv.hit(row, c0, c1, ("tab", tab))
     cv.add("─" * width, "dim")
-    body_h = height - len(cv.lines) - 1
+    footer = legend(st)
+    body_h = height - len(cv.lines) - 1 - len(footer)
     if st.tab == "devices":
         _render_devices(cv, st, devices, body_h)
     elif st.tab == "patch":
@@ -630,14 +649,17 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     else:
         {"settings": _render_settings, "top": _render_top, "presets": _render_presets}[st.tab](
             cv, st, current, block, presets, body_h)
-    cv.lines = cv.lines[:height - 1]
-    cv.hits = [h for h in cv.hits if h[0] < height - 1]
-    while len(cv.lines) < height - 1:
+    body_end = height - 1 - len(footer)
+    cv.lines = cv.lines[:body_end]
+    cv.hits = [h for h in cv.hits if h[0] < body_end]
+    while len(cv.lines) < body_end:
         cv.add("")
+    for line in footer:
+        cv.add(line, "dim")
     if st.confirm:
         cv.add(f" {_confirm_question(st.confirm, devices)} y/n", "alert")
     else:
-        cv.add(f" {st.message}" if st.message else f" {HELP[st.tab]}", "alert" if st.message else "dim")
+        cv.add(f" {st.message}" if st.message else f" {HINTS.get(st.tab, '')}", "alert" if st.message else "dim")
     return cv.lines, cv.hits
 
 
@@ -703,11 +725,6 @@ def _render_presets(cv, st, current, block, presets, body_h):
 
 
 # Always on screen in the Devices tab; the bottom help line is too narrow and gives way to messages.
-DEVICE_KEYS = [
-    "  Keys: ↑↓ select  Enter actions  ←→ volume  Space mute  d default",
-    "        m monitors  H show hidden  R restart WirePlumber  Tab/1-5 tabs  q quit",
-]
-MENU_KEYS = ["  Keys: ↑↓ choose  Enter pick  Esc back", ""]
 
 
 def _fit(text, width):
@@ -754,7 +771,7 @@ def _render_devices(cv, st, devices, body_h):
             title = obj.label if kind in ("row", "card") else obj["name"]
             lines += _menu_lines(devices, st, title)
             menu_at = len(lines) - 1
-    room = max(1, body_h - 3 - len(DEVICE_KEYS))  # blank line, buttons, note and key legend sit below
+    room = max(1, body_h - 3)  # blank line, buttons and note sit below
     at = menu_at if menu_at is not None else next((n for n, line in enumerate(lines) if line[1] == "selected"), 0)
     start = 0 if at < room else at - room + 1
     for text, style, idx in lines[start:start + room]:
@@ -770,20 +787,10 @@ def _render_devices(cv, st, devices, body_h):
         cv.add("  * label or clock changes not written yet; A writes them (no restart)", "alert")
     else:
         cv.add("  generated files match devices.json", "dim")
-    for line in (MENU_KEYS if st.dev_menu else DEVICE_KEYS):
-        cv.add(line, "dim")
 
 
 # --- Patch tab -------------------------------------------------------------------------
 
-PATCH_KEYS = {
-    "cols": ["  Keys: ↑↓ select  ←→ column  Enter connect/disconnect  p ports",
-             "        g grid view  m monitors  Tab/1-5 tabs  q quit"],
-    "grid": ["  Keys: ↑↓ source  ←→ destination  Enter connect/disconnect  p ports",
-             "        g column view  m monitors  Tab/1-5 tabs  q quit"],
-    "ports": ["  Keys: ↑↓ source port  ←→ destination port  Enter link/unlink  p or Esc back",
-              "        Tab/1-5 tabs  q quit"],
-}
 _STATE_MARK = {"full": "●", "partial": "◐", "none": "·"}
 
 
@@ -897,16 +904,13 @@ def _render_patch(cv, st, g, body_h):
     if s is None:
         cv.add("  no audio sources or destinations", "dim")
         return
-    room = max(1, body_h - 3 - 2)  # blank, status, blank-free legend (2 lines)
+    room = max(1, body_h - 2)  # blank line and pair status sit below
     if st.patch_ports:
         _render_port_matrix(cv, st, g, s, d, room)
-        legend = PATCH_KEYS["ports"]
     elif st.patch_view == "grid":
         _render_patch_grid(cv, st, g, srcs, room)
-        legend = PATCH_KEYS["grid"]
     else:
         _render_patch_cols(cv, st, g, srcs, s, room)
-        legend = PATCH_KEYS["cols"]
     cv.add("")
     if st.patch_view == "cols" and st.patch_side == "src" and not st.patch_ports:
         targets = g.targets(s)
@@ -914,8 +918,6 @@ def _render_patch(cv, st, g, body_h):
                else f"  {s.label}: not connected", "alert" if targets else "dim")
     else:
         cv.add(_pair_status(g, s, d), "alert" if g.state(s, d) != "none" else "dim")
-    for line in legend:
-        cv.add(line, "dim")
 
 
 def _render_patch_cols(cv, st, g, srcs, s, room):
@@ -946,7 +948,7 @@ def _render_patch_grid(cv, st, g, srcs, room):
     label_w = 30
     cols_fit = max(1, (cv.width - label_w - 3) // 3)
     cols = list(_window(len(g.dests), st.patch_dst, cols_fit))
-    key_rows = (len(cols) + 2) // 3
+    key_rows = -(-len(cols) // max(1, (cv.width - 2) // 35))
     rows = list(_window(len(srcs), st.patch_src, max(1, room - 2 - key_rows)))
     cv.add(" " * (label_w + 2) + "".join(f"{j + 1:>3}" for j in cols), "title")
     for i in rows:
@@ -961,8 +963,9 @@ def _render_patch_grid(cv, st, g, srcs, room):
             c0 = 2 + label_w + 3 * k
             cv.hit(row, c0, c0 + 3, ("patch_cell", i, j))
     cv.add("")
-    for start in range(0, len(cols), 3):
-        cv.add("  " + "".join(f"{j + 1:>3} {_fit(g.dests[j].label, 30):<31}" for j in cols[start:start + 3]), "dim")
+    per_row = max(1, (cv.width - 2) // 35)  # as many "nn name" columns as fit the screen
+    for start in range(0, len(cols), per_row):
+        cv.add("  " + "".join(f"{j + 1:>3} {_fit(g.dests[j].label, 30):<31}" for j in cols[start:start + per_row]), "dim")
 
 
 def _render_port_matrix(cv, st, g, s, d, room):

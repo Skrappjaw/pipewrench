@@ -268,3 +268,12 @@ def test_full_journey_opens_ports_for_the_chosen_pair():
     st, _ = key(at("GCS-8 CH 1", "Discord"), "enter", "down", "p")   # source, move to dests, pick, ports
     assert st.patch_ports
     assert f"Ports: GCS-8 CH 1 → {G.dests[di('Discord') + 1].label}" in body(screen(st)[0])
+
+
+@pytest.mark.parametrize("width", [80, 120])
+def test_grid_key_fits_the_screen(width):
+    lines, _ = screen(pc.UIState(tab="patch", patch_view="grid"), width=width)
+    key_rows = [t for t, _ in lines if t.strip()[:2].strip().isdigit() and "·" not in t]
+    text = "\n".join(key_rows)
+    for n, d in enumerate(G.dests):
+        assert f"{n + 1} {d.label[:20]}" in text, (n, d.label, text)
