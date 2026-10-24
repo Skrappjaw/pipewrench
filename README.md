@@ -65,9 +65,9 @@ Enter, Enter sets the system default. **All channel work happens here** (Skrappj
 (y/n); an empty name restores the default. **Card profile…** opens that channel's card on Devices with
 its profile menu open. Esc or any other key closes a menu.
 
-**Each channel is a small group:** its name, then its volume and (when metered) its meter on the lines
-under it. The volume % is written inside the bar at its left end, inverted against the bar so it blends
-in; Settings → Display → Volume bar off leaves just the %. The cursor moves channel to channel.
+**One line per channel:** name, volume bar, meter. The volume % is written inside the bar at its left
+end, inverted against the bar so it blends in. Settings → Display → Volume bar off leaves just the %,
+and the meter moves in beside it.
 
 Volume and mute act at once (`wpctl`). Running rows and the selected one show a live peak
 meter (green, yellow past −18 dB, red past −6 dB); a suspended device has no audio and isn't woken just

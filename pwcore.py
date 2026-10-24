@@ -1312,7 +1312,8 @@ def _volume_bar(row, show_bar=True):
     the cell under each character so it blends in; filled to 100% in ok, past it in alert, the rest dim.
     show_bar False leaves just the %."""
     if row.volume is None:
-        return "no volume control", [(0, 17, "dim")]
+        text = "no volume control" if show_bar else "n/a"
+        return text, [(0, len(text), "dim")]
     word = "muted" if row.mute else f"{round(row.volume * 100)}%"
     if not show_bar:
         return word, [(0, len(word), "dim")] if row.mute else []
@@ -1342,6 +1343,8 @@ def _render_mixer(cv, st, mx, body_h):
         st.mix_cursor = target[0]
     metered = mx.get("metered", {}) if st.meters else {}
     levels = mx.get("levels", {})
+    vol_w = _BAR if st.volume_bar else 5  # bar off: just "100%" or "muted", and the meter moves in
+    label_w = max(20, min(44, cv.width - vol_w - 6 - (_METER + 2 if metered else 0)))
     out, n_sel = [], 0
     for kind, section, row in _mixer_lines(mx):
         if kind == "head":
@@ -1358,22 +1361,26 @@ def _render_mixer(cv, st, mx, body_h):
             peers = row.outputs if section == "playback" else row.inputs
             name = f"{row.label} {'→' if section == 'playback' else '←'} {', '.join(peers) or 'nothing'}"
             star = " "
-        indent = "  " if kind == "app" else ""  # app rows sit under their section
-        head = f"{'> ' if sel else '  '}{star} {indent}"
-        head += _fit(name, max(8, cv.width - len(head)))
-        # The name on its own line (the cursor bar covers it), then volume and meter as sub lines.
-        out.append((head, ("normal", [(0, len(head), "anchor" if target else "selected")]) if sel else "normal", n_sel))
-        pad = " " * (6 + len(indent))
+        indent = "  " if kind == "app" else ""
+        w = label_w - len(indent)  # app rows sit under their section; the bars still line up
+        head = f"{'> ' if sel else '  '}{star} {indent}{_fit(name, w):<{w}} "
         bar, spans = _volume_bar(row, st.volume_bar)
-        out.append((pad + bar, ("normal", [(len(pad) + a, len(pad) + b, r) for a, b, r in spans]), n_sel))
+        bar = bar.ljust(vol_w)
+        c0 = len(head)
+        spans = [(c0 + a, c0 + b, r) for a, b, r in spans]
         if (section, row.id) in metered:
             level = levels.get((section, row.id), 0.0)
             cells, cell_spans = _meter_cells(*(level if isinstance(level, tuple) else (level,)))
-            out.append((pad + cells, ("normal", [(len(pad) + a, len(pad) + b, r) for a, b, r in cell_spans]), n_sel))
+            m0 = c0 + len(bar) + 2
+            bar += "  " + cells
+            spans += [(m0 + a, m0 + b, r) for a, b, r in cell_spans]
+        if sel:  # the cursor bar covers the name; the volume keeps its colours
+            spans = [(0, c0 - 1, "anchor" if target else "selected")] + spans
+        out.append((head + bar, ("normal", spans), n_sel))
         if sel and target:
             out += _menu_box(row.label, [label for label, _ in mix_menu_items(mx, st)], st.mix_menu_cursor)
         n_sel += 1
-    cursor_at = max((k for k, line in enumerate(out) if line[2] == st.mix_cursor), default=0)  # the group's last line
+    cursor_at = next((k for k, line in enumerate(out) if line[2] == st.mix_cursor), 0)
     if target:  # keep the whole box in view: scroll to its foot
         cursor_at = next(k for k in range(len(out) - 1, -1, -1) if isinstance(out[k][2], tuple)) + 1
     start = 0 if cursor_at < body_h else cursor_at - body_h + 1
