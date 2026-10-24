@@ -97,6 +97,22 @@ def test_lines_fit_width(width):
     assert all(len(t) <= width for t, _ in lines)
 
 
+def test_key_legend_fits_80_columns_and_survives_messages():
+    st = pc.UIState(tab="devices", message="relabelled ch2")
+    lines, _ = screen(st, width=80)
+    text = body(lines)
+    for keys in ("↑↓", "Enter", "Space", "t test", "a add bus", "d delete bus", "p preview", "A apply",
+                 "1-4", "q quit"):
+        assert keys in text, keys
+    legend = [t for t, _ in lines if "Space" in t or "A apply" in t]
+    assert legend and all(len(t.rstrip()) <= 80 for t in legend)
+
+
+def test_key_legend_stays_visible_when_list_scrolls():
+    lines, _ = screen(at(("bus", "GAME")), height=16)
+    assert "A apply" in body(lines) and "q quit" in body(lines)
+
+
 def test_scrolls_to_keep_cursor_visible():
     st = at(("bus", "GAME"))
     lines, _ = screen(st, height=16)

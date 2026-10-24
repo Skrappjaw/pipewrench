@@ -475,7 +475,7 @@ HELP = {
     "settings": "↑↓ select  ←→ change  Enter apply  Esc revert  R restart WP  Tab switch  q quit",
     "top": "↑↓ PgUp/PgDn scroll  Tab switch  q quit",
     "presets": "↑↓ select  Enter apply  s save current  e edit label  d delete  Tab switch  q quit",
-    "devices": "↑↓ select  Enter label  Space on/off  a add bus  d delete bus  p preview  A apply  t test  q quit",
+    "devices": "edits save to devices.json at once; nothing reaches PipeWire until A",
 }
 
 
@@ -601,6 +601,13 @@ def _render_presets(cv, st, current, block, presets, body_h):
                   ("preset_edit", "Edit label"), ("preset_delete", "Delete")])
 
 
+# Always on screen in the Devices tab; the bottom help line is too narrow and gives way to messages.
+DEVICE_KEYS = [
+    "  Keys: ↑↓ select   Enter rename   Space on/off   t test (output pairs)",
+    "        a add bus   d delete bus   p preview   A apply   Tab/1-4 tabs   q quit",
+]
+
+
 def _device_rows(st, devices):
     """(text, style, item index or None) for every list row, group headings included."""
     m, status, buses = devices["model"], devices["status"], devices["buses"]
@@ -634,7 +641,7 @@ def _render_devices(cv, st, devices, body_h):
         cv.add("  loading devices…", "dim")
         return
     rows = _device_rows(st, devices)
-    room = max(1, body_h - 3)  # blank line, buttons and note sit below the list
+    room = max(1, body_h - 3 - len(DEVICE_KEYS))  # blank line, buttons, note and key legend sit below
     at = next((n for n, r in enumerate(rows) if r[1] == "selected"), 0)
     start = 0 if at < room else at - room + 1
     for text, style, idx in rows[start:start + room]:
@@ -648,3 +655,5 @@ def _render_devices(cv, st, devices, body_h):
         cv.add("  * saved to devices.json but not applied; A applies (restarts PipeWire)", "alert")
     else:
         cv.add("  drop-in matches devices.json", "dim")
+    for line in DEVICE_KEYS:
+        cv.add(line, "dim")
