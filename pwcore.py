@@ -1022,8 +1022,8 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
             count = len(g.targets(srcs[i]))
             mark = "> " if i == st.patch_src and not on_dst else "* " if i == st.patch_src else "  "
             lt = f"{mark}{_fit(srcs[i].label, half - 7):<{half - 7}} {('●' + str(count)) if count else '':>3}"
-            if i == st.patch_src and not on_dst:
-                spans.append((0, half))  # the cursor's highlight covers only its own column
+            if i == st.patch_src:
+                spans.append((0, half))  # each highlight covers only its own column; the source's stays lit
         rt, lit, target = right[n] if n < len(right) else ("", False, None)
         if lit:
             spans.append((half + 2, cv.width if target[0] == "patch_dst" else half + 2 + len(rt)))

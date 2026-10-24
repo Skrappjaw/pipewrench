@@ -84,7 +84,8 @@ def test_highlight_covers_only_the_active_column():
         return [style[1] for _, style in screen(st)[0] if isinstance(style, tuple) and style[0] == "selected"]
     (src,), = spans(at("Discord"))
     assert src[0] == 0 and src[1] < 60  # left column only
-    (dst,), = spans(at("Discord", "GCS-8 CH 4-AUX", patch_side="dst"))
+    (src,), (dst,) = spans(at("Discord", "GCS-8 CH 4-AUX", patch_side="dst"))
+    assert src[0] == 0 and src[1] < 60  # the source stays lit on the left
     assert dst[0] > 40 and dst[1] == 100  # right column only
 
 
