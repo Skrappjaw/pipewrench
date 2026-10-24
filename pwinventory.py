@@ -65,6 +65,8 @@ class Row:
     volume: float = None      # wpctl's cubic scale, 1.0 = 100%
     mute: bool = None
     default: bool = False
+    inputs: tuple = ()        # who plays into it (apps or devices)
+    outputs: tuple = ()       # who reads from it: recorders, or an output's monitor
 
 
 @dataclass
@@ -171,8 +173,31 @@ def _sort(rows):
     return sorted(rows, key=lambda r: (_DIR_ORDER[r.direction], natural_key(r.name)))
 
 
+def _peer_name(props):
+    return props.get("application.name") or props.get("node.description") or props.get("node.nick") \
+        or props.get("node.name") or "?"
+
+
+def _peers(dump):
+    """{node id: (inputs, outputs)} from the link objects, one name per peer, error links skipped."""
+    names = {o["id"]: _peer_name(_info(o).get("props") or {}) for o in dump
+             if o.get("type") == "PipeWire:Interface:Node" and "id" in o}
+    ins, outs = {}, {}
+    for o in dump:
+        info = _info(o)
+        if o.get("type") != "PipeWire:Interface:Link" or info.get("state") == "error":
+            continue
+        a, b = info.get("output-node-id"), info.get("input-node-id")
+        if a in names and b in names:
+            ins.setdefault(b, set()).add(names[a])
+            outs.setdefault(a, set()).add(names[b])
+    order = lambda s: tuple(sorted(s, key=str.lower))
+    return {n: (order(ins.get(n, ())), order(outs.get(n, ()))) for n in set(ins) | set(outs)}
+
+
 def inventory(dump):
     defaults = _defaults(dump)
+    peers = _peers(dump)
     cards = {o["id"]: _card(o) for o in dump
              if o.get("type") == "PipeWire:Interface:Device" and (_info(o).get("props") or {}).get("media.class") == "Audio/Device"}
     virtual = []
@@ -182,6 +207,8 @@ def inventory(dump):
         r = _row(o, defaults)
         if r is None:
             continue
+        if r.id in peers:
+            r = replace(r, inputs=peers[r.id][0], outputs=peers[r.id][1])
         if r.card_id in cards:
             cards[r.card_id].rows.append(r)
         else:
@@ -195,8 +222,19 @@ def inventory(dump):
 def monitor_rows(rows):
     """What capture apps see as '<sink>.monitor': one input per output."""
     return [replace(r, id=r.id, name=f"{r.name}.monitor", label=f"{r.label} (monitor)", direction="in",
-                    kind="monitor", default=False)
+                    kind="monitor", default=False, inputs=())
             for r in rows if r.direction == "out"]
+
+
+def connections(row):
+    """What a device is connected to: "← apps playing into it  → apps reading from it"."""
+    parts = []
+    if row.inputs:
+        parts.append("← " + ", ".join(row.inputs))
+    if row.outputs:
+        monitor = row.direction == "out" and row.kind != "monitor"
+        parts.append("→ " + ", ".join(row.outputs) + (" (monitor)" if monitor else ""))
+    return "  ".join(parts)
 
 
 def view(inv, hidden=(), show_hidden=False, monitors=False):

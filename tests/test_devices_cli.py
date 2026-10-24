@@ -323,3 +323,12 @@ def test_restart_subcommand_asks_first():
 def test_unknown_subcommand_exit_2():
     rc, _, err, *_ = run("frobnicate")
     assert rc == 2 and "usage" in err
+
+
+def test_list_shows_connections_column():
+    links = json.loads((FIX / "pwdump_links.json").read_text())
+    out = run("list", runner=Runner(dump=links))[1]
+    usb = next(line for line in out.splitlines() if "gcs8_stereo_out_GCS8_0_0_1" in line)
+    mic = next(line for line in out.splitlines() if CH2_IN in line)
+    assert "← Brave" in usb and "→ cinnamon" in mic
+    assert usb.index("← Brave") < usb.index("alsa_output")  # before the node name

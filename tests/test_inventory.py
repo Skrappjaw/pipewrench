@@ -157,3 +157,79 @@ def test_read_dump_single_document_unchanged():
 def test_read_dump_garbage_raises():
     with pytest.raises(ValueError):
         pi.read_dump(lambda argv: (0, "[ not json"))
+
+
+# --- connections ---------------------------------------------------------------------
+
+CH_USB_OUT = "alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_0_1__sink"
+
+
+def links_dump():
+    return json.loads((FIX / "pwdump_links.json").read_text())
+
+
+def _node(oid, cls, **props):
+    return {"id": oid, "type": "PipeWire:Interface:Node", "info": {"state": "running",
+            "props": {"media.class": cls, **props}, "params": {}}}
+
+
+def _link(lid, out_id, in_id, state="active"):
+    return {"id": lid, "type": "PipeWire:Interface:Link",
+            "info": {"output-node-id": out_id, "input-node-id": in_id, "state": state}}
+
+
+def test_live_links_name_apps_on_each_side():
+    inv = pi.inventory(links_dump())
+    assert inv.find(CH_USB_OUT).inputs == ("Brave",)          # Brave plays into CH USB
+    assert inv.find(CH2_IN).outputs == ("cinnamon",)           # the sound applet meters CH 2
+    assert inv.find(CH2_IN).inputs == () and inv.find(CH_USB_OUT).outputs == ()
+
+
+def test_links_dedupe_per_channel_and_sort():
+    d = links_dump()
+    sink = pi.inventory(d).find(CH_USB_OUT).id
+    d += [_node(800, "Stream/Output/Audio", **{"application.name": "Discord", "node.name": "discord"}),
+          _link(801, 800, sink), _link(802, 800, sink)]
+    assert pi.inventory(d).find(CH_USB_OUT).inputs == ("Brave", "Discord")
+
+
+def test_monitor_readers_and_device_to_device_links():
+    d = links_dump()
+    inv0 = pi.inventory(d)
+    sink, mic = inv0.find(CH_USB_OUT).id, inv0.find(CH2_IN).id
+    d += [_node(900, "Audio/Duplex", **{"node.name": "OBS_BUS", "node.description": "OBS bus",
+                                        "factory.name": "support.null-audio-sink"}),
+          _node(901, "Stream/Input/Audio", **{"application.name": "OBS", "node.name": "obs"}),
+          _link(902, sink, 901),   # OBS records CH USB's monitor
+          _link(903, mic, 900),    # qpwgraph patch: CH 2 -> OBS bus
+          _link(904, 900, 901)]    # OBS records the bus
+    inv = pi.inventory(d)
+    assert inv.find(CH_USB_OUT).outputs == ("OBS",)
+    assert inv.find(CH2_IN).outputs == ("cinnamon", "OBS bus")  # case-insensitive order
+    assert inv.find("OBS_BUS").inputs == ("GCS-8 CH 2",) and inv.find("OBS_BUS").outputs == ("OBS",)
+
+
+def test_error_links_are_ignored():
+    d = links_dump()
+    sink = pi.inventory(d).find(CH_USB_OUT).id
+    d += [_node(800, "Stream/Output/Audio", **{"application.name": "Ghost"}), _link(801, 800, sink, state="error")]
+    assert pi.inventory(d).find(CH_USB_OUT).inputs == ("Brave",)
+
+
+def test_connections_text_per_direction():
+    d = links_dump()
+    inv0 = pi.inventory(d)
+    sink = inv0.find(CH_USB_OUT).id
+    d += [_node(901, "Stream/Input/Audio", **{"application.name": "OBS"}), _link(902, sink, 901)]
+    inv = pi.inventory(d)
+    assert pi.connections(inv.find(CH_USB_OUT)) == "← Brave  → OBS (monitor)"
+    assert pi.connections(inv.find(CH2_IN)) == "→ cinnamon"
+    assert pi.connections(inv.find("alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_2_3__sink")) == ""
+
+
+def test_monitor_row_shows_its_readers_only():
+    d = links_dump()
+    sink = pi.inventory(d).find(CH_USB_OUT).id
+    d += [_node(901, "Stream/Input/Audio", **{"application.name": "OBS"}), _link(902, sink, 901)]
+    mon = pi.monitor_rows([pi.inventory(d).find(CH_USB_OUT)])[0]
+    assert mon.inputs == () and pi.connections(mon) == "→ OBS"

@@ -693,7 +693,8 @@ def _device_line_text(kind, obj, devices, selected):
     tags = [t for t, on in (("pwctl", obj.name in devices["owned"]), ("made outside pwctl", obj.name in devices["clash"]),
                             ("hidden", hidden), (f"label → {pending}", bool(pending) and pending != obj.label)) if on]
     text = (f"{prefix}{'★' if obj.default else ' '} {obj.direction:<6} {_fit(obj.label, 30):<30} "
-            f"{obj.state or '?':<9} {vol:<6} {obj.id:>5}" + (f"  [{', '.join(tags)}]" if tags else ""))
+            f"{obj.state or '?':<9} {vol:<6} {obj.id:>5}" + (f"  [{', '.join(tags)}]" if tags else "")
+            + (f"  {pi.connections(obj)}" if obj.inputs or obj.outputs else ""))  # tags first: they're rare, and matter
     return text, "dim" if hidden else "normal"
 
 

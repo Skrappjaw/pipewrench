@@ -279,7 +279,8 @@ def device_line(row, c, hidden=False, owned=(), clash=()):
     tags = [t for t, on in (("pwctl", row.name in owned), ("made outside pwctl; in devices.json too", row.name in clash),
                             ("hidden", hidden), (f"label → {pending}", bool(pending) and pending != row.label)) if on]
     return (f"  {'★' if row.default else ' '} {row.direction:<6} {_fit(row.label, 30):<30} {row.state or '?':<9} "
-            f"{fmt:<16} {vol:<9} {row.id:>5}  {row.name}" + (f"  [{', '.join(tags)}]" if tags else ""))
+            f"{fmt:<16} {vol:<9} {row.id:>5}  {_fit(pi.connections(row), 32):<32}  {row.name}"
+            + (f"  [{', '.join(tags)}]" if tags else ""))
 
 
 def _bus_status(c, inv):

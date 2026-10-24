@@ -86,6 +86,10 @@ An inventory of every audio card, sink, source and bus on the system, read from 
   - ★ on the default output and input
   - direction: out / in / duplex
   - label, state, volume (wpctl's scale, so 100% is unity) and node id
+  - connections, from PipeWire's links:
+    - `← Brave`: what plays into the device
+    - `→ OBS`: what records from it; on an output that's its monitor, marked `(monitor)`
+    - qpwgraph patches between devices show the other device's label
 - **Tags:**
   - `pwctl`: the bus comes from pwctl's drop-in
   - `made outside pwctl`: a live bus with the same name as one in `devices.json`, e.g. one made by a
@@ -276,6 +280,7 @@ the tests replace PipeWire.
 - **Display:**
   - `monitor_rows(rows)`: one "(monitor)" input per output
   - `view(inv, hidden, show_hidden, monitors)`: headings and rows, as the CLI lists them
+  - `connections(row)`: "← apps playing into it  → apps reading from it"
 - **Commands:**
   - `default_cmd(row)`, `mute_cmd(row)`
   - `volume_cmd(row, step)`: `+5%`, `-5%`, `50%` or `0.5`, up to 150%

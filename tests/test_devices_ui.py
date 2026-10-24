@@ -220,3 +220,11 @@ def test_buttons_land_on_labels():
         assert lines[r][0][c0:c1] == label
     _, actions = click(pc.UIState(tab="devices"), ("button", "dev_apply"))
     assert actions == [("dev_apply",)]
+
+
+def test_rows_show_connections():
+    links = pi.inventory(json.loads((FIX / "pwdump_links.json").read_text()))
+    d = pc.devices_view(links, pcfg.default_config())
+    text = body(pc.render_screen(pc.UIState(tab="devices"), CUR, None, [], 120, 50, devices=d)[0])
+    assert "← Brave" in next(line for line in text.splitlines() if "GCS-8 CH USB" in line and " out " in line)
+    assert "→ cinnamon" in next(line for line in text.splitlines() if "GCS-8 CH 2 " in line)
