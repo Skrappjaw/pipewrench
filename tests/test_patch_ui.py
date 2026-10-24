@@ -50,14 +50,14 @@ def hit_for(hits, target):
 
 # --- tab -------------------------------------------------------------------------------
 
-def test_patch_is_fifth_tab():
-    st, _ = key(pc.UIState(), "5")
+def test_patch_tab_by_number():
+    st, _ = key(pc.UIState(), str(pc.TABS.index("patch") + 1))
     assert st.tab == "patch"
     st, _ = key(pc.UIState(tab="devices"), "tab")
     assert st.tab == "patch"
     st, _ = key(st, "tab")
     assert st.tab == "settings"
-    assert "5 Patch" in screen(pc.UIState())[0][0][0]
+    assert f"{pc.TABS.index('patch') + 1} Patch" in screen(pc.UIState())[0][0][0]
 
 
 def test_loading_when_graph_missing():

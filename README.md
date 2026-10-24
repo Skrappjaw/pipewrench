@@ -63,8 +63,9 @@ Followers are shown with a `+` under their driver. Rows with errors show in red,
 |---|---|---|
 | ↑ ↓, PgUp PgDn | wheel | scroll |
 
-### 3 Presets
+### Presets (the bottom of Settings)
 
+Presets are no longer a tab of their own; they're the last section of Settings, under Clock and Display.
 Named, labelled snapshots of the Settings rows (force rate, force buffer, min, max, and optionally
 log level). They're stored in `~/.config/pwctl/presets.json`.
 

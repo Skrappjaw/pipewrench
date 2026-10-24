@@ -21,7 +21,7 @@ PRESETS = [{"name": "mix", "label": "Mixing", "values": {"clock.force-quantum": 
 STATES = {
     "settings": pc.UIState(tab="settings"),
     "top": pc.UIState(tab="top"),
-    "presets": pc.UIState(tab="presets"),
+    "presets": pc.UIState(tab="settings", cursor=pc.THEME_ROW + 1),  # a preset row inside Settings
     "devices": pc.UIState(tab="devices"),
     "devices menu": pc.UIState(tab="devices", dev_menu=("card", 95), dev_cursor=5),
     "patch columns": pc.UIState(tab="patch"),
@@ -83,7 +83,7 @@ def test_keys_are_chips_with_their_slug(name):
 @pytest.mark.parametrize("name", [n for n in STATES if n != "devices menu"])
 def test_every_box_ends_with_tabs_and_quit(name):
     pairs = chips(render(STATES[name]))
-    assert pairs[-2:] == [("Tab/1-5", "tabs"), ("q", "quit")]
+    assert pairs[-2:] == [(f"Tab/1-{len(pc.TABS)}", "tabs"), ("q", "quit")]
 
 
 def test_enter_comes_first_where_it_acts():

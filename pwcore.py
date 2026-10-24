@@ -362,8 +362,9 @@ def summarize_preset(p):
 
 # --- TUI state machine -------------------------------------------------------
 
-TABS = ["settings", "top", "presets", "devices", "patch"]
-TAB_TITLES = {"settings": "1 Settings", "top": "2 Top", "presets": "3 Presets", "devices": "4 Devices", "patch": "5 Patch"}
+# Basic first (everyday audio), then the engineering tools. Presets live inside Settings.
+TABS = ["devices", "patch", "settings", "top"]
+TAB_TITLES = {t: f"{n} {t.capitalize()}" for n, t in enumerate(TABS, start=1)}
 
 
 @dataclass
@@ -371,7 +372,6 @@ class UIState:
     tab: str = "settings"
     cursor: int = 0
     pending: dict = field(default_factory=dict)
-    preset_cursor: int = 0
     top_scroll: int = 0
     dev_cursor: int = 0
     dev_show_hidden: bool = False
@@ -415,22 +415,28 @@ def handle_key(st, key, current, presets, devices=None, patch=None):
     if key == "tab":
         st.tab = TABS[(TABS.index(st.tab) + 1) % len(TABS)]
         return st, []
-    if key in ("1", "2", "3", "4", "5"):
+    if key.isdigit() and 1 <= int(key) <= len(TABS):
         st.tab = TABS[int(key) - 1]
         return st, []
     if st.tab == "devices":
         return _key_devices(st, key, devices)
     if st.tab == "patch":
         return _key_patch(st, key, patch)
-    return {"settings": _key_settings, "top": _key_top, "presets": _key_presets}[st.tab](st, key, current, presets)
+    return {"settings": _key_settings, "top": _key_top}[st.tab](st, key, current, presets)
 
 
-THEME_ROW = len(SETTINGS)  # pwctl's own row under the PipeWire settings; it applies at once
+# Settings is one list: the clock rows, then Theme (pwctl's own; applies at once), then the presets.
+THEME_ROW = len(SETTINGS)
 
 
 def _key_settings(st, key, current, presets):
+    st.cursor = max(0, min(THEME_ROW + len(presets), st.cursor))
+    if key == "s":
+        return st, [("prompt_save",)]
+    if st.cursor > THEME_ROW and key in ("enter", "e", "d", "left", "right"):
+        return _key_preset_row(st, key, presets[st.cursor - THEME_ROW - 1]["name"])
     if key in ("up", "down"):
-        st.cursor = max(0, min(THEME_ROW, st.cursor + (1 if key == "down" else -1)))
+        st.cursor = max(0, min(THEME_ROW + len(presets), st.cursor + (1 if key == "down" else -1)))
     elif key in ("left", "right") and st.cursor == THEME_ROW:
         st.theme = THEME_NAMES[(THEME_NAMES.index(st.theme) + (1 if key == "right" else -1)) % len(THEME_NAMES)]
         return st, [("set_theme", st.theme)]
@@ -469,16 +475,8 @@ def _key_top(st, key, current, presets):
     return st, []
 
 
-def _key_presets(st, key, current, presets):
-    if key == "s":
-        return st, [("prompt_save",)]
-    if not presets:
-        return st, []
-    st.preset_cursor = min(st.preset_cursor, len(presets) - 1)
-    name = presets[st.preset_cursor]["name"]
-    if key in ("up", "down"):
-        st.preset_cursor = max(0, min(len(presets) - 1, st.preset_cursor + (1 if key == "down" else -1)))
-    elif key == "enter":
+def _key_preset_row(st, key, name):
+    if key == "enter":
         return st, [("apply_preset", name)]
     elif key == "e":
         return st, [("prompt_label", name)]
@@ -607,7 +605,7 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
     elif kind == "key":  # a legend chip
         keys = [target[1]] if event in ("click", "double") else []
     elif kind == "preset":
-        st = dataclasses.replace(st, preset_cursor=target[1])
+        st = dataclasses.replace(st, cursor=THEME_ROW + 1 + target[1])
         keys = ["enter"] if event == "double" else []
     elif kind == "toplist":
         keys = {"wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
@@ -639,11 +637,11 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
 
 # --- rendering (view model) --------------------------------------------------
 
-TAB_KEYS = [("Tab/1-5", "tabs"), ("q", "quit")]
+TAB_KEYS = [(f"Tab/1-{len(TABS)}", "tabs"), ("q", "quit")]
 # (key, slug) pairs; Enter first wherever it acts. Drawn as a box of chips by _key_box.
 LEGENDS = {
     "settings": [("Enter", "apply"), ("↑↓", "select"), ("←→", "change"), ("Esc", "revert"),
-                 ("R", "restart WirePlumber")] + TAB_KEYS,
+                 ("s", "save as preset"), ("R", "restart WirePlumber")] + TAB_KEYS,
     "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
     "presets": [("Enter", "apply"), ("↑↓", "select"), ("s", "save current"), ("e", "edit label"),
                 ("d", "delete")] + TAB_KEYS,
@@ -694,6 +692,8 @@ def _chip_key(label):
 def legend(st):
     if st.tab == "devices" and st.dev_menu:
         return LEGENDS["devices menu"]
+    if st.tab == "settings" and st.cursor > THEME_ROW:
+        return LEGENDS["presets"]
     if st.tab == "patch" and st.patch_menu:
         return LEGENDS["patch menu"]
     if st.tab == "patch":
@@ -755,7 +755,7 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     elif st.tab == "patch":
         _render_patch(cv, dataclasses.replace(st), patch, body_h)
     else:
-        {"settings": _render_settings, "top": _render_top, "presets": _render_presets}[st.tab](
+        {"settings": _render_settings, "top": _render_top}[st.tab](
             cv, st, current, block, presets, body_h)
     body_end = height - 1 - len(footer)
     cv.lines = cv.lines[:body_end]
@@ -776,6 +776,8 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
 
 
 def _render_settings(cv, st, current, block, presets, body_h):
+    st.cursor = max(0, min(THEME_ROW + len(presets), st.cursor))
+    cv.add("  Clock", "title")
     for i, s in enumerate(SETTINGS):
         value = st.pending.get(s.key, current.get(s.key))
         mark = "*" if s.key in st.pending else " "
@@ -788,15 +790,6 @@ def _render_settings(cv, st, current, block, presets, body_h):
         cv.hit(row, arrow_l, arrow_l + 1, ("arrow", i, -1))
         cv.hit(row, arrow_l + 1, arrow_r, ("setting", i))
         cv.hit(row, arrow_r, arrow_r + 1, ("arrow", i, +1))
-    cv.add("")
-    head = f"{'> ' if st.cursor == THEME_ROW else '  '}{'Theme':<20} "
-    row = cv.add(f"{head}◀ {st.theme:^14} ▶   applies at once", "selected" if st.cursor == THEME_ROW else "normal")
-    arrow_l, arrow_r = len(head), len(head) + 17
-    cv.hit(row, 0, arrow_l, ("setting", THEME_ROW))
-    cv.hit(row, arrow_l, arrow_l + 1, ("arrow", THEME_ROW, -1))
-    cv.hit(row, arrow_l + 1, arrow_r, ("setting", THEME_ROW))
-    cv.hit(row, arrow_r, arrow_r + 1, ("arrow", THEME_ROW, +1))
-    cv.add("")
     allowed = current.get("clock.allowed-rates")
     allowed = ", ".join(map(str, allowed)) if isinstance(allowed, list) else "?"
     cv.add(f"  allowed rates: {allowed}   defaults: rate {current.get('clock.rate', '?')}"
@@ -807,6 +800,18 @@ def _render_settings(cv, st, current, block, presets, body_h):
         warnings = [str(e)]
     for w in warnings:
         cv.add(f"  ! {w}", "alert")
+    cv.add("")
+    cv.add("  Display", "title")
+    head = f"{'> ' if st.cursor == THEME_ROW else '  '}{'Theme':<20} "
+    row = cv.add(f"{head}◀ {st.theme:^14} ▶   applies at once", "selected" if st.cursor == THEME_ROW else "normal")
+    arrow_l, arrow_r = len(head), len(head) + 17
+    cv.hit(row, 0, arrow_l, ("setting", THEME_ROW))
+    cv.hit(row, arrow_l, arrow_l + 1, ("arrow", THEME_ROW, -1))
+    cv.hit(row, arrow_l + 1, arrow_r, ("setting", THEME_ROW))
+    cv.hit(row, arrow_r, arrow_r + 1, ("arrow", THEME_ROW, +1))
+    cv.add("")
+    cv.add("  Presets", "title")
+    _render_presets(cv, st, presets)
 
 
 _TOP_HDR = f"{'S':<2}{'ID':>5}{'QUANT':>7}{'RATE':>7}{'WAIT':>9}{'BUSY':>9}{'W/Q':>6}{'B/Q':>6}{'ERR':>5}  {'FORMAT':<16} NAME"
@@ -829,11 +834,11 @@ def _render_top(cv, st, current, block, presets, body_h):
         cv.hit(row, 0, cv.width, ("toplist",))
 
 
-def _render_presets(cv, st, current, block, presets, body_h):
+def _render_presets(cv, st, presets):
     if not presets:
-        cv.add("  no presets yet; press s to save the current settings", "dim")
+        cv.add("  no presets yet; s saves the current clock settings as one", "dim")
     for i, p in enumerate(presets):
-        sel = i == min(st.preset_cursor, len(presets) - 1)
+        sel = st.cursor == THEME_ROW + 1 + i
         line = f"{'> ' if sel else '  '}{p['name']:<16} {p['label']:<28} {summarize_preset(p)}"
         row = cv.add(line, "selected" if sel else "normal")
         cv.hit(row, 0, cv.width, ("preset", i))

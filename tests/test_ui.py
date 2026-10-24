@@ -67,7 +67,7 @@ def test_settings_render_shows_allowed_rates_and_warning():
 
 @pytest.mark.parametrize("width", [40, 80, 120])
 def test_lines_fit_width(width):
-    for tab in ("settings", "top", "presets"):
+    for tab in ("settings", "top"):
         lines, hits = screen(pc.UIState(tab=tab), width=width)
         assert all(len(t) <= width for t, _ in lines)
         assert all(c1 <= width for _, _, c1, _ in hits)
@@ -99,13 +99,15 @@ def test_top_render_waiting_for_data():
 
 
 def test_presets_render_lists_labels():
-    lines, _ = screen(pc.UIState(tab="presets"))
+    lines, _ = screen(pc.UIState(tab="settings"), height=40)
     body = "\n".join(t for t, _ in lines)
+    assert "Clock" in body and "Display" in body and "Presets" in body
+    assert body.index("Clock") < body.index("Display") < body.index("Presets")
     assert "tracking" in body and "Low-latency tracking" in body and "buf 64" in body
 
 
 def test_presets_render_empty_hint():
-    lines, _ = pc.render_screen(pc.UIState(tab="presets"), CUR, None, [], 80, 20)
+    lines, _ = pc.render_screen(pc.UIState(tab="settings"), CUR, None, [], 80, 30)
     assert any("no presets" in t for t, _ in lines)
 
 
@@ -114,8 +116,8 @@ def test_presets_render_empty_hint():
 def test_up_down_moves_cursor_and_clamps():
     st, _ = key(pc.UIState(), "up")
     assert st.cursor == 0
-    st, _ = key(st, *["down"] * 10)
-    assert st.cursor == pc.THEME_ROW
+    st, _ = key(st, *["down"] * 20)
+    assert st.cursor == pc.THEME_ROW + len(PRESETS)  # clock rows, Theme, then the presets
 
 
 def test_left_right_sets_pending_without_action():
@@ -155,19 +157,20 @@ def test_esc_reverts():
 
 
 def test_tab_and_number_keys_switch_tabs():
-    st, _ = key(pc.UIState(), "tab")
-    assert st.tab == "top"
-    st, _ = key(st, "tab")
-    assert st.tab == "presets"
-    st, _ = key(st, "tab")
-    assert st.tab == "devices"
-    st, _ = key(st, "tab")
-    assert st.tab == "patch"
-    st, _ = key(st, "tab")
-    assert st.tab == "settings"
-    for k, tab in (("2", "top"), ("3", "presets"), ("4", "devices"), ("5", "patch"), ("1", "settings")):
-        st, _ = key(st, k)
+    st = pc.UIState(tab=pc.TABS[0])
+    for want in pc.TABS[1:] + pc.TABS[:1]:
+        st, _ = key(st, "tab")
+        assert st.tab == want
+    for n, tab in enumerate(pc.TABS, start=1):
+        st, _ = key(st, str(n))
         assert st.tab == tab
+    st, _ = key(st, str(len(pc.TABS) + 1))  # past the last tab: nothing
+    assert st.tab == pc.TABS[-1]
+
+
+def test_basic_tabs_come_first():
+    assert pc.TABS.index("devices") < pc.TABS.index("patch") < pc.TABS.index("settings") < pc.TABS.index("top")
+    assert "presets" not in pc.TABS
 
 
 def test_restart_needs_confirmation():
@@ -192,7 +195,7 @@ def test_q_quits():
 
 
 def test_presets_keys():
-    st = pc.UIState(tab="presets")
+    st = pc.UIState(tab="settings", cursor=pc.THEME_ROW + 1)
     st, actions = key(st, "down", "enter")
     assert actions == [("apply_preset", "mix")]
     _, actions = key(st, "s")
@@ -206,7 +209,7 @@ def test_presets_keys():
 
 
 def test_presets_keys_with_no_presets():
-    st = pc.UIState(tab="presets")
+    st = pc.UIState(tab="settings", cursor=pc.THEME_ROW + 1)
     _, actions = key(st, "enter", "d", "e", presets=[])
     assert actions == []
     _, actions = key(st, "s", presets=[])
@@ -244,8 +247,8 @@ def test_hitmap_lands_on_drawn_glyphs(width):
 def test_click_tab_switches():
     st = pc.UIState()
     _, hits = screen(st)
-    st, actions = click(st, hits, ("tab", "presets"))
-    assert st.tab == "presets" and actions == []
+    st, actions = click(st, hits, ("tab", "top"))
+    assert st.tab == "top" and actions == []
 
 
 def test_click_row_selects():
@@ -304,12 +307,13 @@ def test_click_outside_targets_does_nothing():
 
 
 def test_presets_mouse():
-    st = pc.UIState(tab="presets")
-    _, hits = screen(st)
+    st = pc.UIState(tab="settings")
+    _, hits = screen(st, height=40)
     st, actions = click(st, hits, ("preset", 1))
-    assert st.preset_cursor == 1 and actions == []
+    assert st.cursor == pc.THEME_ROW + 2 and actions == []
     _, actions = click(st, hits, ("preset", 0), event="double")
     assert actions == [("apply_preset", "tracking")]
+    _, hits = screen(st, height=40)  # a preset row's legend adds e and d
     _, actions = click(st, hits, ("key", "s"))
     assert actions == [("prompt_save",)]
     st2, actions = click(st, hits, ("key", "d"))
@@ -335,7 +339,7 @@ def test_click_while_confirming_cancels_without_acting():
 # --- theme ------------------------------------------------------------------------------
 
 def test_theme_row_switches_at_once_and_reports_it():
-    st, _ = key(pc.UIState(), *["down"] * 10)
+    st = pc.UIState(cursor=pc.THEME_ROW)
     st, actions = key(st, "right")
     assert st.theme == "light" and actions == [("set_theme", "light")]
     assert "light" in "\n".join(t for t, _ in screen(st)[0])
@@ -344,7 +348,7 @@ def test_theme_row_switches_at_once_and_reports_it():
 
 
 def test_enter_on_the_theme_row_does_not_switch_it():
-    st, _ = key(pc.UIState(), *["down"] * 10)
+    st = pc.UIState(cursor=pc.THEME_ROW)
     st, actions = key(st, "enter")
     assert st.theme == "dark" and actions == []
 
@@ -402,7 +406,7 @@ def test_saved_orange_loads_as_crowbar(tmp_path):
 
 # --- no button rows; the legend's chips take the mouse --------------------------------------
 
-@pytest.mark.parametrize("tab", ["settings", "presets", "devices", "patch"])
+@pytest.mark.parametrize("tab", ["settings", "devices", "patch"])
 def test_no_button_rows(tab):
     lines, hits = screen(pc.UIState(tab=tab))
     assert not any(t[0] == "button" for *_, t in hits)
@@ -412,4 +416,4 @@ def test_no_button_rows(tab):
 def test_multi_key_chips_have_no_hit():
     _, hits = screen(pc.UIState())
     keys = {t[1] for *_, t in hits if t[0] == "key"}
-    assert keys == {"enter", "esc", "R", "q"}  # not ↑↓, ←→ or Tab/1-5
+    assert keys == {"enter", "esc", "s", "R", "q"}  # not ↑↓, ←→ or Tab/1-n

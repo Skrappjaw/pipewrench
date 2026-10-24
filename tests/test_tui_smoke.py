@@ -13,6 +13,13 @@ from pathlib import Path
 import pytest
 
 HERE = Path(__file__).parent
+sys.path.insert(0, str(HERE.parent))
+import pwcore as pc  # noqa: E402
+
+
+def tab(name):
+    """The number key for a tab, so these tests follow the tab order."""
+    return str(pc.TABS.index(name) + 1)
 APP = HERE.parent / "pwctl.py"
 
 
@@ -78,8 +85,9 @@ def test_tab_key_mouse_click_and_quit(app):
     app.expect("Force sample rate")
     app.send("\t")
     app.expect("QUANT")
-    # tab bar on top tab: " 1 Settings [2 Top] ..." -> click "Settings" at row 0, col 3
-    app.click(0, 3)
+    # the tab bar is " " then " n Title " per tab, one space apart: click inside "Settings"
+    col = 1 + sum(len(pc.TAB_TITLES[t]) + 3 for t in pc.TABS[:pc.TABS.index("settings")]) + 3
+    app.click(0, col)
     app.expect("Force sample rate")
     app.send("q")
     assert app.wait_exit() == 0
@@ -87,8 +95,7 @@ def test_tab_key_mouse_click_and_quit(app):
 
 def test_save_preset_via_prompt(app, tmp_path):
     app.expect("Force sample rate")
-    app.send("3")
-    app.expect("no presets")
+    app.expect("no presets")  # Presets sit inside Settings
     app.send("s")
     app.expect("preset name")
     app.send("tracking\r")
@@ -102,7 +109,7 @@ def test_save_preset_via_prompt(app, tmp_path):
 
 def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
     app.expect("Force sample rate")
-    app.send("4")
+    app.send(tab("devices"))
     app.expect("GCS-8 · profile HiFi")
     app.send("a")
     app.expect("bus name")
@@ -118,7 +125,7 @@ def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
 
 def test_patch_tab_shows_both_views(app):
     app.expect("Force sample rate")
-    app.send("5")
+    app.send(tab("patch"))
     app.expect("Destinations")
     app.expect("Discord")
     app.send("g")
@@ -131,7 +138,7 @@ def test_patch_tab_shows_both_views(app):
 
 def test_devices_rename_is_enter_enter_type_enter(app, tmp_path):
     app.expect("Force sample rate")
-    app.send("4")
+    app.send(tab("devices"))
     app.expect("GCS-8 · profile HiFi")
     app.send("\x1bOB")          # Built-in Audio -> DualShock card
     app.send("\x1bOB")          # -> DualShock output row
@@ -156,7 +163,7 @@ def test_devices_rename_empty_restores_the_default(app, tmp_path):
     (tmp_path / "pwctl" / "devices.json").write_text(json.dumps(
         {"version": 2, "clock_rate": None, "buses": [], "labels": {ds4: "Pad"}, "hidden": []}))
     app.expect("Force sample rate")
-    app.send("4")
+    app.send(tab("devices"))
     app.expect("GCS-8 · profile HiFi")
     app.send("\x1bOB")
     app.send("\x1bOB")
@@ -183,7 +190,7 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
         app.send("\x1bOB" * 10 + "\x1bOD")  # down to the theme row, then left: light → dark
         app.expect("theme: dark")
         assert json.loads((tmp_path / "pwctl" / "ui.json").read_text()) == {"theme": "dark"}
-        app.send("5")
+        app.send(tab("patch"))
         app.expect("Destinations")
         app.send("q")
         assert app.wait_exit() == 0
