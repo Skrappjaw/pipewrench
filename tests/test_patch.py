@@ -177,3 +177,37 @@ def test_jack_ports_pair_by_position():
 def test_jack_client_does_not_become_a_device():
     inv = pi.inventory(with_reaper(dump()))
     assert inv.find("REAPER") is None
+
+
+# --- slots: where a source lands on unnamed inputs ------------------------------------------
+
+def test_slots_on_unnamed_inputs_are_aligned_runs_sized_to_the_source():
+    g = pp.graph(with_reaper(dump()))
+    d = g.find_dest("REAPER")
+    runs = pp.slots(g.find_source("GCS-8 CH 2"), d)
+    assert [[p.name for p in r] for r in runs] == [["in1", "in2"], ["in3", "in4"], ["in5", "in6"], ["in7", "in8"]]
+    mono = next(s for s in g.sources if len(s.ports) == 1 and not s.monitor)
+    assert len(pp.slots(mono, d)) == 8
+
+
+def test_no_slots_where_channel_names_decide():
+    g = pp.graph(with_reaper(dump()))
+    assert pp.slots(g.find_source("REAPER"), g.find_dest("GCS-8 CH 3-AUX")) is None
+
+
+def test_slot_cmds_link_into_a_later_slot_and_count_as_full():
+    d = with_reaper(dump())
+    g = pp.graph(d)
+    s, r = g.find_source("GCS-8 CH 2"), g.find_dest("REAPER")
+    third = pp.slots(s, r)[2]
+    cmds = pp.slot_cmds(g, s, third)
+    assert [c[2] for c in cmds] == [str(p.id) for p in third]
+    for n, c in enumerate(cmds):
+        d.append({"id": 9000 + n, "type": "PipeWire:Interface:Link",
+                  "info": {"output-port-id": int(c[1]), "input-port-id": int(c[2]), "state": "active"}})
+    g = pp.graph(d)
+    s, r = g.find_source("GCS-8 CH 2"), g.find_dest("REAPER")
+    assert g.state(s, r) == "full"
+    runs = pp.slots(s, r)
+    assert g.slot_sources(runs[2]) == [s] and g.first_free(runs) == 0
+    assert all(c[1] == "-d" for c in pp.slot_cmds(g, s, runs[2]))  # picking it again disconnects

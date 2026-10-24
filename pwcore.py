@@ -320,6 +320,8 @@ class UIState:
     patch_ports: bool = False
     patch_port_row: int = 0      # source port in the port matrix
     patch_port_col: int = 0      # destination port
+    patch_menu: bool = False     # the slot menu under the destination
+    patch_menu_cursor: int = 0
     confirm: tuple = None
     message: str = ""
 
@@ -549,11 +551,14 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
         keys = {"double": ["enter"], "wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
     elif kind in ("patch_src", "patch_dst"):
         side = "src" if kind == "patch_src" else "dst"
-        st = dataclasses.replace(st, patch_side=side, **{f"patch_{side}": target[1]})
+        st = dataclasses.replace(st, patch_side=side, patch_menu=False, **{f"patch_{side}": target[1]})
         keys = {"double": ["enter"] if side == "dst" else [], "wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
     elif kind == "patch_cell":
-        st = dataclasses.replace(st, patch_src=target[1], patch_dst=target[2])
+        st = dataclasses.replace(st, patch_src=target[1], patch_dst=target[2], patch_menu=False)
         keys = ["enter"] if event == "double" else []
+    elif kind == "patch_slot":
+        st = dataclasses.replace(st, patch_menu_cursor=target[1])
+        keys = {"click": ["enter"], "double": ["enter"], "wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
     elif kind == "patch_pcell":
         st = dataclasses.replace(st, patch_port_row=target[1], patch_port_col=target[2])
         keys = ["enter"] if event == "double" else []
@@ -581,6 +586,7 @@ LEGENDS = {
                    ("g", "grid view"), ("m", "monitors")] + TAB_KEYS,
     "patch grid": [("Enter", "connect/disconnect"), ("↑↓", "source"), ("←→", "destination"), ("p", "ports"),
                    ("g", "column view"), ("m", "monitors")] + TAB_KEYS,
+    "patch menu": [("Enter", "connect/disconnect"), ("↑↓", "choose inputs"), ("Esc", "back")],
     "patch ports": [("Enter", "link/unlink"), ("↑↓", "source port"), ("←→", "destination port"),
                     ("p Esc", "back")] + TAB_KEYS,
 }
@@ -614,6 +620,8 @@ def _key_box(items, width):
 def legend(st):
     if st.tab == "devices" and st.dev_menu:
         return LEGENDS["devices menu"]
+    if st.tab == "patch" and st.patch_menu:
+        return LEGENDS["patch menu"]
     if st.tab == "patch":
         return LEGENDS["patch ports" if st.patch_ports else f"patch {st.patch_view}"]
     return LEGENDS[st.tab]
@@ -842,9 +850,36 @@ def _toggle(g, st, s, d):
     return st, [("patch_cmds", cmds)]
 
 
+def _connect(g, st, s, d):
+    """Enter on a destination: a slot menu where there's a choice of inputs, else a toggle."""
+    runs = pp.slots(s, d)
+    if not runs:
+        return _toggle(g, st, s, d)
+    st.patch_menu, st.patch_menu_cursor = True, g.first_free(runs)
+    return st, []
+
+
+def _key_slot_menu(st, key, g, s, d):
+    runs = pp.slots(s, d) if s else None
+    st.patch_menu = False
+    if not runs:
+        return st, []
+    st.patch_menu_cursor = max(0, min(len(runs) - 1, st.patch_menu_cursor))
+    if key in ("up", "down"):
+        st.patch_menu = True
+        st.patch_menu_cursor = max(0, min(len(runs) - 1, st.patch_menu_cursor + (1 if key == "down" else -1)))
+        return st, []
+    if key != "enter":
+        return st, []  # Esc, ← or any other key closes the menu, like the Devices menus
+    return st, [("patch_cmds", pp.slot_cmds(g, s, runs[st.patch_menu_cursor]))]
+
+
 def _key_patch(st, key, g):
     if g is None:
         return st, []
+    if st.patch_menu:
+        _, s, d = _patch_pair(g, st)
+        return _key_slot_menu(st, key, g, s, d)
     if key == "g":
         st.patch_view = "grid" if st.patch_view == "cols" else "cols"
         st.patch_ports = False
@@ -883,7 +918,7 @@ def _key_patch(st, key, g):
         elif key in ("left", "right"):
             st.patch_dst = max(0, min(len(g.dests) - 1, st.patch_dst + (1 if key == "right" else -1)))
         elif key == "enter":
-            return _toggle(g, st, s, d)
+            return _connect(g, st, s, d)
         return st, []
     if key == "left":
         st.patch_side = "src"
@@ -897,7 +932,7 @@ def _key_patch(st, key, g):
         if st.patch_side == "src":
             _enter_dests(g, st, s)
         else:
-            return _toggle(g, st, s, d)
+            return _connect(g, st, s, d)
     return st, []
 
 
@@ -934,7 +969,7 @@ def _render_patch(cv, st, g, body_h):
     if st.patch_ports:
         _render_port_matrix(cv, st, g, s, d, room)
     elif st.patch_view == "grid":
-        _render_patch_grid(cv, st, g, srcs, room)
+        _render_patch_grid(cv, st, g, srcs, s, d, room)
     else:
         _render_patch_cols(cv, st, g, srcs, s, room)
     cv.add("")
@@ -946,42 +981,66 @@ def _render_patch(cv, st, g, body_h):
         cv.add(_pair_status(g, s, d), "alert" if g.state(s, d) != "none" else "dim")
 
 
+def _slot_menu(g, st, s, d, avail):
+    """The slot menu as box lines (text, selected, hit target): each run of inputs and who feeds it."""
+    runs = (pp.slots(s, d) or []) if st.patch_menu else []
+    if not runs:
+        return []
+    st.patch_menu_cursor = max(0, min(len(runs) - 1, st.patch_menu_cursor))
+    items = []
+    for r in runs:
+        a = d.ports.index(r[0]) + 1
+        name = f"In {a}" if len(r) == 1 else f"In {a}-{a + len(r) - 1}"
+        on = g.slot_sources(r)
+        items.append(f"{'●' if s in on else ' '} {name:<8} {', '.join(x.label for x in on) or 'free'}")
+    w = max(10, min(avail - 2, max([len(s.label) + 4] + [len(t) + 3 for t in items])))
+    out = [("┌" + f"─ {_fit(s.label, w - 3)} ".ljust(w, "─") + "┐", False, None)]
+    for k, text in enumerate(items):
+        sel = k == st.patch_menu_cursor
+        out.append(("│" + f"{'>' if sel else ' '} {_fit(text, w - 2)}".ljust(w) + "│", sel, ("patch_slot", k)))
+    out.append(("└" + "─" * w + "┘", False, None))
+    return out
+
+
 def _render_patch_cols(cv, st, g, srcs, s, room):
     half = max(20, (cv.width - 3) // 2)
     cv.add(f"  {'Sources':<{half - 2}}│ Destinations", "title")
+    on_dst = st.patch_side == "dst"
+    menu = _slot_menu(g, st, s, g.dests[st.patch_dst], cv.width - half - 2) if on_dst else []
     left = list(_window(len(srcs), st.patch_src, room - 1))
-    right = list(_window(len(g.dests), st.patch_dst, room - 1))
+    right = []  # (text, highlighted, hit target); the slot menu sits under its destination
+    for j in _window(len(g.dests), st.patch_dst, max(1, room - 1 - len(menu))):
+        mark = "> " if j == st.patch_dst and on_dst else "  "
+        rt = f"{mark}{_STATE_MARK[g.state(s, g.dests[j])].replace('·', ' ')} {_fit(g.dests[j].label, half - 4)}"
+        right.append((rt, j == st.patch_dst and on_dst and not menu, ("patch_dst", j)))
+        if j == st.patch_dst:
+            right += menu
     for n in range(max(len(left), len(right))):
-        lt, rt = "", ""
+        lt, spans = "", []
         if n < len(left):
             i = left[n]
             count = len(g.targets(srcs[i]))
-            mark = "> " if i == st.patch_src and st.patch_side == "src" else "* " if i == st.patch_src else "  "
+            mark = "> " if i == st.patch_src and not on_dst else "* " if i == st.patch_src else "  "
             lt = f"{mark}{_fit(srcs[i].label, half - 7):<{half - 7}} {('●' + str(count)) if count else '':>3}"
-        if n < len(right):
-            j = right[n]
-            mark = "> " if j == st.patch_dst and st.patch_side == "dst" else "  "
-            rt = f"{mark}{_STATE_MARK[g.state(s, g.dests[j])].replace('·', ' ')} {_fit(g.dests[j].label, half - 4)}"
-        # The cursor's highlight covers only its own column.
-        if st.patch_side == "src" and n < len(left) and left[n] == st.patch_src:
-            style = ("selected", [(0, half)])
-        elif st.patch_side == "dst" and n < len(right) and right[n] == st.patch_dst:
-            style = ("selected", [(half + 2, cv.width)])
-        else:
-            style = "normal"
-        row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), style)
+            if i == st.patch_src and not on_dst:
+                spans.append((0, half))  # the cursor's highlight covers only its own column
+        rt, lit, target = right[n] if n < len(right) else ("", False, None)
+        if lit:
+            spans.append((half + 2, cv.width if target[0] == "patch_dst" else half + 2 + len(rt)))
+        row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), ("selected", spans) if spans else "normal")
         if n < len(left):
             cv.hit(row, 0, half, ("patch_src", left[n]))
-        if n < len(right):
-            cv.hit(row, half + 1, cv.width, ("patch_dst", right[n]))
+        if target:
+            cv.hit(row, half + 1, cv.width, target)
 
 
-def _render_patch_grid(cv, st, g, srcs, room):
+def _render_patch_grid(cv, st, g, srcs, s, d, room):
     label_w = 30
     cols_fit = max(1, (cv.width - label_w - 3) // 3)
     cols = list(_window(len(g.dests), st.patch_dst, cols_fit))
     key_rows = -(-len(cols) // max(1, (cv.width - 2) // 35))
-    rows = list(_window(len(srcs), st.patch_src, max(1, room - 2 - key_rows)))
+    menu = _slot_menu(g, st, s, d, cv.width - 4)
+    rows = list(_window(len(srcs), st.patch_src, max(1, room - 2 - key_rows - len(menu))))
     cv.add(" " * (label_w + 2) + "".join(f"{j + 1:>3}" for j in cols), "title")
     for i in rows:
         cells = ""
@@ -994,6 +1053,10 @@ def _render_patch_grid(cv, st, g, srcs, room):
         for k, j in enumerate(cols):
             c0 = 2 + label_w + 3 * k
             cv.hit(row, c0, c0 + 3, ("patch_cell", i, j))
+    for text, sel, target in menu:
+        row = cv.add("    " + text, ("selected", [(4, 4 + len(text))]) if sel else "normal")
+        if target:
+            cv.hit(row, 4, 4 + len(text), target)
     cv.add("")
     per_row = max(1, (cv.width - 2) // 35)  # as many "nn name" columns as fit the screen
     for start in range(0, len(cols), per_row):

@@ -287,3 +287,49 @@ def test_grid_key_fits_the_screen(width):
     text = "\n".join(key_rows)
     for n, d in enumerate(G.dests):
         assert f"{n + 1} {d.label[:20]}" in text, (n, d.label, text)
+
+
+# --- slot menu ---------------------------------------------------------------------------
+
+def reaper_menu(src="GCS-8 CH 2"):
+    srcs = [s for s in GR.sources if not s.monitor]
+    i = next(n for n, s in enumerate(srcs) if s.label == src)
+    j = next(n for n, d in enumerate(GR.dests) if d.label == "REAPER")
+    return key(pc.UIState(tab="patch", patch_src=i, patch_dst=j, patch_side="dst"), "enter", g=GR)
+
+
+def test_enter_on_unnamed_inputs_opens_the_slot_menu():
+    st, actions = reaper_menu()
+    assert st.patch_menu and actions == []
+    lines, hits = screen(st, g=GR)
+    text = body(lines)
+    assert "In 1-2" in text and "In 7-8" in text
+    assert pc.legend(st) == pc.LEGENDS["patch menu"]
+    assert any(t[0] == "patch_slot" for *_, t in hits)
+
+
+def test_slot_menu_enter_links_the_chosen_slot():
+    st, _ = reaper_menu()
+    st, actions = key(st, "down", "enter", g=GR)
+    assert not st.patch_menu
+    r = next(d for d in GR.dests if d.label == "REAPER")
+    assert [c[2] for c in actions[0][1]] == [str(r.ports[2].id), str(r.ports[3].id)]
+
+
+def test_slot_menu_closes_on_esc():
+    st, _ = reaper_menu()
+    st, actions = key(st, "esc", g=GR)
+    assert not st.patch_menu and actions == []
+
+
+def test_named_destination_still_toggles_at_once():
+    st, actions = key(at("Discord", "GCS-8 CH 3-AUX", patch_side="dst"), "enter")
+    assert not st.patch_menu and actions and actions[0][0] == "patch_cmds"
+
+
+def test_clicking_a_slot_picks_it():
+    st, _ = reaper_menu()
+    _, hits = screen(st, g=GR)
+    row, c0, _, t = next(h for h in hits if h[3] == ("patch_slot", 1))
+    st, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, [], patch=GR)
+    assert not st.patch_menu and actions[0][0] == "patch_cmds"

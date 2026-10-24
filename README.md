@@ -164,7 +164,7 @@ How it works:
 | Key | Action |
 |---|---|
 | ↑ ↓ / ← → | columns: select / switch column. Grid: source / destination |
-| Enter | connect or disconnect the selected pair (on a source in columns: move to the destinations) |
+| Enter | connect or disconnect the selected pair (on a source in columns: move to the destinations). On unnamed inputs (REAPER's in1…in8) it opens a slot menu: In 1-2, In 3-4… with who's on each, cursor on the next free one |
 | → (columns) | move to the destinations, landing on one the source already feeds |
 | p | port matrix for the chosen source and destination (on the source side it moves you to the destinations first): ↑↓ source port, ←→ destination port, Enter links/unlinks; `p`/Esc back |
 | g | switch between columns and grid |

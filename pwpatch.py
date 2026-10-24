@@ -52,6 +52,15 @@ def pair_ports(src, dst):
     return matched if len(matched) == len(src) else list(zip(src, dst))
 
 
+def slots(s, d):
+    """Where a source can land on a destination whose inputs have no channel names (REAPER's in1…in8,
+    AUXn): aligned runs of as many inputs as the source has outputs. None when there's no choice."""
+    k, n = len(s.ports), len(d.ports)
+    if not k or n <= k or any(p.channel in _CHANNELS for p in d.ports):
+        return None
+    return [d.ports[i:i + k] for i in range(0, n - k + 1, k)]
+
+
 class Graph:
     def __init__(self, sources, dests, links):
         self.sources, self.dests = sources, dests
@@ -61,11 +70,20 @@ class Graph:
         return any((a.id, b.id) in self.links for a in s.ports for b in d.ports)
 
     def state(self, s, d):
-        """full: every paired channel linked; partial: some link between them; none."""
-        pairs = pair_ports(s.ports, d.ports)
-        if pairs and all((a.id, b.id) in self.links for a, b in pairs):
-            return "full"
+        """full: every paired channel linked (into any one slot); partial: some link between them; none."""
+        runs = slots(s, d)
+        for pairs in ([list(zip(s.ports, r)) for r in runs] if runs else [pair_ports(s.ports, d.ports)]):
+            if pairs and all((a.id, b.id) in self.links for a, b in pairs):
+                return "full"
         return "partial" if self._any_link(s, d) else "none"
+
+    def slot_sources(self, slot):
+        """The sources linked into any of a slot's inputs."""
+        feeding = {a for a, b in self.links if b in {p.id for p in slot}}
+        return [s for s in self.sources if any(p.id in feeding for p in s.ports)]
+
+    def first_free(self, runs):
+        return next((k for k, r in enumerate(runs) if not self.slot_sources(r)), 0)
 
     def targets(self, s):
         return [d for d in self.dests if self._any_link(s, d)]
@@ -160,6 +178,12 @@ def disconnect_cmds(g, s, d):
 
 def toggle_cmds(g, s, d):
     return disconnect_cmds(g, s, d) if g.state(s, d) != "none" else connect_cmds(g, s, d)
+
+
+def slot_cmds(g, s, slot):
+    """Toggle a source on one slot: drop its links into those inputs, else link it in by position."""
+    drop = [["pw-link", "-d", str(g.links[(a.id, b.id)])] for a in s.ports for b in slot if (a.id, b.id) in g.links]
+    return drop or [["pw-link", str(a.id), str(b.id)] for a, b in zip(s.ports, slot)]
 
 
 def port_pairs(g, s, d):
