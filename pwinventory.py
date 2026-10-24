@@ -183,3 +183,48 @@ def view(inv, hidden=(), show_hidden=False, monitors=False):
     out.append(("Virtual", None))
     out += rows_of(inv.virtual)
     return out
+
+
+# --- commands (wpctl) -------------------------------------------------------------
+
+_REL = re.compile(r"([+-])(\d{1,3})%")
+_ABS_PCT = re.compile(r"(\d{1,3})%")
+_ABS_FRAC = re.compile(r"\d(\.\d+)?")
+MAX_VOLUME = 1.5  # wpctl's own ceiling for set-volume
+
+
+def _actionable(row):
+    if row.kind == "monitor":
+        raise ValueError(f"{row.label} is a monitor; act on its sink instead")
+
+
+def default_cmd(row):
+    _actionable(row)
+    return ["wpctl", "set-default", str(row.id)]
+
+
+def mute_cmd(row):
+    _actionable(row)
+    return ["wpctl", "set-mute", str(row.id), "toggle"]
+
+
+def volume_cmd(row, step):
+    """step: +5% / -5% (relative), 50% or 0.5 (absolute, up to 150%)."""
+    _actionable(row)
+    step = str(step).strip()
+    if m := _REL.fullmatch(step):
+        return ["wpctl", "set-volume", str(row.id), f"{m.group(2)}%{m.group(1)}"]
+    if (m := _ABS_PCT.fullmatch(step)) and int(m.group(1)) <= MAX_VOLUME * 100:
+        return ["wpctl", "set-volume", str(row.id), step]
+    if _ABS_FRAC.fullmatch(step) and float(step) <= MAX_VOLUME:
+        return ["wpctl", "set-volume", str(row.id), step]
+    raise ValueError(f"volume {step!r}: use +5%, -5%, 50% or 0.5 (at most 150%)")
+
+
+def profile_cmd(card, profile):
+    """profile: an index or a name from the card's profile list."""
+    p = next((p for p in card.profiles if str(p.index) == str(profile) or p.name == profile), None)
+    if p is None:
+        names = ", ".join(p.name for p in card.profiles)
+        raise ValueError(f"{card.label} has no profile {profile!r}; choose one of: {names}")
+    return ["wpctl", "set-profile", str(card.id), str(p.index)]

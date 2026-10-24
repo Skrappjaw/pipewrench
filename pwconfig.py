@@ -256,3 +256,10 @@ def rollback_generated(path):
         path.unlink()
         return f"removed {path.name}"
     return f"nothing to roll back for {path.name}"
+
+
+def bus_conflicts(c, live_names, applied_text):
+    """Buses in the config that already exist live but aren't pwctl's yet (e.g. made by a script).
+    Applying would create a second node with the same name."""
+    return [b["name"] for b in c.get("buses", [])
+            if b["name"] in live_names and f'node.name = "{b["name"]}"' not in (applied_text or "")]
