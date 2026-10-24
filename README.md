@@ -9,12 +9,14 @@ Standard library Python only. The UI is curses, with keyboard and mouse.
 ## Install and launch
 
 ```
-ln -s "$PWD/pwctl.py" ~/.local/bin/pwctl      # from the repo root
-pwctl                                          # interactive UI
-pwctl status                                   # one-shot commands, see below
+ln -s "$PWD/pwctl.py" ~/.local/bin/pwrench      # from the repo root
+ln -s "$PWD/pwctl.py" ~/.local/bin/pipewrench   # same app, long name
+pwrench                                          # interactive UI
+pwrench status                                   # one-shot commands, see below
 ```
 
-On this machine, `pwctl` → `projects/pwctl/pwctl.py` (branch `main`).
+On this machine, `pwrench` and `pipewrench` → `projects/pwctl/pwctl.py` (branch `main`). The old
+`pwctl` link is gone (2026-10-24). The examples below still say `pwctl`; read it as `pwrench`.
 
 Needs PipeWire's command-line tools: `pw-metadata`, `pw-top`, `pw-dump`, `pw-cat`, plus `systemctl --user`.
 
