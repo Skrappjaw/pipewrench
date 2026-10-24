@@ -1567,12 +1567,16 @@ def _key_menu(st, key, devices):
 
 
 def _menu_lines(devices, st, title):
-    """A box under the selected row. Every line shares one interior width, so the edges line up."""
-    items = dev_menu_items(devices, st)
-    width = max(26, len(title) + 4, max((len(label) for label, _ in items), default=0) + 5)
+    return _menu_box(title, [label for label, _ in dev_menu_items(devices, st)], st.dev_menu_cursor)
+
+
+def _menu_box(title, labels, cursor):
+    """A box under the selected row (Devices and Mixer). Every line shares one interior width, so the
+    edges line up. Item lines carry ("menu", k) for their click target."""
+    width = max(26, len(title) + 4, max((len(label) for label in labels), default=0) + 5)
     lines = [("    ┌" + f"─ {title} ".ljust(width, "─") + "┐", "title", None)]
-    for k, (label, _) in enumerate(items):
-        sel = k == st.dev_menu_cursor
+    for k, label in enumerate(labels):
+        sel = k == cursor
         lines.append(("    │" + f" {'> ' if sel else '  '}{label}".ljust(width) + "│",
                       "selected" if sel else "normal", ("menu", k)))
     lines.append(("    └" + "─" * width + "┘", "title", None))
