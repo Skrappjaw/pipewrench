@@ -214,8 +214,14 @@ green:
 
 ### Display
 
-Theme (dark, light, or crowbar orange), the meters' frame rate, fall speed and peak hold, and the
+Theme (dark, light, crowbar orange, or Pipe Boy green), the meters' frame rate, fall speed and peak hold, and the
 Mixer's volume bar. These apply at once and are kept in `~/.config/pipewrench/ui.json`.
+
+**Pipe Boy** is one phosphor green, after Fallout's Pip-Boy. With no other colours, status shows by style:
+good is bold, waiting is underlined, and a problem is a pale block. Crowbar and Pipe Boy need a 256-colour
+terminal; on a basic one PipeWrench shows dark instead.
+
+![Pipe Boy](guide/mixer-pipeboy.png)
 
 ### Keys
 

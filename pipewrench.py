@@ -849,7 +849,7 @@ class Tui:
         theme = self.st.theme
         if c.COLORS < pc.THEME_MIN_COLOURS.get(theme, 8):
             theme = "dark"
-            self.st.message = self.st.failed = f"{self.st.theme} needs {pc.THEME_MIN_COLOURS[self.st.theme]} colours; showing dark"
+            self.st.message = self.st.failed = f"{pc.theme_label(self.st.theme)} needs {pc.THEME_MIN_COLOURS[self.st.theme]} colours; showing dark"
         exact = c.can_change_color() and c.COLORS >= 256
         slots = iter(range(min(c.COLORS, 256) - 1, 15, -1))  # palette slots for exact hex; reset when PipeWrench exits
 
@@ -987,7 +987,7 @@ class Tui:
                 self.st.failed = "" if rc == 0 else self.st.message
             elif kind == "set_theme":
                 pc.save_ui(pc.ui_path(), pc.ui_prefs(self.st))
-                self.st.message = f"theme: {action[1]}"
+                self.st.message = f"theme: {pc.theme_label(action[1])}"
                 self._apply_theme(scr)  # may replace the message: a theme the terminal can't show
             elif kind == "save_ui":
                 pc.save_ui(pc.ui_path(), pc.ui_prefs(self.st))

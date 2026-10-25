@@ -3,7 +3,7 @@
 
 Each picture is the frame pwrench paints: pwcore.render_screen gives the same lines and colour roles the
 curses UI draws, and this script paints them as PNG in the dark theme, one character per cell in DejaVu
-Sans Mono. Fixtures only, so nothing from a live machine ends up in the docs, and the pictures can be
+Sans Mono (one shot shows the Pipe Boy theme). Fixtures only, so nothing from a live machine ends up in the docs, and the pictures can be
 redrawn whenever the UI changes:
 
     python3 tools/screenshots.py            # writes docs/guide/*.png
@@ -42,24 +42,32 @@ FONT, FONT_BOLD = (ImageFont.truetype(str(FONT_DIR / f), 15) for f in ("DejaVuSa
 CELL_W, CELL_H = round(FONT.getlength("M")), 19
 
 
-def _role(name):
-    fg, bg, attrs = pc.THEMES["dark"][name]
-    fg, bg = PALETTE.get(fg, SCREEN_FG) if fg else SCREEN_FG, PALETTE.get(bg) if bg else None
+def _screen(theme):
+    """(fg, bg) of the window: the theme's own screen colours when it names hex, else the dark terminal's."""
+    fg, bg, _ = pc.THEMES[theme]["screen"]
+    return (fg if fg and fg.startswith("#") else SCREEN_FG), (bg if bg and bg.startswith("#") else SCREEN_BG)
+
+
+def _role(name, theme="dark"):
+    fg, bg, attrs = pc.THEMES[theme][name]
+    screen_fg, screen_bg = _screen(theme)
+    colour = lambda c: c if c.startswith("#") else PALETTE.get(c)  # noqa: E731
+    fg, bg = colour(fg) if fg else screen_fg, colour(bg) if bg else None
     attrs = attrs.split()
     if "reverse" in attrs:
-        fg, bg = bg or SCREEN_BG, fg
-    return fg, bg, "bold" in attrs, "dim" in attrs
+        fg, bg = bg or screen_bg, fg
+    return fg, bg, "bold" in attrs, "dim" in attrs, "underline" in attrs
 
 
-def _cells(text, style, width):
-    """Per-cell (fg, bg, bold, dim), painting the base role over the text and then each span in order,
-    as Tui._draw does."""
-    plain = (SCREEN_FG, None, False, False)
+def _cells(text, style, width, theme="dark"):
+    """Per-cell (fg, bg, bold, dim, underline), painting the base role over the text and then each span in
+    order, as Tui._draw does."""
+    plain = (_screen(theme)[0], None, False, False, False)
     base, spans = (style, []) if not isinstance(style, tuple) else style
-    cells = [_role(base) if n < len(text) else plain for n in range(width)]
+    cells = [_role(base, theme) if n < len(text) else plain for n in range(width)]
     for c0, c1, role in spans:
         for n in range(max(0, c0), min(c1, len(text), width)):
-            cells[n] = _role(role)
+            cells[n] = _role(role, theme)
     return cells
 
 
@@ -71,10 +79,11 @@ def _blend(fg, bg, k=0.55):
     return tuple(round(b + (f - b) * k) for f, b in zip(fg, bg))
 
 
-def png(lines, title="pwrench"):
+def png(lines, title="pwrench", theme="dark"):
     """A terminal window around the frame, every character placed on its cell so box lines meet."""
     top, pad = 30, 10
-    img = Image.new("RGB", (W * CELL_W + 2 * pad, len(lines) * CELL_H + top + pad), _hex(SCREEN_BG))
+    screen_bg = _screen(theme)[1]
+    img = Image.new("RGB", (W * CELL_W + 2 * pad, len(lines) * CELL_H + top + pad), _hex(screen_bg))
     draw = ImageDraw.Draw(img)
     draw.rectangle((0, 0, img.width, top - 6), fill=_hex("#2c2f33"))
     for k, c in enumerate(("#e05252", "#e5c07b", "#7cc243")):
@@ -82,12 +91,12 @@ def png(lines, title="pwrench"):
     draw.text((img.width / 2, 12), title, fill=_hex("#9aa0a6"), font=FONT, anchor="mm")
     for y, (text, style) in enumerate(lines):
         text = text[:W]
-        cells = _cells(text.rstrip(), style, W)
+        cells = _cells(text.rstrip(), style, W, theme)
         by = top + y * CELL_H
         for x, ch in enumerate(text.ljust(W)):
-            fg, bg, bold, dim = cells[x]
+            fg, bg, bold, dim, under = cells[x]
             px = pad + x * CELL_W
-            back = _hex(bg) if bg else _hex(SCREEN_BG)
+            back = _hex(bg) if bg else _hex(screen_bg)
             if bg:
                 draw.rectangle((px, by, px + CELL_W - 1, by + CELL_H - 1), fill=back)
             if ch.strip():
@@ -100,6 +109,8 @@ def png(lines, title="pwrench"):
                     _box(draw, ch, px, by, colour)
                 else:
                     draw.text((px, by + 2), ch, fill=colour, font=FONT_BOLD if bold else FONT)
+                if under:
+                    draw.line((px, by + CELL_H - 2, px + CELL_W - 1, by + CELL_H - 2), fill=colour)
     return img
 
 
@@ -245,6 +256,8 @@ def shots():
     block = top.flush()
 
     yield "mixer", frame(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH USB")), mixer=m, media=MEDIA)
+    yield "mixer-pipeboy", frame(pc.UIState(tab="mixer", theme="pipeboy", mix_cursor=mix_at(m, "GCS-8 CH USB")),
+                                 mixer=m, media=MEDIA)
     yield "mixer-bar-off", frame(pc.UIState(tab="mixer", volume_bar=False, mix_cursor=mix_at(m, "GCS-8 CH USB")),
                                  mixer=m, media=MEDIA)
     st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH 2", "recording")), "enter", CUR, [], mixer=m)
@@ -289,12 +302,15 @@ def shots():
                          about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"})
 
 
+SHOT_THEMES = {"mixer-pipeboy": "pipeboy"}  # the rest are drawn in the dark theme
+
+
 def main(out=OUT):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     names = []
     for name, lines in shots():
-        png(lines).save(out / f"{name}.png", optimize=True)
+        png(lines, theme=SHOT_THEMES.get(name, "dark")).save(out / f"{name}.png", optimize=True)
         names.append(name)
     return names
 

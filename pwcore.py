@@ -49,13 +49,30 @@ THEMES = {
                "chip": ("#2e2e33", "#dedee0", ""),
                "bar_ok": ("#2e2e33", "#73d216", ""), "bar_alert": ("#2e2e33", "#fc4138", ""),
                "bar_dim": (None, None, "reverse dim")},
+    # Pipe Boy: Fallout's Pip-Boy, one phosphor green. Without hue, status reads by style: ok bold, pending
+    # underlined, alert a pale block.
+    "pipeboy": {"screen": ("#3cff62", "#0b1a0d", ""),
+                "normal": (None, None, ""), "dim": ("#1f8a35", None, ""),
+                "selected": ("#0b1a0d", "#3cff62", ""), "anchor": ("#3cff62", "#13401c", ""),
+                "title": ("#b6ffc2", None, "bold"),
+                "ok": ("#3cff62", None, "bold"), "pending": ("#3cff62", None, "underline"),
+                "alert": ("#0b1a0d", "#b6ffc2", ""),
+                "chip": ("#b6ffc2", "#13401c", "bold"),
+                "bar_ok": ("#0b1a0d", "#1f8a35", ""), "bar_alert": ("#0b1a0d", "#b6ffc2", ""),
+                "bar_dim": ("#1f8a35", "#13401c", "")},
 }
 THEME_NAMES = list(THEMES)
+THEME_LABELS = {"pipeboy": "Pipe Boy"}
+
+
+def theme_label(name):
+    return THEME_LABELS.get(name, name)
+
 METER_FALL = [10, 20, 40, 80]  # dB a second: slow, VU-like, through fast
 PEAK_HOLD = [0, 0.5, 1, 1.5, 2, 3]  # seconds a peak marker hangs before it falls; 0 is off
 PEAK_FALL = 20  # dB a second, once the hold is over
 METER_FPS = [5, 10, 15, 20, 30, 45, 60]  # new audio lands once per graph cycle (21 ms at 1024/48k); falls redraw every frame
-THEME_MIN_COLOURS = {"crowbar": 256}  # below this the theme falls back to dark
+THEME_MIN_COLOURS = {"crowbar": 256, "pipeboy": 256}  # below this the theme falls back to dark
 
 
 def hex_rgb(colour):
@@ -1003,7 +1020,7 @@ def _render_settings(cv, st, current, block, presets, body_h, realtime=None):
     _render_realtime(cv, realtime)
     cv.add("")
     cv.add("  Display", "title")
-    _display_row(cv, st, THEME_ROW, "Theme", st.theme, "applies at once")
+    _display_row(cv, st, THEME_ROW, "Theme", theme_label(st.theme), "applies at once")
     _display_row(cv, st, FPS_ROW, "Meter frame rate", f"{st.meter_fps} fps", "how often Mixer meters redraw")
     _display_row(cv, st, FALL_ROW, "Meter fall", f"{st.meter_fall} dB/s", "how fast a meter drops after a peak")
     _display_row(cv, st, HOLD_ROW, "Peak hold", f"{st.peak_hold:g} s" if st.peak_hold else "off",

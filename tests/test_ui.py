@@ -371,8 +371,31 @@ def test_theme_row_switches_at_once_and_reports_it():
     st, actions = key(st, "right")
     assert st.theme == "light" and actions == [("set_theme", "light")]
     assert "light" in "\n".join(t for t, _ in screen(st)[0])
-    st, actions = key(st, "right", "right")
-    assert st.theme == "dark"  # dark → light → crowbar → dark
+    st, actions = key(st, "right", "right", "right")
+    assert st.theme == "dark"  # dark → light → crowbar → pipeboy → dark
+
+
+def _rgb(colour):
+    return pc.hex_rgb(colour)
+
+
+def test_pipe_boy_is_monochrome_green():
+    t = pc.THEMES["pipeboy"]
+    assert "pipeboy" in pc.THEME_NAMES and pc.THEME_MIN_COLOURS["pipeboy"] == 256
+    hexes = {c for fg, bg, _ in t.values() for c in (fg, bg) if c}
+    assert hexes and all(c.startswith("#") for c in hexes)
+    for c in hexes:  # every colour is a green: green channel leads, red and blue trail it
+        r, g, b = _rgb(c)
+        assert g >= r and g >= b and g > 0, c
+    # without hue, status reads by style: ok bold, pending underlined, alert a block
+    assert "bold" in t["ok"][2] and "underline" in t["pending"][2] and t["alert"][1]
+    assert t["selected"] != t["alert"] and t["selected"] != t["chip"]
+
+
+def test_pipe_boy_shows_its_name():
+    st = UIState(cursor=pc.THEME_ROW, theme="pipeboy")
+    assert "Pipe Boy" in "\n".join(t for t, _ in screen(st)[0])
+    assert pc.theme_label("pipeboy") == "Pipe Boy" and pc.theme_label("dark") == "dark"
 
 
 def test_enter_on_the_theme_row_does_not_switch_it():
