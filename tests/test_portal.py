@@ -144,3 +144,42 @@ def test_no_connection_dot_is_drawn_in_ok_green(view):
             if ch in "●◐":
                 role = role_at(style, n)
                 assert role.split("@")[0] in ("src", "dst", "dst_partial"), (text, role)
+
+
+# --- headers, volume and level bars (Skrappjaw, 2026-10-24): no green in pipeOS -----------------------
+
+NEW_ROLES = {"head_src": "title", "head_dst": "title", "vol": "ok", "vol_over": "alert",
+             "meter_low": "ok", "meter_mid": "pending", "meter_high": "alert"}
+
+
+@pytest.mark.parametrize("name", ["dark", "light", "crowbar", "pipeboy", "vaporware", "pipecraft"])
+def test_other_themes_keep_their_header_and_bar_colours(name):
+    t = pc.THEMES[name]
+    assert all(t[new] == t[old] for new, old in NEW_ROLES.items())
+
+
+@pytest.mark.parametrize("name", ["pipeos-lite", "pipeos-dark"])
+def test_pipeos_headers_and_bars(name):
+    t = pc.THEMES[name]
+    assert t["head_src"][0] == t["src"][0] and t["head_dst"][0] == t["dst"][0]
+    assert (t["meter_low"][0], t["meter_mid"][0]) == (t["src"][0], t["dst"][0])   # blue, then orange
+    for role in ("vol", "meter_low", "meter_mid"):                                  # nothing green
+        r, g, b = pc.hex_rgb(t[role][0])
+        assert not (g > r and g > b), (role, t[role])
+    assert t["bar_ok"][1] == t["vol"][0] and t["bar_alert"][1] == t["vol_over"][0]  # the % blends with the fill
+
+
+def test_patch_headers_use_their_roles():
+    lines = patch_lines(theme="pipeos-dark")
+    text, style = next((t, s) for t, s in lines if "Sources" in t and "Destinations" in t)
+    assert role_at(style, text.index("Sources")) == "head_src"
+    assert role_at(style, text.index("Destinations")) == "head_dst"
+
+
+def test_volume_and_meters_use_their_roles():
+    row = type("R", (), {"volume": 1.2, "mute": False})()
+    _, spans = pc._volume_bar(row)
+    roles = {r for *_, r in spans}
+    assert "vol" in roles and "vol_over" in roles and "ok" not in roles
+    _, spans = pc._meter_cells(1.0)
+    assert {r for *_, r in spans} >= {"meter_low", "meter_mid", "meter_high"}

@@ -96,7 +96,7 @@ def test_sections_and_default_stars():
 def test_volume_bar_over_100_reads_as_alert_and_mute_as_dim():
     loud = dataclasses.replace(MX["playback"][0][0], volume=1.3, mute=False)
     text, spans = pc._volume_bar(loud)
-    assert text.startswith("130%") and any(r == "alert" for *_, r in spans)
+    assert text.startswith("130%") and any(r == "vol_over" for *_, r in spans)
     text, spans = pc._volume_bar(dataclasses.replace(loud, mute=True))
     assert text.startswith("muted") and {r for *_, r in spans} <= {"dim", "bar_dim"}
     assert "no volume control" in pc._volume_bar(dataclasses.replace(loud, volume=None))[0]
@@ -106,7 +106,7 @@ def test_cursor_bar_covers_the_name_not_the_volume():
     lines, _ = screen(at("Discord"))
     style = next(s for t, s in lines if "Discord →" in t)
     roles = [r for *_, r in style[1]]
-    assert roles[0] == "selected" and "ok" in roles
+    assert roles[0] == "selected" and "vol" in roles
 
 
 def test_loading_before_the_first_dump():
@@ -314,7 +314,7 @@ def test_meter_level_jumps_up_and_falls_20_db_a_second():
 
 def test_meter_cells_colour_by_level():
     text, spans = pc._meter_cells(1.0)
-    assert text == "█" * 16 and {"ok", "pending", "alert"} <= {r for *_, r in spans}
+    assert text == "█" * 16 and {"meter_low", "meter_mid", "meter_high"} <= {r for *_, r in spans}
     text, spans = pc._meter_cells(0.0)
     assert text == "·" * 16
     text, _ = pc._meter_cells(10 ** (-12 / 20))  # -12 dBFS
@@ -368,7 +368,7 @@ def test_a_new_peak_restarts_the_hold_and_a_lower_one_does_not():
 def test_marker_sits_above_the_bar_in_its_zone_colour():
     text, spans = pc._meter_cells(10 ** (-30 / 20), hold=10 ** (-3 / 20))  # bar at -30 dB, peak at -3 dB
     m = text.index("▌")
-    assert m == 14 and text.count("█") == 6 and (m, m + 1, "alert") in spans
+    assert m == 14 and text.count("█") == 6 and (m, m + 1, "meter_high") in spans
     text, _ = pc._meter_cells(10 ** (-3 / 20), hold=10 ** (-30 / 20))      # marker under the bar: not drawn
     assert "▌" not in text
     assert "▌" not in pc._meter_cells(0.5)[0]                               # hold off

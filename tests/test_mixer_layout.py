@@ -74,7 +74,7 @@ def test_percent_over_empty_cells_at_low_volume():
 def test_past_100_is_alert():
     ln = line(screen(mx(volume=1.5))[0], FIRST)
     c = ln[0].index("150%")
-    assert roles_at(ln, c, c + 4) == ["bar_ok"] * 4 and "alert" in roles_at(ln, c, c + pc._BAR)
+    assert roles_at(ln, c, c + 4) == ["bar_ok"] * 4 and "vol_over" in roles_at(ln, c, c + pc._BAR)
 
 
 def test_muted_word_is_dim():

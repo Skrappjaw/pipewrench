@@ -76,13 +76,17 @@ THEMES = {
                      "ok": ("#2f9e44", None, "bold"), "pending": ("#8a6d00", None, "bold"),
                      "alert": ("#d62828", None, "bold"),
                      "chip": ("#ffffff", "#2b2f33", ""),
-                     "bar_ok": ("#ffffff", "#6c7a84", ""), "bar_alert": ("#ffffff", "#d62828", ""),
+                     "bar_ok": ("#ffffff", "#5b6770", ""), "bar_alert": ("#ffffff", "#ff7a00", ""),
                      "bar_dim": ("#8a9399", "#e1e5e8", ""),
                      "src": ("#0a84ff", None, "bold"), "dst": ("#ff7a00", None, "bold"),
                      "dst_partial": ("#ff7a00", None, ""),
                      "bar_src": ("#0b2540", "#bcdcff", ""), "anchor_src": ("#2b2f33", "#e3efff", ""),
                      "bar_dst": ("#3a1f00", "#ffd9b3", ""), "anchor_dst": ("#2b2f33", "#fff0e0", ""),
-                     "head_play": ("#0a84ff", None, "bold"), "head_rec": ("#ff7a00", None, "bold")},
+                     "head_play": ("#0a84ff", None, "bold"), "head_rec": ("#ff7a00", None, "bold"),
+                     "head_src": ("#0a84ff", None, "bold"), "head_dst": ("#ff7a00", None, "bold"),
+                     "vol": ("#5b6770", None, ""), "vol_over": ("#ff7a00", None, ""),
+                     "meter_low": ("#0a84ff", None, ""), "meter_mid": ("#ff7a00", None, ""),
+                     "meter_high": ("#d62828", None, "")},
     # Dark: Portal 2's moody chambers, dark panels with the portals glowing.
     "pipeos-dark": {"screen": ("#c9d1d6", "#14181b", ""),
                     "normal": (None, None, ""), "dim": ("#5f6b73", None, ""),
@@ -91,13 +95,17 @@ THEMES = {
                     "ok": ("#5fbf6a", None, "bold"), "pending": ("#d8c35a", None, "bold"),
                     "alert": ("#e5484d", None, "bold"),
                     "chip": ("#e8eef2", "#2f4250", ""),
-                    "bar_ok": ("#e8eef2", "#3d5566", ""), "bar_alert": ("#ffffff", "#b3261e", ""),
+                    "bar_ok": ("#14181b", "#b8c4cc", ""), "bar_alert": ("#14181b", "#ff9a1f", ""),
                     "bar_dim": ("#5f6b73", "#1d2327", ""),
                     "src": ("#28a7ff", None, "bold"), "dst": ("#ff9a1f", None, "bold"),
                     "dst_partial": ("#ff9a1f", None, ""),
                     "bar_src": ("#ffffff", "#0b4a80", ""), "anchor_src": ("#c9d1d6", "#16283a", ""),
                     "bar_dst": ("#ffffff", "#7a3d00", ""), "anchor_dst": ("#c9d1d6", "#3a2410", ""),
-                    "head_play": ("#28a7ff", None, "bold"), "head_rec": ("#ff9a1f", None, "bold")},
+                    "head_play": ("#28a7ff", None, "bold"), "head_rec": ("#ff9a1f", None, "bold"),
+                    "head_src": ("#28a7ff", None, "bold"), "head_dst": ("#ff9a1f", None, "bold"),
+                    "vol": ("#b8c4cc", None, ""), "vol_over": ("#ff9a1f", None, ""),
+                    "meter_low": ("#28a7ff", None, ""), "meter_mid": ("#ff9a1f", None, ""),
+                    "meter_high": ("#e5484d", None, "")},
 }
 
 
@@ -136,8 +144,10 @@ for _t in THEMES.values():
                        for b in ("selected", "anchor", "bar_src", "anchor_src", "bar_dst", "anchor_dst")):
         # a dot under a bar keeps its colour on the bar's background (pipeOS); elsewhere the bar covers it
         _t[f"{_dot}@{_bar}"] = (_t[_dot][0], _t[_bar][1], _t[_dot][2]) if _own else _t[_bar]
-    _t.setdefault("head_play", _t["title"])
-    _t.setdefault("head_rec", _t["title"])
+    for _new, _old in (("head_play", "title"), ("head_rec", "title"), ("head_src", "title"), ("head_dst", "title"),
+                       ("vol", "ok"), ("vol_over", "alert"),
+                       ("meter_low", "ok"), ("meter_mid", "pending"), ("meter_high", "alert")):
+        _t.setdefault(_new, _t[_old])
 THEME_NAMES = list(THEMES)
 THEME_LABELS = {"pipeboy": "Pipe Boy", "pipeboy-amber": "Pipe Boy Amber", "pipeboy-cyan": "Pipe Boy Cyan",
                 "pipeboy-white": "Pipe Boy White", "vaporware": "Vaporware", "pipecraft": "Pipecraft",
@@ -1553,7 +1563,7 @@ def _lit(level):
 
 
 def _zone(cell):
-    return "ok" if cell < 10 else "pending" if cell < 14 else "alert"
+    return "meter_low" if cell < 10 else "meter_mid" if cell < 14 else "meter_high"
 
 
 def _meter_cells(level, hold=None):
@@ -1588,7 +1598,7 @@ def _volume_bar(row, show_bar=True):
     if row.mute:
         spans = [(0, _BAR, "dim")]
     else:
-        spans = [(0, min(n, _BAR_FULL), "ok")] + ([(_BAR_FULL, n, "alert")] if n > _BAR_FULL else []) + [(n, _BAR, "dim")]
+        spans = [(0, min(n, _BAR_FULL), "vol")] + ([(_BAR_FULL, n, "vol_over")] if n > _BAR_FULL else []) + [(n, _BAR, "dim")]
     for col in range(len(word)):  # the overlay last, so it draws over the bar's colours
         role = "bar_dim" if row.mute or col >= n else "bar_alert" if col >= _BAR_FULL else "bar_ok"
         if spans[-1][2] == role and spans[-1][1] == col:
@@ -1851,7 +1861,7 @@ def _slot_menu(g, st, s, d, avail):
 
 def _render_patch_cols(cv, st, g, srcs, s, room):
     half = max(20, (cv.width - 3) // 2)
-    cv.add(f"  {'Sources':<{half - 2}}│ Destinations", "title")
+    cv.add(f"  {'Sources':<{half - 2}}│ Destinations", ("title", [(2, 9, "head_src"), (half + 2, half + 14, "head_dst")]))
     on_dst = st.patch_side == "dst"
     menu = _slot_menu(g, st, s, g.dests[st.patch_dst], cv.width - half - 2) if on_dst else []
     has_mon = any(s_.monitor for s_ in srcs)
