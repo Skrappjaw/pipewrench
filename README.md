@@ -48,7 +48,7 @@ muted. ★ marks the default playback and recording device. Apps show what they'
 | Key | Mouse | Action |
 |---|---|---|
 | ↑ ↓ | click a row | select |
-| ← → | the wheel over a row | volume −5% / +5% |
+| ← → | | volume −5% / +5% (not on the wheel: it scrolls) |
 | Space | its chip | mute or unmute |
 | Enter | double-click a row | open its menu |
 | v | its chip | live meters on or off |

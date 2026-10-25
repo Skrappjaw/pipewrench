@@ -664,8 +664,13 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
         st = dataclasses.replace(st, cursor=PRESETS_ROW + target[1])
         keys = ["enter"] if event == "double" else []
     elif kind == "mix_row":
-        st = dataclasses.replace(st, mix_cursor=target[1], mix_menu=None)
-        keys = {"double": ["enter"], "wheel_up": ["right"], "wheel_down": ["left"]}.get(event, [])
+        # The wheel scrolls the list from the selection; it never changes volume (it clashed with scrolling).
+        if event in ("wheel_up", "wheel_down"):
+            st = dataclasses.replace(st, mix_menu=None)
+            keys = ["up" if event == "wheel_up" else "down"]
+        else:
+            st = dataclasses.replace(st, mix_cursor=target[1], mix_menu=None)
+            keys = ["enter"] if event == "double" else []
     elif kind == "mix_menu_item":
         st = dataclasses.replace(st, mix_menu_cursor=target[1])
         keys = ["enter"] if event in ("click", "double") else []

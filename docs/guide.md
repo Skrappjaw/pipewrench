@@ -35,7 +35,8 @@ Every output and input, then the apps playing or recording under each. ★ marks
 | Key | Does |
 |---|---|
 | ↑ ↓ | select a channel |
-| ← → (mouse wheel) | volume −5% / +5%, up to 150% |
+| ← → | volume −5% / +5%, up to 150% |
+| mouse wheel | scroll the list (it never changes volume) |
 | Space | mute or unmute |
 | Enter (double-click) | the channel's menu |
 | v | live meters on or off |

@@ -243,12 +243,21 @@ def test_no_volume_control_is_refused():
     assert actions == [] and "no volume control" in st.message and st.message == st.failed
 
 
-def test_wheel_changes_volume_and_double_click_opens_the_menu():
+def test_wheel_scrolls_and_never_changes_volume():
+    # Skrappjaw, 2026-10-24: on a long list the wheel scrolls; volume on the wheel clashed with that.
+    st = pc.UIState(mix_cursor=3)
+    _, hits = screen(st)
+    row, c0, _, _ = next(h for h in hits if h[3] == ("mix_row", 0))  # the mouse over a different row
+    st2, actions = pc.handle_mouse(st, hits, row, c0, "wheel_down", CUR, [], mixer=MX)
+    assert actions == [] and st2.mix_cursor == 4                     # moved from the selection, not the mouse
+    st2, actions = pc.handle_mouse(st2, hits, row, c0, "wheel_up", CUR, [], mixer=MX)
+    assert actions == [] and st2.mix_cursor == 3
+
+
+def test_double_click_opens_the_menu():
     st = pc.UIState()
     _, hits = screen(st)
     row, c0, _, _ = next(h for h in hits if h[3] == ("mix_row", 0))
-    _, actions = pc.handle_mouse(st, hits, row, c0, "wheel_up", CUR, [], mixer=MX)
-    assert actions[0][1][1] == "set-volume" and actions[0][1][-1] == "5%+"
     st2, actions = pc.handle_mouse(st, hits, row, c0, "double", CUR, [], mixer=MX)
     assert actions == [] and st2.mix_menu is not None
     st3, _ = pc.handle_mouse(st2, hits, row, c0, "click", CUR, [], mixer=MX)
