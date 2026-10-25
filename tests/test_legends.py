@@ -16,12 +16,12 @@ CUR = pc.parse_settings((FIX / "settings.txt").read_text())
 DUMP = json.loads((FIX / "pwdump_patch.json").read_text())
 DEV = pc.devices_view(pi.inventory(DUMP), pcfg.default_config())
 PATCH = pp.graph(DUMP)
-PRESETS = [{"name": "mix", "label": "Mixing", "values": {"clock.force-quantum": 1024}}]
 
 STATES = {
-    "settings": pc.UIState(tab="settings"),
+    "settings": pc.UIState(tab="settings", settings_focus="pane"),
+    "settings menu": pc.UIState(tab="settings"),
+    "preferences": pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane"),
     "top": pc.UIState(tab="top"),
-    "presets": pc.UIState(tab="settings", cursor=pc.PRESETS_ROW),  # a preset row inside Settings
     "devices": pc.UIState(tab="devices"),
     "devices menu": pc.UIState(tab="devices", dev_menu=("card", 95), dev_cursor=5),
     "mixer": pc.UIState(tab="mixer"),
@@ -30,12 +30,12 @@ STATES = {
     "patch grid": pc.UIState(tab="patch", patch_view="grid"),
     "patch ports": pc.UIState(tab="patch", patch_ports=True, patch_side="dst"),
 }
-ENTER = {"mixer": "actions", "mixer menu": "pick", "settings": "apply", "presets": "apply", "devices": "actions", "devices menu": "pick",
+ENTER = {"mixer": "actions", "mixer menu": "pick", "settings": "apply", "settings menu": "open", "devices": "actions", "devices menu": "pick",
          "patch columns": "connect/disconnect", "patch grid": "connect/disconnect", "patch ports": "link/unlink"}
 
 
 def render(st, width=80, height=30):
-    return pc.render_screen(st, CUR, [], PRESETS, width, height, devices=DEV, patch=PATCH)[0]
+    return pc.render_screen(st, CUR, [], width, height, devices=DEV, patch=PATCH)[0]
 
 
 def box(lines):
@@ -103,7 +103,7 @@ def test_one_box_and_a_status_line_for_messages(name):
 
 
 def test_legend_survives_a_message():
-    assert ("Enter", "apply") in chips(render(pc.UIState(tab="settings", message="applied")))
+    assert ("Enter", "apply") in chips(render(pc.UIState(tab="settings", settings_focus="pane", message="applied")))
 
 
 def flat(lines):

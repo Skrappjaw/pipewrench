@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """PipeWrench (pwrench): terminal PipeWire control. Change PipeWire sample rate and buffer size live,
-watch pw-top, and keep labelled presets.
+watch pw-top, and save the clock for the next PipeWire start.
 
     pwrench                      interactive UI (keyboard + mouse)
     pwrench status
     pwrench rate N | buf N | min N | max N | log N
     pwrench reset                stop forcing rate and buffer
     pwrench top                  run pw-top
-    pwrench preset list | save NAME [LABEL] | apply NAME | delete NAME
     pwrench devices [list] | default | volume | mute | profile | label | hide | bus | apply …
     pwrench patch [list] | connect SRC DST | disconnect SRC DST
     pwrench realtime             is PipeWire's audio realtime? and the fix if not
@@ -154,8 +153,6 @@ def _cli(argv, runner, out, err, execvp, ask):
     if cmd == "top":
         (execvp or os.execvp)("pw-top", ["pw-top"])
         return 0
-    if cmd == "preset":
-        return _preset(args, runner, out)
     if cmd == "devices":
         return _devices(args, runner, out, err, ask)
     if cmd == "patch":
@@ -168,41 +165,6 @@ def _cli(argv, runner, out, err, execvp, ask):
             out.write(f"{'fix:' if n == 0 else '':<16} {line}\n")
         return 0 if s.ok else 1
     raise CliError(f"unknown command {cmd!r}\n\nusage:\n{USAGE}", 2)
-
-
-def _preset(args, runner, out):
-    path = pc.presets_path()
-    presets = pc.load_presets(path)
-    sub, rest = (args[0], args[1:]) if args else ("list", [])
-    if sub == "list":
-        if not presets:
-            out.write("no presets saved\n")
-        for p in presets:
-            out.write(f"{p['name']:<16} {p['label']:<28} {pc.summarize_preset(p)}\n")
-        return 0
-    if sub == "save" and 1 <= len(rest) <= 2:
-        try:
-            p = pc.capture_preset(_read(runner), rest[0], rest[1] if len(rest) > 1 else rest[0])
-            presets = pc.add_preset(presets, p)
-        except ValueError as e:
-            raise CliError(str(e), 2)
-        pc.save_presets(path, presets)
-        out.write(f"saved {p['name']}: {pc.summarize_preset(p)}\n")
-        return 0
-    if sub in ("apply", "delete") and len(rest) == 1:
-        p = pc.find_preset(presets, rest[0])
-        if not p:
-            raise CliError(f"no preset named {rest[0]!r}", 2)
-        if sub == "apply":
-            _write(runner, pc.preset_cmds(p, _read(runner)))
-            out.write(f"applied {p['name']}: {pc.summarize_preset(p)}\n")
-        else:
-            pc.save_presets(path, pc.delete_preset(presets, p["name"]))
-            out.write(f"deleted {p['name']}\n")
-        return 0
-    raise CliError("usage: pwrench preset list | save NAME [LABEL] | apply NAME | delete NAME", 2)
-
-
 
 
 def _dump(runner):
@@ -643,7 +605,6 @@ class Tui:
         self.runner = runner
         self.st = pc.UIState(**pc.load_ui(pc.ui_path()), message=message)
         self.current = {}
-        self.presets = []
         self.block = None
         self.devices = None
         self.wp_version = None
@@ -730,10 +691,6 @@ class Tui:
             self.current = pc.read_settings(self.runner)
         except (pc.MetadataError, FileNotFoundError) as e:
             self.st.message = self.st.failed = f"cannot read settings: {e}"
-        try:
-            self.presets = pc.load_presets(pc.presets_path())
-        except (ValueError, OSError) as e:
-            self.st.message = self.st.failed = f"presets file problem: {e}"
         if self.st.tab == "devices":
             self._refresh_devices()
         if self.st.tab == "patch":
@@ -813,13 +770,13 @@ class Tui:
                 event = self._mouse_event(b)
                 if not event:
                     continue
-                self.st, actions = pc.handle_mouse(self.st, self.hits, y, x, event, self.current, self.presets,
+                self.st, actions = pc.handle_mouse(self.st, self.hits, y, x, event, self.current,
                                                    self.devices, self.patch, self.mixer)
             else:
                 key = self._key(ch)
                 if not key:
                     continue
-                self.st, actions = pc.handle_key(self.st, key, self.current, self.presets, self.devices, self.patch,
+                self.st, actions = pc.handle_key(self.st, key, self.current, self.devices, self.patch,
                                                  self.mixer)
             for action in actions:
                 if action == ("quit",):
@@ -917,7 +874,7 @@ class Tui:
             block = self.block
         if self.st.tab == "about" and self.about is None:
             self.about = pc.about_info(self.runner)
-        lines, self.hits = pc.render_screen(self.st, self.current, block, self.presets, w, h, self.devices,
+        lines, self.hits = pc.render_screen(self.st, self.current, block, w, h, self.devices,
                                             self.patch, self.mixer, self._media_view(), self.about,
                                             self.realtime)
         scr.erase()
@@ -958,29 +915,8 @@ class Tui:
                 warn = self.st.message
                 _write(self.runner, [pc.set_cmd(k, v) for k, v in action[1]])
                 self.st.message = warn or "applied: " + ", ".join(f"{k.split('.')[-1]}={v}" for k, v in action[1])
-            elif kind == "apply_preset":
-                p = pc.find_preset(self.presets, action[1])
-                _write(self.runner, pc.preset_cmds(p, self.current))
-                self.st.message = f"applied preset {p['name']}: {pc.summarize_preset(p)}"
-            elif kind == "prompt_save":
-                name = self._prompt(scr, "preset name (letters, digits, - _; empty cancels):")
-                if not name:
-                    self.st.message = "cancelled"
-                    return
-                label = self._prompt(scr, f"label for {name}:", default=name)
-                self.presets = pc.add_preset(self.presets, pc.capture_preset(self.current, name, label))
-                pc.save_presets(pc.presets_path(), self.presets)
-                self.st.message = f"saved preset {name}"
-            elif kind == "prompt_label":
-                label = self._prompt(scr, f"new label for {action[1]}:")
-                if label:
-                    self.presets = pc.relabel_preset(self.presets, action[1], label)
-                    pc.save_presets(pc.presets_path(), self.presets)
-                    self.st.message = f"relabelled {action[1]}"
-            elif kind == "delete_preset":
-                self.presets = pc.delete_preset(self.presets, action[1])
-                pc.save_presets(pc.presets_path(), self.presets)
-                self.st.message = f"deleted preset {action[1]}"
+            elif kind == "save_clock":
+                self._save_clock()
             elif kind == "restart_wireplumber":
                 rc, out = self.runner(pc.RESTART_CMD)
                 self.st.message = "WirePlumber restarted" if rc == 0 else f"restart failed: {out.strip()}"
@@ -991,7 +927,7 @@ class Tui:
                 self._apply_theme(scr)  # may replace the message: a theme the terminal can't show
             elif kind == "save_ui":
                 pc.save_ui(pc.ui_path(), pc.ui_prefs(self.st))
-                if self.st.cursor < pc.KEYS_ROW:  # a Keys row keeps its own message
+                if self.st.cursor < pc.KEYS_ROW:  # a Keys row keeps its own message (save_ui is Preferences only)
                     hold = f"{self.st.peak_hold:g} s" if self.st.peak_hold else "off"
                     self.st.message = (f"meters: {self.st.meter_fps} fps, fall {self.st.meter_fall} dB/s, "
                                        f"peak hold {hold} · volume bar {'on' if self.st.volume_bar else 'off'}")
@@ -1098,6 +1034,18 @@ class Tui:
             self.st.message = _play_noise(self.runner, inv.find(action[1]))
         elif kind == "dev_apply":
             self._apply_devices(scr, c)
+
+    def _save_clock(self):
+        """Settings → Save: the live clock into devices.json and PipeWrench's PipeWire drop-in. Never restarts;
+        PipeWire reads it when it next starts. The label rules are left for Devices' A."""
+        path = pcfg.config_path()
+        c = {**pcfg.load_config(path), **pcfg.clock_fields(self.current)}
+        pcfg.save_config(path, c)
+        for p, t, _ in _generated(self.runner, c, self.wp_version):
+            if p == pcfg.dropin_path():
+                pcfg.write_generated(p, t)
+        saved = ", ".join(f"{k.split('_', 1)[1].replace('_', '-')} {c[k]}" for k, *_ in pcfg.CLOCK if c.get(k))
+        self.st.message = f"saved {saved or 'PipeWire defaults'}; takes effect the next time PipeWire starts"
 
     def _apply_devices(self, scr, c):
         """Write the generated files; never restart here. R restarts WirePlumber, after a y/n."""

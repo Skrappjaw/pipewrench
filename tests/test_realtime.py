@@ -131,12 +131,12 @@ def test_refusals_unknown_when_journal_fails(tmp_path):
 # --- Settings tab ---------------------------------------------------------------
 
 def settings(width=100, height=50, realtime=None):
-    return pc.render_screen(pc.UIState(tab="settings"), {}, [], [], width, height, realtime=realtime)[0]
+    return pc.render_screen(pc.UIState(tab="settings"), {}, [], width, height, realtime=realtime)[0]
 
 
-def test_section_between_clock_and_display(tmp_path):
-    lines = [t.strip() for t, _ in settings(realtime=check(tmp_path))]
-    assert lines.index("Clock") < lines.index("Realtime") < lines.index("Display")
+def test_section_follows_the_clock_in_audio(tmp_path):
+    lines = [t[pc.MENU_W:].strip() for t, _ in settings(realtime=check(tmp_path))]
+    assert lines.index("Clock") < lines.index("Realtime") and "Display" not in lines
 
 
 def test_section_shows_rows_and_fix(tmp_path):
@@ -154,8 +154,8 @@ def test_section_fits_width(tmp_path, width):
     assert all(len(t) <= width for t, _ in settings(width=width, realtime=check(tmp_path)))
 
 
-def test_cursor_rows_unchanged():
-    assert pc.THEME_ROW == len(pc.SETTINGS)
+def test_realtime_has_no_cursor_rows():
+    assert pc.CLOCK_BUTTONS_ROW == len(pc.SETTINGS)  # the last Audio row: Realtime is read-only
 
 
 # --- CLI ------------------------------------------------------------------------

@@ -184,15 +184,32 @@ only. Enter links or unlinks the port under the cursor.
 
 ## Settings
 
+A menu on the left picks the category, and the category opens on the right. Settings opens on the
+menu: ↑↓ picks **Audio** or **Preferences**, and Enter or → goes into it. Esc comes back to the menu,
+once any unapplied change has been reverted. A click on a category opens it.
+
 ![Settings, with a realtime problem](guide/settings.png)
 
-### Clock
+### Audio
 
-PipeWire's sample rate and buffer sizes, live. ←→ changes a value (marked `*` until applied), Enter
-applies, Esc reverts. Smaller buffers mean less latency and more risk of dropouts. **Force buffer
-size** is the one to change for tracking (128 or lower) versus mixing (1024).
+#### Clock
 
-### Realtime
+PipeWire's sample rate and buffer sizes. ←→ changes a value, marked `*` until applied. Smaller
+buffers mean less latency and more risk of dropouts. **Force buffer size** is the one to change for
+tracking (128 or lower) versus mixing (1024).
+
+Under the clock rows are three buttons. ↓ to their row, ←→ picks one, and Enter or a click presses it:
+
+- **Apply** sets the changes live, now. Enter on a clock row does the same, and Esc reverts.
+- **Save** keeps the live clock for the next time PipeWire starts (`s` saves from anywhere in
+  Settings). It writes to PipeWrench's PipeWire file, `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf`,
+  and never restarts anything. A forced rate or buffer is saved as PipeWire's default, so apps can still
+  ask for another size after a restart. Values that aren't forced, or match PipeWire's own defaults,
+  aren't written. Apply any changes before saving.
+- **Reset** loads PipeWire's defaults (no forced rate or buffer, min 32, max 2048) as changes marked
+  `*`. Apply sets them live, and Save after that clears the saved clock.
+
+#### Realtime
 
 Whether PipeWire's audio thread runs with realtime priority. Without it, anything else on the computer
 can interrupt the audio, and you hear stutters and dropouts, for example on a Discord call.
@@ -212,11 +229,17 @@ green:
 
 `pwrench realtime` prints the same check in a terminal and exits 0 when all is well.
 
-### Display
+### Preferences
+
+PipeWrench's own settings. They apply at once and are kept in `~/.config/pipewrench/ui.json`.
+
+![Settings → Preferences](guide/settings-preferences.png)
+
+#### Display
 
 Theme (dark, light, crowbar orange, Pipe Boy in green, amber, cyan or white, Vaporware, Pipecraft, or
 pipeOS-lite and pipeOS-dark), the meters' frame rate, fall speed and peak hold, and the
-Mixer's volume bar. These apply at once and are kept in `~/.config/pipewrench/ui.json`.
+Mixer's volume bar.
 
 **Pipe Boy** is one phosphor colour, after Fallout's Pip-Boy: green, amber, cyan or white. With no other
 colours, status shows by style: good is bold, waiting is underlined, and a problem is a pale block.
@@ -240,11 +263,11 @@ Recording orange, volume bars are panel grey, and the level meters run blue, ora
 
 Every theme except dark and light needs a 256-colour terminal; on a basic one PipeWrench shows dark instead.
 
-### Keys
+#### Keys
 
 Every letter shortcut, one row each, with the key it's on. Enter on a row, then press the new key.
 Backspace (or Delete) takes the key off, so the shortcut does nothing; Esc cancels. **Reset all keys**
-puts every shortcut back after a y/n. Changes apply at once and are kept in `~/.config/pipewrench/ui.json`.
+puts every shortcut back after a y/n.
 
 - A key that's taken on the same screen, or one that works everywhere (`q`, `1`–`6`, the media keys
   `* - + < >`, `y` and `n`), is refused and the reason shows on the status line.
@@ -254,13 +277,6 @@ puts every shortcut back after a y/n. Changes apply at once and are kept in `~/.
 - The key legend at the bottom of each tab shows your keys.
 
 ![Settings → Keys](guide/settings-keys.png)
-
-### Presets
-
-Saved clock settings with a label, such as tracking and mixing. `s` saves the current settings as a
-preset; on a preset, Enter applies it, `e` relabels it and `d` deletes it.
-
-![Presets](guide/settings-presets.png)
 
 ## Top
 

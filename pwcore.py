@@ -1,4 +1,4 @@
-"""Pure logic for PipeWrench: PipeWire settings metadata, pw-top parsing, presets, and the TUI
+"""Pure logic for PipeWrench: PipeWire settings metadata, pw-top parsing, and the TUI
 state machine. No curses and no subprocess calls here; callers pass a runner.
 
 Behaviour follows PipeControl (github.com/portaloffreedom/pipecontrol v0.3.0):
@@ -242,7 +242,8 @@ SETTINGS = [
 ]
 KEYS = [s.key for s in SETTINGS]
 FORCE_KEYS = ("clock.force-rate", "clock.force-quantum")
-CAPTURE_KEYS = ("clock.force-rate", "clock.force-quantum", "clock.min-quantum", "clock.max-quantum")
+# Settings → Audio → Reset: PipeWire's stock clock (/usr/share/pipewire/pipewire.conf). Log level keeps its value.
+CLOCK_DEFAULTS = {"clock.force-rate": 0, "clock.force-quantum": 0, "clock.min-quantum": 32, "clock.max-quantum": 2048}
 
 
 def setting(key):
@@ -404,96 +405,9 @@ class TopParser:
         return rows if self.cols else []
 
 
-# --- presets -----------------------------------------------------------------
-
-_NAME = re.compile(r"[A-Za-z0-9_-]{1,32}")
-
-
-def presets_path():
-    if os.environ.get("PIPEWRENCH_PRESETS"):
-        return Path(os.environ["PIPEWRENCH_PRESETS"])
-    base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
-    return Path(base) / "pipewrench" / "presets.json"
-
-
-def validate_preset(p):
-    if not isinstance(p.get("name"), str) or not _NAME.fullmatch(p["name"]):
-        raise ValueError("preset name must be 1-32 letters, digits, - or _")
-    if not isinstance(p.get("label"), str):
-        raise ValueError("preset label must be text")
-    values = p.get("values")
-    if not isinstance(values, dict) or not values:
-        raise ValueError("preset needs at least one value")
-    for k, v in values.items():
-        _check_value(k, v)
-    validate({}, values)
-
-
-def load_presets(path):
-    path = Path(path)
-    if not path.exists():
-        return []
-    presets = json.loads(path.read_text()).get("presets", [])
-    for p in presets:
-        validate_preset(p)
-    return presets
-
-
-def save_presets(path, presets):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps({"presets": presets}, indent=2) + "\n")
-    os.replace(tmp, path)
-
-
-def find_preset(presets, name):
-    return next((p for p in presets if p["name"] == name), None)
-
-
-def add_preset(presets, p):
-    validate_preset(p)
-    if find_preset(presets, p["name"]):
-        raise ValueError(f"a preset named {p['name']!r} already exists")
-    return presets + [json.loads(json.dumps(p))]
-
-
-def delete_preset(presets, name):
-    if not find_preset(presets, name):
-        raise KeyError(name)
-    return [p for p in presets if p["name"] != name]
-
-
-def relabel_preset(presets, name, label):
-    if not find_preset(presets, name):
-        raise KeyError(name)
-    return [{**p, "label": label} if p["name"] == name else p for p in presets]
-
-
-def capture_preset(current, name, label):
-    return {"name": name, "label": label,
-            "values": {k: current[k] for k in CAPTURE_KEYS if isinstance(current.get(k), int)}}
-
-
-def preset_cmds(p, current):
-    return [set_cmd(k, v) for k, v in ordered_changes(current, p["values"])]
-
-
-def summarize_preset(p):
-    v = p["values"]
-    parts = []
-    for key, word in (("clock.force-rate", "rate"), ("clock.force-quantum", "buf"),
-                      ("clock.min-quantum", "min"), ("clock.max-quantum", "max")):
-        if key in v:
-            parts.append(f"{word} {'auto' if key in FORCE_KEYS and v[key] == 0 else v[key]}")
-    if "log.level" in v:
-        parts.append(f"log {v['log.level']}")
-    return " · ".join(parts)
-
-
 # --- TUI state machine -------------------------------------------------------
 
-# Basic first (everyday audio), then the engineering tools. Presets live inside Settings. About is last.
+# Basic first (everyday audio), then the engineering tools. About is last.
 TABS = ["mixer", "devices", "patch", "settings", "top", "about"]
 TAB_TITLES = {t: f"{n} {t.capitalize()}" for n, t in enumerate(TABS, start=1)}
 
@@ -505,8 +419,11 @@ class UIState:
     mix_menu: tuple = None       # (section, node id) of the row whose menu is open
     mix_menu_cursor: int = 0
     meters: bool = True          # live levels on the Mixer (v toggles)
-    cursor: int = 0
+    cursor: int = 0              # Settings: the row in the open category
     pending: dict = field(default_factory=dict)
+    settings_cat: str = "audio"  # Settings: the category open on the right (SETTINGS_CATS)
+    settings_focus: str = "menu" # menu | pane: where Settings' keys go
+    clock_button: int = 0        # Settings → Audio: Apply · Save · Reset
     top_scroll: int = 0
     dev_cursor: int = 0
     dev_show_hidden: bool = False
@@ -543,7 +460,7 @@ MEDIA_KEYS = {"*": ("media", "play/pause"), "<": ("media", "previous"),
               "=": ("media_volume", "+5%")}
 
 
-def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
+def handle_key(st, key, current, devices=None, patch=None, mixer=None):
     """Return (new_state, actions). Nothing touches PipeWire until an action is executed.
 
     devices is the Devices tab's view: {"model", "status", "buses", "dirty"}, or None until loaded.
@@ -559,8 +476,8 @@ def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
                 st.keys, st.message = {}, "keys reset to the defaults"
                 return st, [("save_ui",)]
             # confirm tuples name their action, except the two v1 ones
-            return st, [{"restart": ("restart_wireplumber",), "restart_labels": ("restart_wireplumber",),
-                         "delete": ("delete_preset", *kind[1:])}.get(kind[0], kind)]
+            return st, [{"restart": ("restart_wireplumber",), "restart_labels": ("restart_wireplumber",)
+                         }.get(kind[0], kind)]
         # Any other key cancels: a missed prompt that swallowed keys looked like a frozen screen.
         st.confirm, st.message = None, "cancelled" if key in ("n", "esc") else "cancelled (y confirms)"
         return st, []
@@ -586,18 +503,23 @@ def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
         return _key_patch(st, key, patch)
     if st.tab == "about":
         return st, []
-    return {"settings": _key_settings, "top": _key_top}[st.tab](st, key, current, presets)
+    return {"settings": _key_settings, "top": _key_top}[st.tab](st, key, current)
 
 
-# Settings is one list: the clock rows, then Display (PipeWrench's own rows; they apply at once), then presets.
-THEME_ROW = len(SETTINGS)
+# Settings is a menu of categories on the left with the open one on the right (Skrappjaw, 2026-10-25).
+# Each category is its own list; st.cursor is the row in the open one.
+SETTINGS_CATS = [("audio", "Audio"), ("prefs", "Preferences")]
+MENU_W = 15                         # the menu column, its │ included
+CLOCK_BUTTONS_ROW = len(SETTINGS)   # Audio: the clock rows, then Apply · Save · Reset
+CLOCK_BUTTONS = ["Apply", "Save", "Reset"]
+# Preferences: Display (PipeWrench's own rows; they apply at once), then Keys.
+THEME_ROW = 0
 FPS_ROW = THEME_ROW + 1
 FALL_ROW = FPS_ROW + 1
 HOLD_ROW = FALL_ROW + 1
 BAR_ROW = HOLD_ROW + 1
 KEYS_ROW = BAR_ROW + 1     # one row per pwkeys action
 RESET_KEYS_ROW = KEYS_ROW + len(pk.ACTIONS)
-PRESETS_ROW = RESET_KEYS_ROW + 1  # the first preset
 
 
 def _bind(st, action_id, new):
@@ -624,38 +546,44 @@ def _capture_key(st, key):
     return _bind(st, action_id, key)
 
 
-def _key_settings(st, key, current, presets):
-    last = PRESETS_ROW + len(presets) - 1
-    st.cursor = max(0, min(last, st.cursor))
+def _key_settings(st, key, current):
     if key == "s":
-        return st, [("prompt_save",)]
-    if KEYS_ROW <= st.cursor < RESET_KEYS_ROW and key in ("enter", "backspace", "delete", "left", "right"):
-        a = pk.ACTIONS[st.cursor - KEYS_ROW]
-        if key == "enter":
-            st.key_capture = a.id
-            st.message = f"press a key for {pk.label(a)} (Esc cancels, Backspace unbinds)"
-            return st, []
-        return _bind(st, a.id, None) if key in ("backspace", "delete") else (st, [])
-    if st.cursor == RESET_KEYS_ROW and key in ("enter", "left", "right"):
-        if key == "enter":
-            st.confirm = ("reset_keys",)
+        return _save_clock(st)
+    if key == "R":
+        st.confirm = ("restart",)
         return st, []
-    if st.cursor >= PRESETS_ROW and key in ("enter", "e", "d", "left", "right"):
-        return _key_preset_row(st, key, presets[st.cursor - PRESETS_ROW]["name"])
-    if key in ("left", "right") and st.cursor == BAR_ROW:
-        st.volume_bar = not st.volume_bar
-        return st, [("save_ui",)]
-    if key in ("left", "right") and st.cursor in (FPS_ROW, FALL_ROW, HOLD_ROW):
-        name, choices = {FPS_ROW: ("meter_fps", METER_FPS), FALL_ROW: ("meter_fall", METER_FALL),
-                         HOLD_ROW: ("peak_hold", PEAK_HOLD)}[st.cursor]
-        n = max(0, min(len(choices) - 1, choices.index(getattr(st, name)) + (1 if key == "right" else -1)))
-        setattr(st, name, choices[n])
-        return st, [("save_ui",)]
+    if st.settings_focus == "menu":
+        return _key_settings_menu(st, key)
+    if key == "esc" and not st.pending:
+        st.settings_focus = "menu"
+        return st, []
+    return (_key_prefs if st.settings_cat == "prefs" else _key_audio)(st, key, current)
+
+
+def _key_settings_menu(st, key):
+    names = [c for c, _ in SETTINGS_CATS]
     if key in ("up", "down"):
-        st.cursor = max(0, min(last, st.cursor + (1 if key == "down" else -1)))
-    elif key in ("left", "right") and st.cursor == THEME_ROW:
-        st.theme = THEME_NAMES[(THEME_NAMES.index(st.theme) + (1 if key == "right" else -1)) % len(THEME_NAMES)]
-        return st, [("set_theme", st.theme)]
+        n = max(0, min(len(names) - 1, names.index(st.settings_cat) + (1 if key == "down" else -1)))
+        if names[n] != st.settings_cat:
+            st.settings_cat, st.cursor = names[n], 0
+    elif key in ("enter", "right"):
+        st.settings_focus = "pane"
+    return st, []
+
+
+def _key_audio(st, key, current):
+    st.cursor = max(0, min(CLOCK_BUTTONS_ROW, st.cursor))
+    if key in ("up", "down"):
+        st.cursor = max(0, min(CLOCK_BUTTONS_ROW, st.cursor + (1 if key == "down" else -1)))
+    elif st.cursor == CLOCK_BUTTONS_ROW and key in ("left", "right"):
+        st.clock_button = max(0, min(len(CLOCK_BUTTONS) - 1, st.clock_button + (1 if key == "right" else -1)))
+    elif st.cursor == CLOCK_BUTTONS_ROW and key == "enter":
+        button = CLOCK_BUTTONS[st.clock_button]
+        if button == "Save":
+            return _save_clock(st)
+        if button == "Reset":
+            return _reset_clock(st, current)
+        return _apply_clock(st, current)
     elif key in ("left", "right"):
         s = SETTINGS[st.cursor]
         base = st.pending.get(s.key, current.get(s.key))
@@ -666,38 +594,76 @@ def _key_settings(st, key, current, presets):
             st.pending[s.key] = new
         st.message = ""
     elif key == "enter":
-        if not st.pending:
-            return st, []
-        try:
-            warnings = validate(current, st.pending)
-            changes = ordered_changes(current, st.pending)
-        except ValueError as e:
-            st.message = st.failed = str(e)
-            return st, []
-        st.pending, st.message = {}, "; ".join(warnings)
-        return st, [("set_many", changes)]
+        return _apply_clock(st, current)
     elif key == "esc":
-        if st.pending:
-            st.pending, st.message = {}, "reverted"
-    elif key == "R":
-        st.confirm = ("restart",)
+        st.pending, st.message = {}, "reverted"
     return st, []
 
 
-def _key_top(st, key, current, presets):
+def _apply_clock(st, current):
+    if not st.pending:
+        return st, []
+    try:
+        warnings = validate(current, st.pending)
+        changes = ordered_changes(current, st.pending)
+    except ValueError as e:
+        st.message = st.failed = str(e)
+        return st, []
+    st.pending, st.message = {}, "; ".join(warnings)
+    return st, [("set_many", changes)]
+
+
+def _save_clock(st):
+    """Save keeps the live clock for the next PipeWire start; unapplied edits would make that ambiguous."""
+    if st.pending:
+        st.message = st.failed = "apply first: Save keeps the live clock settings"
+        return st, []
+    return st, [("save_clock",)]
+
+
+def _reset_clock(st, current):
+    """PipeWire's stock clock into pending: the rows show *, and Apply writes them."""
+    for k, v in CLOCK_DEFAULTS.items():
+        if current.get(k) == v:
+            st.pending.pop(k, None)
+        else:
+            st.pending[k] = v
+    st.message = "PipeWire defaults loaded; Apply writes them" if st.pending else "already at PipeWire's defaults"
+    return st, []
+
+
+def _key_prefs(st, key, current):
+    st.cursor = max(0, min(RESET_KEYS_ROW, st.cursor))
+    if key in ("up", "down"):
+        st.cursor = max(0, min(RESET_KEYS_ROW, st.cursor + (1 if key == "down" else -1)))
+    elif KEYS_ROW <= st.cursor < RESET_KEYS_ROW and key in ("enter", "backspace", "delete"):
+        a = pk.ACTIONS[st.cursor - KEYS_ROW]
+        if key == "enter":
+            st.key_capture = a.id
+            st.message = f"press a key for {pk.label(a)} (Esc cancels, Backspace unbinds)"
+            return st, []
+        return _bind(st, a.id, None)
+    elif st.cursor == RESET_KEYS_ROW and key == "enter":
+        st.confirm = ("reset_keys",)
+    elif key in ("left", "right") and st.cursor == BAR_ROW:
+        st.volume_bar = not st.volume_bar
+        return st, [("save_ui",)]
+    elif key in ("left", "right") and st.cursor in (FPS_ROW, FALL_ROW, HOLD_ROW):
+        name, choices = {FPS_ROW: ("meter_fps", METER_FPS), FALL_ROW: ("meter_fall", METER_FALL),
+                         HOLD_ROW: ("peak_hold", PEAK_HOLD)}[st.cursor]
+        n = max(0, min(len(choices) - 1, choices.index(getattr(st, name)) + (1 if key == "right" else -1)))
+        setattr(st, name, choices[n])
+        return st, [("save_ui",)]
+    elif key in ("left", "right") and st.cursor == THEME_ROW:
+        st.theme = THEME_NAMES[(THEME_NAMES.index(st.theme) + (1 if key == "right" else -1)) % len(THEME_NAMES)]
+        return st, [("set_theme", st.theme)]
+    return st, []
+
+
+def _key_top(st, key, current):
     step = {"down": 1, "up": -1, "pgdn": 10, "pgup": -10}.get(key)
     if step:
         st.top_scroll = max(0, st.top_scroll + step)
-    return st, []
-
-
-def _key_preset_row(st, key, name):
-    if key == "enter":
-        return st, [("apply_preset", name)]
-    elif key == "e":
-        return st, [("prompt_label", name)]
-    elif key == "d":
-        st.confirm = ("delete", name)
     return st, []
 
 
@@ -792,7 +758,7 @@ def _key_devices(st, key, devices):
     return st, []
 
 
-def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=None, mixer=None):
+def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer=None):
     """Map a mouse event onto the same keys the keyboard uses."""
     if st.confirm:
         return dataclasses.replace(st, confirm=None, message="cancelled (y confirms)"), []
@@ -802,24 +768,30 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
         # and never changes a value. On Patch it scrolls the column it's over.
         if target and target[0] in ("patch_src", "patch_dst") and not st.patch_menu:
             st = dataclasses.replace(st, patch_side="src" if target[0] == "patch_src" else "dst")
-        return handle_key(st, "up" if event == "wheel_up" else "down", current, presets, devices, patch, mixer)
+        if target and target[0] == "settings_cat":
+            st = dataclasses.replace(st, settings_focus="menu")
+        return handle_key(st, "up" if event == "wheel_up" else "down", current, devices, patch, mixer)
     if target is None:
         return st, []
     kind = target[0]
     keys = []
     if kind == "tab":
         return dataclasses.replace(st, tab=target[1]), []
-    if kind == "setting":
-        st = dataclasses.replace(st, cursor=target[1])
+    if kind == "settings_cat":
+        cursor = st.cursor if target[1] == st.settings_cat else 0
+        st = dataclasses.replace(st, settings_cat=target[1], cursor=cursor, settings_focus="menu")
+        keys = ["enter"] if event == "double" else []
+    elif kind == "setting":
+        st = dataclasses.replace(st, cursor=target[1], settings_focus="pane")
         keys = ["enter"] if event == "double" else []
     elif kind == "arrow":
-        st = dataclasses.replace(st, cursor=target[1])
+        st = dataclasses.replace(st, cursor=target[1], settings_focus="pane")
         keys = ["right" if target[2] > 0 else "left"] if event in ("click", "double") else []
+    elif kind == "clock_button":  # a button: one click presses it
+        st = dataclasses.replace(st, cursor=CLOCK_BUTTONS_ROW, clock_button=target[1], settings_focus="pane")
+        keys = ["enter"] if event in ("click", "double") else []
     elif kind == "key":  # a legend chip
         keys = [target[1]] if event in ("click", "double") else []
-    elif kind == "preset":
-        st = dataclasses.replace(st, cursor=PRESETS_ROW + target[1])
-        keys = ["enter"] if event == "double" else []
     elif kind == "mix_row":
         st = dataclasses.replace(st, mix_cursor=target[1], mix_menu=None)
         keys = ["enter"] if event == "double" else []
@@ -847,7 +819,7 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
         keys = ["enter"] if event == "double" else []
     actions = []
     for k in keys:
-        st, a = handle_key(st, k, current, presets, devices, patch, mixer)
+        st, a = handle_key(st, k, current, devices, patch, mixer)
         actions += a
     return st, actions
 
@@ -859,14 +831,15 @@ TAB_KEYS = [(f"Tab/1-{len(TABS)}", "tabs"), ("q", "quit")]
 LEGENDS = {
     "mixer": [("Enter", "actions"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"),
               ("v", "meters")] + TAB_KEYS,
-    "settings": [("Enter", "apply"), ("↑↓", "select"), ("←→", "change"), ("Esc", "revert"),
-                 ("s", "save as preset"), ("R", "restart WirePlumber")] + TAB_KEYS,
+    "settings": [("Enter", "apply"), ("↑↓", "select"), ("←→", "change"), ("Esc", "revert/menu"),
+                 ("s", "save"), ("R", "restart WirePlumber")] + TAB_KEYS,
+    "settings menu": [("Enter", "open"), ("↑↓", "category"), ("s", "save clock"),
+                      ("R", "restart WirePlumber")] + TAB_KEYS,
+    "preferences": [("↑↓", "select"), ("←→", "change"), ("Esc", "menu")] + TAB_KEYS,
     "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
     "about": TAB_KEYS,
-    "presets": [("Enter", "apply"), ("↑↓", "select"), ("s", "save current"), ("e", "edit label"),
-                ("d", "delete")] + TAB_KEYS,
     "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("h", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
-    "keys": [("Enter", "rebind"), ("↑↓", "select"), ("Bksp", "unbind")] + TAB_KEYS,
+    "keys": [("Enter", "rebind"), ("↑↓", "select"), ("Bksp", "unbind"), ("Esc", "menu")] + TAB_KEYS,
     "keys capture": [("Esc", "cancel"), ("Bksp", "unbind")],
     "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
     "mixer menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
@@ -937,10 +910,10 @@ def _legend(st):
         return LEGENDS["mixer menu"]
     if st.tab == "settings" and st.key_capture:
         return LEGENDS["keys capture"]
-    if st.tab == "settings" and KEYS_ROW <= st.cursor < RESET_KEYS_ROW:
-        return LEGENDS["keys"]
-    if st.tab == "settings" and st.cursor >= PRESETS_ROW:
-        return LEGENDS["presets"]
+    if st.tab == "settings" and st.settings_focus == "menu":
+        return LEGENDS["settings menu"]
+    if st.tab == "settings" and st.settings_cat == "prefs":
+        return LEGENDS["keys" if KEYS_ROW <= st.cursor < RESET_KEYS_ROW else "preferences"]
     if st.tab == "patch" and st.patch_menu:
         return LEGENDS["patch menu"]
     if st.tab == "patch":
@@ -978,16 +951,6 @@ class _Canvas:
             self.hits.append((row, c0, min(c1, self.width), target))
 
 
-def _paste_window(cv, sub, room):
-    """Copy the part of sub that fits in room lines, scrolled so the cursor row (the selected one) shows."""
-    cursor = next((n for n, (_, style) in enumerate(sub.lines) if style == "selected"), 0)
-    rows = _window(len(sub.lines), min(len(sub.lines) - 1, cursor + 3), max(1, room))  # and a little below it
-    top = len(cv.lines)
-    for n in rows:
-        cv.lines.append(sub.lines[n])
-    cv.hits += [(top + r - rows.start, c0, c1, t) for r, c0, c1, t in sub.hits if r in rows]
-
-
 def _confirm_question(confirm, devices=None):
     kind, arg = confirm[0], (confirm[1] if len(confirm) > 1 else None)
     if kind == "dev_profile":
@@ -995,12 +958,11 @@ def _confirm_question(confirm, devices=None):
         return f"Switch {card.label if card else 'the card'} to {confirm[3]}? Audio on that card drops for a moment."
     return {"restart": "Restart WirePlumber?",
             "restart_labels": "Restart WirePlumber now to show it? Apps like Discord may lose their audio.",
-            "delete": f"Delete preset {arg!r}?",
             "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now.",
             "reset_keys": "Reset every key to its default?"}[kind]
 
 
-def render_screen(st, current, block, presets, width, height, devices=None, patch=None, mixer=None, media=None,
+def render_screen(st, current, block, width, height, devices=None, patch=None, mixer=None, media=None,
                   about=None, realtime=None):
     cv = _Canvas(width)
     text, spans = " ", []
@@ -1024,11 +986,9 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     elif st.tab == "about":
         _render_about(cv, about, st.theme)
     elif st.tab == "settings":
-        sub = _Canvas(width)
-        _render_settings(sub, st, current, block, presets, body_h, realtime)
-        _paste_window(cv, sub, body_h)
+        _render_settings(cv, st, current, body_h, realtime)
     else:
-        _render_top(cv, st, current, block, presets, body_h, realtime)
+        _render_top(cv, st, block, body_h)
     body_end = height - 2 - len(footer)
     cv.lines = cv.lines[:body_end]
     cv.hits = [h for h in cv.hits if h[0] < body_end]
@@ -1086,8 +1046,41 @@ def _media_bar(cv, media):
         cv.hit(row, c0 + a, c0 + b, ("key", k))
 
 
-def _render_settings(cv, st, current, block, presets, body_h, realtime=None):
-    st.cursor = max(0, min(PRESETS_ROW + len(presets) - 1, st.cursor))
+def _render_settings(cv, st, current, body_h, realtime=None):
+    """The category menu on the left, the open category on the right, scrolled so its cursor row shows.
+    While the menu has the keys the pane shows no cursor and the open category is an anchor."""
+    focused = st.settings_focus == "pane"
+    view = st if focused else dataclasses.replace(st, cursor=-1)
+    pane = _Canvas(max(10, cv.width - MENU_W))
+    if st.settings_cat == "prefs":
+        _render_prefs(pane, view)
+    else:
+        _render_audio(pane, view, current, realtime)
+    cursor = next((n for n, (_, style) in enumerate(pane.lines) if style == "selected"), 0)
+    rows = list(_window(len(pane.lines), min(len(pane.lines) - 1, cursor + 3), max(1, body_h)))
+    top = len(cv.lines)
+    for i in range(max(len(rows), len(SETTINGS_CATS))):
+        menu, spans = " " * (MENU_W - 1), []
+        if i < len(SETTINGS_CATS):
+            name, label = SETTINGS_CATS[i]
+            menu = f" {label}".ljust(MENU_W - 1)
+            if name == st.settings_cat:
+                spans.append((0, MENU_W - 1, "anchor" if focused else "selected"))
+        spans.append((MENU_W - 1, MENU_W, "dim"))
+        text, style = pane.lines[rows[i]] if i < len(rows) else ("", "normal")
+        if isinstance(style, tuple):
+            spans += [(MENU_W, MENU_W + len(text), style[0])] + [(MENU_W + a, MENU_W + b, r) for a, b, r in style[1]]
+        elif style != "normal":
+            spans.append((MENU_W, MENU_W + len(text), style))
+        row = cv.add(menu + "│" + text, ("normal", spans))
+        if i < len(SETTINGS_CATS):
+            cv.hit(row, 0, MENU_W - 1, ("settings_cat", SETTINGS_CATS[i][0]))
+    for r, c0, c1, t in pane.hits:
+        if r in rows:
+            cv.hit(top + rows.index(r), MENU_W + c0, MENU_W + c1, t)
+
+
+def _render_audio(cv, st, current, realtime=None):
     cv.add("  Clock", "title")
     for i, s in enumerate(SETTINGS):
         value = st.pending.get(s.key, current.get(s.key))
@@ -1111,9 +1104,30 @@ def _render_settings(cv, st, current, block, presets, body_h, realtime=None):
         warnings = [str(e)]
     for w in warnings:
         cv.add(f"  ! {w}", "alert")
+    _clock_buttons(cv, st)
+    for line in textwrap.wrap("Apply: live now · Save: for the next PipeWire start · Reset: PipeWire's defaults",
+                              max(10, cv.width - 2)):
+        cv.add("  " + line, "dim")
     cv.add("")
     _render_realtime(cv, realtime)
-    cv.add("")
+
+
+def _clock_buttons(cv, st):
+    """Apply · Save · Reset as chips. On their row ←→ picks one and Enter presses it; a click presses it."""
+    on_row = st.cursor == CLOCK_BUTTONS_ROW
+    line, spans, chips = "> " if on_row else "  ", [], []
+    for n, label in enumerate(CLOCK_BUTTONS):
+        c0 = len(line)
+        line += f"[ {label} ]"
+        spans.append((c0, len(line), "selected" if on_row and n == st.clock_button else "chip"))
+        chips.append((c0, len(line), n))
+        line += "  "
+    row = cv.add(line.rstrip(), ("normal", spans))
+    for c0, c1, n in chips:
+        cv.hit(row, c0, c1, ("clock_button", n))
+
+
+def _render_prefs(cv, st):
     cv.add("  Display", "title")
     _display_row(cv, st, THEME_ROW, "Theme", theme_label(st.theme), "applies at once")
     _display_row(cv, st, FPS_ROW, "Meter frame rate", f"{st.meter_fps} fps", "how often Mixer meters redraw")
@@ -1123,9 +1137,6 @@ def _render_settings(cv, st, current, block, presets, body_h, realtime=None):
     _display_row(cv, st, BAR_ROW, "Volume bar", "on" if st.volume_bar else "off", "the bar under each Mixer channel")
     cv.add("")
     _render_keys(cv, st)
-    cv.add("")
-    cv.add("  Presets", "title")
-    _render_presets(cv, st, presets)
 
 
 def _render_keys(cv, st):
@@ -1287,7 +1298,7 @@ def _render_about(cv, about, theme="dark"):
 _TOP_HDR = f"{'S':<2}{'ID':>5}{'QUANT':>7}{'RATE':>7}{'WAIT':>9}{'BUSY':>9}{'W/Q':>6}{'B/Q':>6}{'ERR':>5}  {'FORMAT':<16} NAME"
 
 
-def _render_top(cv, st, current, block, presets, body_h, realtime=None):
+def _render_top(cv, st, block, body_h):
     if block is None:
         cv.add("  waiting for pw-top…", "dim")
         return
@@ -1302,16 +1313,6 @@ def _render_top(cv, st, current, block, presets, body_h, realtime=None):
         style = "alert" if r.err > 0 else ("normal" if r.state == "R" else "dim")
         row = cv.add(line, style)
         cv.hit(row, 0, cv.width, ("toplist",))
-
-
-def _render_presets(cv, st, presets):
-    if not presets:
-        cv.add("  no presets yet; s saves the current clock settings as one", "dim")
-    for i, p in enumerate(presets):
-        sel = st.cursor == PRESETS_ROW + i
-        line = f"{'> ' if sel else '  '}{p['name']:<16} {p['label']:<28} {summarize_preset(p)}"
-        row = cv.add(line, "selected" if sel else "normal")
-        cv.hit(row, 0, cv.width, ("preset", i))
 
 
 # Always on screen in the Devices tab; the bottom help line is too narrow and gives way to messages.

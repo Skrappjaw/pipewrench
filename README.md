@@ -25,14 +25,13 @@ pwrench
 ```
 
 Six tabs: **Mixer** (levels and mute), **Devices** (cards and buses), **Patch** (what goes where),
-**Settings** (clock, display, keys, presets), **Top** (`pw-top`) and **About**. `Tab` or `1`–`6` switches, `q`
+**Settings** (audio clock and realtime; display and keys), **Top** (`pw-top`) and **About**. `Tab` or `1`–`6` switches, `q`
 quits, and every tab lists its keys at the bottom. The mouse works too.
 
 ## Command line
 
 ```
 pwrench status | rate N | buf N | min N | max N | reset
-pwrench preset list | save NAME [LABEL] | apply NAME | delete NAME
 pwrench devices [list] | default DEV | volume DEV STEP | mute DEV | profile CARD PROFILE | test DEV
 pwrench devices label DEV TEXT | hide NAME | bus add NAME | bus delete NAME
 pwrench devices preview | apply [--restart] | rollback | restart

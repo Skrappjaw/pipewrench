@@ -26,7 +26,7 @@ def role_at(style, col):
 def patch_lines(theme="dark", **kw):
     src = next(i for i, s in enumerate(SRCS) if s.label == "Discord")
     st = pc.UIState(tab="patch", patch_src=src, theme=theme, **kw)
-    return pc.render_screen(st, {}, None, [], 100, 40, patch=G)[0]
+    return pc.render_screen(st, {}, None, 100, 40, patch=G)[0]
 
 
 def test_every_theme_has_the_dot_roles():
@@ -124,7 +124,7 @@ def test_mixer_headings_use_their_roles():
     import pwinventory as pi
     inv = pi.inventory(_json.loads((FIX / "pwdump_inventory.json").read_text()))
     mx = pc.mixer_view(inv, {"version": 2, "clock_rate": None, "buses": [], "labels": {}, "hidden": []}, [])
-    lines = pc.render_screen(pc.UIState(tab="mixer"), {}, None, [], 100, 60, mixer=mx)[0]
+    lines = pc.render_screen(pc.UIState(tab="mixer"), {}, None, 100, 60, mixer=mx)[0]
     assert next(s for t, s in lines if t.strip() == "Playback") == "head_play"
     assert next(s for t, s in lines if t.strip() == "Recording") == "head_rec"
 

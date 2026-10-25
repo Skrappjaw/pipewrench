@@ -7,9 +7,6 @@ import pwcore as pc
 
 FIX = Path(__file__).parent / "fixtures"
 CUR = pc.parse_settings((FIX / "settings.txt").read_text())
-PRESETS = [{"name": "tracking", "label": "Low-latency tracking",
-            "values": {"clock.force-rate": 48000, "clock.force-quantum": 64}},
-           {"name": "mix", "label": "Mixing", "values": {"clock.force-quantum": 1024}}]
 
 
 def block():
@@ -20,21 +17,23 @@ def block():
 
 
 def UIState(**kw):
-    """These tests are about Settings, Top and the chrome; PipeWrench itself opens on the Mixer."""
+    """These tests are about Settings, Top and the chrome; PipeWrench itself opens on the Mixer. Settings
+    opens with its menu in focus; most tests here start in the open category."""
     kw.setdefault("tab", "settings")
+    kw.setdefault("settings_focus", "pane")
     return pc.UIState(**kw)
 
 
-def key(st, *keys, cur=CUR, presets=PRESETS):
+def key(st, *keys, cur=CUR):
     actions = []
     for k in keys:
-        st, a = pc.handle_key(st, k, cur, presets)
+        st, a = pc.handle_key(st, k, cur)
         actions += a
     return st, actions
 
 
 def screen(st, width=80, height=30):
-    return pc.render_screen(st, CUR, block(), PRESETS, width, height)
+    return pc.render_screen(st, CUR, block(), width, height)
 
 
 def hit_for(hits, target):
@@ -85,7 +84,7 @@ def test_lines_fit_height():
 
 
 def test_top_render_styles():
-    lines, _ = pc.render_screen(UIState(tab="top"), CUR, block(), PRESETS, 200, 40)
+    lines, _ = pc.render_screen(UIState(tab="top"), CUR, block(), 200, 40)
     styles = {t.split()[-1] if t.split() else "": s for t, s in lines}
     assert any("QUANT" in t for t, _ in lines)
     assert styles["Dummy-Driver"] == "dim"
@@ -95,38 +94,19 @@ def test_top_render_styles():
     p = pc.TopParser()
     p.feed(hdr)
     p.feed("R  155    227  44100  24.6us  32.9us  0.01  0.01    2    S16LE 2 44100  + ALSA plug-in [sunvox]")
-    lines, _ = pc.render_screen(UIState(tab="top"), CUR, p.flush(), PRESETS, 120, 40)
+    lines, _ = pc.render_screen(UIState(tab="top"), CUR, p.flush(), 120, 40)
     assert [s for t, s in lines if "sunvox" in t] == ["alert"]
 
 
 def test_top_render_waiting_for_data():
-    lines, _ = pc.render_screen(UIState(tab="top"), CUR, None, PRESETS, 80, 20)
+    lines, _ = pc.render_screen(UIState(tab="top"), CUR, None, 80, 20)
     assert any("waiting for pw-top" in t for t, _ in lines)
 
 
-def test_presets_render_lists_labels():
-    lines, _ = screen(UIState(tab="settings"), height=80)
-    body = "\n".join(t for t, _ in lines)
-    assert "Clock" in body and "Display" in body and "Presets" in body
-    assert body.index("Clock") < body.index("Display") < body.index("Presets")
-    assert "tracking" in body and "Low-latency tracking" in body and "buf 64" in body
 
 
-def test_presets_render_empty_hint():
-    lines, _ = pc.render_screen(UIState(tab="settings", cursor=pc.RESET_KEYS_ROW), CUR, None, [], 80, 30)
-    assert any("no presets" in t for t, _ in lines)
 
 
-def test_settings_scrolls_to_the_cursor():
-    top = "\n".join(t for t, _ in screen(UIState(tab="settings"), height=30)[0])
-    assert "Clock" in top and "Low-latency tracking" not in top
-    st = UIState(tab="settings", cursor=pc.PRESETS_ROW + 1)
-    lines, hits = screen(st, height=30)
-    body = "\n".join(t for t, _ in lines)
-    assert "Mixing" in body and "  Clock" not in body
-    assert len(lines) == 30
-    row, _, _ = hit_for(hits, ("preset", 1))
-    assert "Mixing" in lines[row][0]
 
 
 # --- 7. keys -----------------------------------------------------------------
@@ -135,7 +115,9 @@ def test_up_down_moves_cursor_and_clamps():
     st, _ = key(UIState(), "up")
     assert st.cursor == 0
     st, _ = key(st, *["down"] * 60)
-    assert st.cursor == pc.PRESETS_ROW + len(PRESETS) - 1  # clock rows, Display, then the presets
+    assert st.cursor == pc.CLOCK_BUTTONS_ROW  # Audio: the clock rows, then Apply · Save · Reset
+    st, _ = key(UIState(settings_cat="prefs"), *["down"] * 60)
+    assert st.cursor == pc.RESET_KEYS_ROW  # Preferences: Display, then Keys
 
 
 def test_left_right_sets_pending_without_action():
@@ -212,26 +194,107 @@ def test_q_quits():
     assert key(UIState(), "q")[1] == [("quit",)]
 
 
-def test_presets_keys():
-    st = UIState(tab="settings", cursor=pc.PRESETS_ROW)
-    st, actions = key(st, "down", "enter")
-    assert actions == [("apply_preset", "mix")]
-    _, actions = key(st, "s")
-    assert actions == [("prompt_save",)]
-    _, actions = key(st, "e")
-    assert actions == [("prompt_label", "mix")]
-    st, actions = key(st, "d")
-    assert actions == [] and st.confirm == ("delete", "mix")
-    st, actions = key(st, "y")
-    assert actions == [("delete_preset", "mix")]
 
 
-def test_presets_keys_with_no_presets():
-    st = UIState(tab="settings", cursor=pc.PRESETS_ROW)
-    _, actions = key(st, "enter", "d", "e", presets=[])
+
+
+# --- Settings: the category menu, and the clock's Apply · Save · Reset -------------------------
+
+def test_settings_opens_on_the_menu_and_arrows_pick_a_category():
+    st = pc.UIState(tab="settings")
+    assert st.settings_focus == "menu" and st.settings_cat == "audio"
+    st, actions = key(st, "down")
+    assert st.settings_cat == "prefs" and st.cursor == 0 and actions == []
+    st, _ = key(st, "down", "up")
+    assert st.settings_cat == "audio"
+    st, _ = key(st, "right")
+    assert st.settings_focus == "pane"
+    st, _ = key(pc.UIState(tab="settings"), "enter")
+    assert st.settings_focus == "pane"
+
+
+def test_menu_keys_never_change_a_value():
+    st, actions = key(pc.UIState(tab="settings"), "left", "up", "down", "up")
+    assert actions == [] and st.pending == {}
+
+
+def test_esc_drops_pending_first_then_goes_back_to_the_menu():
+    st, _ = key(UIState(), "right")
+    assert st.pending
+    st, _ = key(st, "esc")
+    assert st.pending == {} and st.settings_focus == "pane"
+    st, _ = key(st, "esc")
+    assert st.settings_focus == "menu"
+
+
+def test_the_pane_shows_only_the_open_category():
+    audio = "\n".join(t for t, _ in screen(UIState(), height=40)[0])
+    assert "Clock" in audio and "Realtime" in audio and "Display" not in audio and "Keys  " not in audio
+    prefs = "\n".join(t for t, _ in screen(UIState(settings_cat="prefs"), height=40)[0])
+    assert "Display" in prefs and "Theme" in prefs and "Force sample rate" not in prefs
+    assert "Audio" in prefs and "Preferences" in prefs  # the menu stays on the left
+    assert "preset" not in (audio + prefs).lower()
+
+
+def test_menu_marks_the_open_category():
+    lines, _ = screen(pc.UIState(tab="settings", settings_cat="prefs"))
+    row = next(n for n, (t, _) in enumerate(lines) if t.startswith(" Preferences"))
+    assert (0, pc.MENU_W - 1, "selected") in lines[row][1][1]
+    lines, _ = screen(UIState(settings_cat="prefs"))  # keys in the pane: the menu keeps an anchor
+    assert (0, pc.MENU_W - 1, "anchor") in lines[row][1][1]
+
+
+def test_clicking_a_category_opens_it_and_a_row_focuses_the_pane():
+    st = pc.UIState(tab="settings")
+    lines, hits = screen(st)
+    st, _ = click(st, hits, ("settings_cat", "prefs"))
+    assert st.settings_cat == "prefs" and st.settings_focus == "menu"
+    lines, hits = screen(st)
+    st, _ = click(st, hits, ("setting", pc.FPS_ROW))
+    assert st.settings_focus == "pane" and st.cursor == pc.FPS_ROW
+
+
+def test_clock_buttons_apply_save_reset():
+    st = UIState(cursor=pc.CLOCK_BUTTONS_ROW, pending={"clock.force-quantum": 256})
+    _, actions = key(st, "enter")  # Apply is first
+    assert actions == [("set_many", [("clock.force-quantum", 256)])]
+    st2, actions = key(st, "right", "enter")  # Save, with an edit not yet applied
+    assert actions == [] and "apply first" in st2.message and st2.failed == st2.message
+    _, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW), "right", "enter")
+    assert actions == [("save_clock",)]
+    st, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW), "right", "right", "right", "enter")  # Reset, clamped
+    assert actions == [] and st.clock_button == 2
+
+
+def test_s_saves_from_anywhere_in_settings():
+    assert key(pc.UIState(tab="settings"), "s")[1] == [("save_clock",)]
+    assert key(UIState(settings_cat="prefs"), "s")[1] == [("save_clock",)]
+
+
+def test_reset_loads_pipewire_defaults_as_pending():
+    cur = {**CUR, "clock.force-rate": 96000, "clock.force-quantum": 128, "clock.min-quantum": 64,
+           "clock.max-quantum": 2048}
+    st, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW, clock_button=2), "enter", cur=cur)
     assert actions == []
-    _, actions = key(st, "s", presets=[])
-    assert actions == [("prompt_save",)]
+    assert st.pending == {"clock.force-rate": 0, "clock.force-quantum": 0, "clock.min-quantum": 32}
+    assert "Apply" in st.message
+    _, actions = key(st, "left", "left", "enter", cur=cur)  # then Apply writes them
+    assert [k for k, _ in actions[0][1]] == ["clock.min-quantum", "clock.force-rate", "clock.force-quantum"]
+
+
+def test_reset_at_the_defaults_says_so():
+    cur = {**CUR, **pc.CLOCK_DEFAULTS}
+    st, _ = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW, clock_button=2), "enter", cur=cur)
+    assert st.pending == {} and "already" in st.message
+
+
+def test_clock_button_click_presses_it():
+    st = UIState()
+    lines, hits = screen(st, height=40)
+    row, c0, c1 = hit_for(hits, ("clock_button", 1))
+    assert "Save" in lines[row][0][c0:c1]
+    _, actions = click(st, hits, ("clock_button", 1))
+    assert actions == [("save_clock",)]
 
 
 def test_top_scroll_keys():
@@ -245,7 +308,7 @@ def test_top_scroll_keys():
 
 def click(st, hits, target, event="click", offset=0):
     row, c0, _ = hit_for(hits, target)
-    return pc.handle_mouse(st, hits, row, c0 + offset, event, CUR, PRESETS)
+    return pc.handle_mouse(st, hits, row, c0 + offset, event, CUR)
 
 
 @pytest.mark.parametrize("width", [80, 120])
@@ -300,7 +363,7 @@ def test_wheel_works_anywhere_on_the_screen():
     lines, hits = screen(st)
     blank = next(n for n, (t, _) in enumerate(lines) if not t.strip())
     for y in (0, blank):                                    # the tab bar, an empty line
-        st2, _ = pc.handle_mouse(st, hits, y, 2, "wheel_down", CUR, PRESETS)
+        st2, _ = pc.handle_mouse(st, hits, y, 2, "wheel_down", CUR)
         assert st2.cursor == 2 and st2.tab == "settings"
 
 
@@ -330,22 +393,10 @@ def test_restart_chip_needs_confirmation():
 def test_click_outside_targets_does_nothing():
     st = UIState(cursor=2)
     _, hits = screen(st)
-    st2, actions = pc.handle_mouse(st, hits, 29, 79, "click", CUR, PRESETS)
+    st2, actions = pc.handle_mouse(st, hits, 29, 79, "click", CUR)
     assert st2 == st and actions == []
 
 
-def test_presets_mouse():
-    st = UIState(tab="settings", cursor=pc.PRESETS_ROW)
-    _, hits = screen(st, height=40)
-    st, actions = click(st, hits, ("preset", 1))
-    assert st.cursor == pc.PRESETS_ROW + 1 and actions == []
-    _, actions = click(st, hits, ("preset", 0), event="double")
-    assert actions == [("apply_preset", "tracking")]
-    _, hits = screen(st, height=40)  # a preset row's legend adds e and d
-    _, actions = click(st, hits, ("key", "s"))
-    assert actions == [("prompt_save",)]
-    st2, actions = click(st, hits, ("key", "d"))
-    assert actions == [] and st2.confirm == ("delete", "mix")
 
 
 def test_wheel_scrolls_top():
@@ -367,7 +418,7 @@ def test_click_while_confirming_cancels_without_acting():
 # --- theme ------------------------------------------------------------------------------
 
 def test_theme_row_switches_at_once_and_reports_it():
-    st = UIState(cursor=pc.THEME_ROW)
+    st = UIState(settings_cat="prefs", cursor=pc.THEME_ROW)
     st, actions = key(st, "right")
     assert st.theme == "light" and actions == [("set_theme", "light")]
     assert "light" in "\n".join(t for t, _ in screen(st)[0])
@@ -438,13 +489,13 @@ def test_pipecraft_uses_minecraft_text_colours():
 
 
 def test_pipe_boy_shows_its_name():
-    st = UIState(cursor=pc.THEME_ROW, theme="pipeboy")
+    st = UIState(settings_cat="prefs", cursor=pc.THEME_ROW, theme="pipeboy")
     assert "Pipe Boy" in "\n".join(t for t, _ in screen(st)[0])
     assert pc.theme_label("pipeboy") == "Pipe Boy" and pc.theme_label("dark") == "dark"
 
 
 def test_enter_on_the_theme_row_does_not_switch_it():
-    st = UIState(cursor=pc.THEME_ROW)
+    st = UIState(settings_cat="prefs", cursor=pc.THEME_ROW)
     st, actions = key(st, "enter")
     assert st.theme == "dark" and actions == []
 
@@ -516,7 +567,7 @@ def test_multi_key_chips_have_no_hit():
 
 
 def test_meter_frame_rate_steps_and_saves():
-    st = UIState(cursor=pc.FPS_ROW)
+    st = UIState(settings_cat="prefs", cursor=pc.FPS_ROW)
     st, actions = key(st, "right")
     assert st.meter_fps == 15 and actions == [("save_ui",)]
     st, _ = key(st, *["right"] * 8)
@@ -525,11 +576,11 @@ def test_meter_frame_rate_steps_and_saves():
     assert st.meter_fps == 5
     text = "\n".join(t for t, _ in screen(st, height=80)[0])
     assert "Meter frame rate" in text and "5 fps" in text
-    assert text.index("Theme") < text.index("Meter frame rate") < text.index("Presets")
+    assert text.index("Theme") < text.index("Meter frame rate") < text.index("  Keys")
 
 
 def test_meter_fall_steps_and_saves():
-    st = UIState(cursor=pc.FALL_ROW)
+    st = UIState(settings_cat="prefs", cursor=pc.FALL_ROW)
     st, actions = key(st, "right")
     assert st.meter_fall == 40 and actions == [("save_ui",)]
     st, _ = key(st, *["left"] * 6)
@@ -537,11 +588,11 @@ def test_meter_fall_steps_and_saves():
     assert pc.ui_prefs(st) == {"theme": "dark", "meter_fps": 10, "meter_fall": 10, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
     text = "\n".join(t for t, _ in screen(st, height=80)[0])
     assert "Meter fall" in text and "10 dB/s" in text
-    assert text.index("Meter frame rate") < text.index("Meter fall") < text.index("Peak hold") < text.index("Presets")
+    assert text.index("Meter frame rate") < text.index("Meter fall") < text.index("Peak hold") < text.index("  Keys")
 
 
 def test_peak_hold_steps_to_off_and_saves():
-    st = UIState(cursor=pc.HOLD_ROW)
+    st = UIState(settings_cat="prefs", cursor=pc.HOLD_ROW)
     st, actions = key(st, "right")
     assert st.peak_hold == 2 and actions == [("save_ui",)]
     st, _ = key(st, *["left"] * 8)

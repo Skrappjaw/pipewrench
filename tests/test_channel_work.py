@@ -32,7 +32,7 @@ def mix_at(label, section="playback", m=None):
 def mkey(st, *keys, m=None):
     m, actions = m or mx(), []
     for k in keys:
-        st, a = pc.handle_key(st, k, CUR, [], mixer=m)
+        st, a = pc.handle_key(st, k, CUR, mixer=m)
         actions += a
     return st, actions
 
@@ -40,7 +40,7 @@ def mkey(st, *keys, m=None):
 def dkey(st, *keys, devices=None):
     devices, actions = devices or dv(), []
     for k in keys:
-        st, a = pc.handle_key(st, k, CUR, [], devices=devices)
+        st, a = pc.handle_key(st, k, CUR, devices=devices)
         actions += a
     return st, actions
 
@@ -115,7 +115,7 @@ def test_monitors_are_read_only_too():
 
 
 def test_channels_still_listed_dim():
-    lines, hits = pc.render_screen(pc.UIState(tab="devices"), CUR, None, [], 120, 80, devices=dv())
+    lines, hits = pc.render_screen(pc.UIState(tab="devices"), CUR, None, 120, 80, devices=dv())
     row = next((t, s) for t, s in lines if "GCS-8 CH 2 " in t or t.rstrip().endswith("GCS-8 CH 2"))
     assert row[1] == "dim"
     n = next(i for i, (t, _) in enumerate(lines) if t == row[0])

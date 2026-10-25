@@ -24,10 +24,8 @@ ACTIONS = [
     Action("patch", "patch.grid", "g", "grid/column view"),
     Action("patch", "patch.monitors", "m", "monitors"),
     Action("patch", "patch.ports", "p", "ports"),
-    Action("settings", "settings.save", "s", "save as preset"),
+    Action("settings", "settings.save", "s", "save clock settings"),
     Action("settings", "settings.restart", "R", "restart WirePlumber"),
-    Action("settings", "presets.edit", "e", "edit preset label"),
-    Action("settings", "presets.delete", "d", "delete preset"),
 ]
 BY_ID = {a.id: a for a in ACTIONS}
 

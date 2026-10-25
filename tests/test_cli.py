@@ -29,13 +29,6 @@ class FakeRunner:
         return [c for c in self.calls if c != READ]
 
 
-@pytest.fixture(autouse=True)
-def presets_file(tmp_path, monkeypatch):
-    path = tmp_path / "presets.json"
-    monkeypatch.setenv("PIPEWRENCH_PRESETS", str(path))
-    return path
-
-
 def run(*argv, runner=None, execvp=None):
     runner = runner or FakeRunner()
     out, err = io.StringIO(), io.StringIO()
@@ -102,31 +95,5 @@ def test_top_execs_pw_top():
     assert seen == [("pw-top", ["pw-top"])]
 
 
-def test_preset_save_list_apply_delete(presets_file):
-    rc, _, _, r = run("preset", "save", "now", "Current setup")
-    assert rc == 0 and r.writes == []
-    assert pc.find_preset(pc.load_presets(presets_file), "now")["label"] == "Current setup"
-
-    rc, out, _, _ = run("preset", "list")
-    assert "now" in out and "Current setup" in out
-
-    rc, _, _, r = run("preset", "apply", "now")
-    assert rc == 0
-    assert r.writes == pc.preset_cmds(pc.find_preset(pc.load_presets(presets_file), "now"),
-                                      pc.parse_settings((FIX / "settings.txt").read_text()))
-
-    rc, *_ = run("preset", "delete", "now")
-    assert rc == 0 and pc.load_presets(presets_file) == []
-
-
-def test_preset_errors():
-    assert run("preset", "apply", "ghost")[0] == 2
-    assert run("preset", "delete", "ghost")[0] == 2
-    assert run("preset", "save", "bad name", "x")[0] == 2
-    run("preset", "save", "a", "A")
-    assert run("preset", "save", "a", "again")[0] == 2
-
-
-def test_preset_list_empty():
-    rc, out, _, _ = run("preset", "list")
-    assert rc == 0 and "no presets" in out
+def test_presets_are_gone_until_scenes():
+    assert run("preset", "list")[0] == 2

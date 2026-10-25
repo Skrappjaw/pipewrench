@@ -28,7 +28,7 @@ def player(**kw):
 
 
 def screen(st, media, width=100, height=30):
-    return pc.render_screen(st, CUR, None, [], width, height, media=media)
+    return pc.render_screen(st, CUR, None, width, height, media=media)
 
 
 def bar(lines):
@@ -85,7 +85,7 @@ def test_media_keys_work_on_every_tab(tab):
     for k, action in (("*", ("media", "play/pause")), ("<", ("media", "previous")),
                       (">", ("media", "next")), ("-", ("media_volume", "-5%")), ("+", ("media_volume", "+5%")),
                       ("=", ("media_volume", "+5%"))):
-        assert pc.handle_key(pc.UIState(tab=tab), k, CUR, [])[1] == [action], (tab, k)
+        assert pc.handle_key(pc.UIState(tab=tab), k, CUR)[1] == [action], (tab, k)
 
 
 # --- the bar --------------------------------------------------------------------------------
@@ -116,7 +116,7 @@ def test_bar_chips_are_clickable():
     lines, hits = screen(st, {"player": player(), "position": 0})
     row, c0, c1, _ = next(h for h in hits if h[3] == ("key", "*"))
     assert lines[row][0][c0:c1] == " * "
-    assert pc.handle_mouse(st, hits, row, c0, "click", CUR, [])[1] == [("media", "play/pause")]
+    assert pc.handle_mouse(st, hits, row, c0, "click", CUR)[1] == [("media", "play/pause")]
 
 
 @pytest.mark.parametrize("width", [40, 80, 160])
@@ -130,4 +130,4 @@ def test_bar_fits_any_width(width):
 def test_dot_and_slash_are_not_media_keys():
     """No stop: Brave ends its session on Stop, and only the browser can start it again."""
     for k in (".", "/"):
-        assert pc.handle_key(pc.UIState(tab="settings"), k, CUR, [])[1] == []
+        assert pc.handle_key(pc.UIState(tab="settings"), k, CUR)[1] == []

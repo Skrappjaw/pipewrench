@@ -9,7 +9,7 @@ ABOUT = {"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipe
 
 
 def screen(width=80, height=30, about=ABOUT):
-    return pc.render_screen(UIState(tab="about"), {}, [], [], width, height, about=about)
+    return pc.render_screen(UIState(tab="about"), {}, [], width, height, about=about)
 
 
 def body(lines):
@@ -19,7 +19,7 @@ def body(lines):
 def test_about_is_the_last_tab():
     assert pc.TABS[-1] == "about"
     assert pc.TAB_TITLES["about"] == f"{len(pc.TABS)} About"
-    st, _ = pc.handle_key(UIState(), str(len(pc.TABS)), {}, [])
+    st, _ = pc.handle_key(UIState(), str(len(pc.TABS)), {})
     assert st.tab == "about"
 
 
@@ -90,7 +90,7 @@ def test_about_legend_is_the_tab_keys():
 
 
 def test_other_keys_do_nothing_on_about():
-    st, actions = pc.handle_key(UIState(tab="about"), "x", {}, [])
+    st, actions = pc.handle_key(UIState(tab="about"), "x", {})
     assert st.tab == "about" and actions == []
 
 
@@ -114,7 +114,7 @@ def test_about_info_survives_missing_tools():
 #     Vaporware Slant; narrow terminals fall back to Pagga, then the letterspaced line
 
 def themed(theme, width=100):
-    return body(pc.render_screen(UIState(tab="about", theme=theme), {}, [], [], width, 30, about=ABOUT)[0])
+    return body(pc.render_screen(UIState(tab="about", theme=theme), {}, [], width, 30, about=ABOUT)[0])
 
 
 @pytest.mark.parametrize("theme,logo", [("dark", "LOGO_ANSI"), ("light", "LOGO_ANSI"), ("crowbar", "LOGO_DOOM"),

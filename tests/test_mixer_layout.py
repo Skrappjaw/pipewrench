@@ -27,7 +27,7 @@ def mx(volume=None, mute=None, metered=False):
 
 
 def screen(m=None, width=100, height=60, **st):
-    return pc.render_screen(pc.UIState(tab="mixer", **st), {}, None, [], width, height, mixer=m or mx())
+    return pc.render_screen(pc.UIState(tab="mixer", **st), {}, None, width, height, mixer=m or mx())
 
 
 def line(lines, label):
@@ -116,15 +116,15 @@ def test_every_theme_defines_the_bar_roles():
 # --- Settings ------------------------------------------------------------------
 
 def test_volume_bar_row_toggles_and_saves():
-    st = pc.UIState(tab="settings", cursor=pc.BAR_ROW)
-    st, actions = pc.handle_key(st, "right", {}, [])
+    st = pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane", cursor=pc.BAR_ROW)
+    st, actions = pc.handle_key(st, "right", {})
     assert st.volume_bar is False and actions == [("save_ui",)]
-    st, _ = pc.handle_key(st, "left", {}, [])
+    st, _ = pc.handle_key(st, "left", {})
     assert st.volume_bar is True and pc.ui_prefs(st)["volume_bar"] is True
 
 
 def test_volume_bar_row_renders():
-    lines, _ = pc.render_screen(pc.UIState(tab="settings"), {}, [], [], 100, 50)
+    lines, _ = pc.render_screen(pc.UIState(tab="settings", settings_cat="prefs"), {}, [], 100, 50)
     assert any("Volume bar" in t and "on" in t for t, _ in lines)
 
 
@@ -134,5 +134,5 @@ def test_load_ui_defaults_bar_on(tmp_path):
     assert pc.load_ui(tmp_path / "ui.json")["volume_bar"] is False
 
 
-def test_keys_then_presets_follow_the_bar_row():
-    assert pc.KEYS_ROW == pc.BAR_ROW + 1 and pc.PRESETS_ROW == pc.RESET_KEYS_ROW + 1
+def test_keys_follow_the_bar_row():
+    assert pc.KEYS_ROW == pc.BAR_ROW + 1

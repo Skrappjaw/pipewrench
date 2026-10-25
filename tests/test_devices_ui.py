@@ -23,7 +23,7 @@ def key(st, *keys, devices=None):
     devices = dv() if devices is None else devices
     actions = []
     for k in keys:
-        st, a = pc.handle_key(st, k, CUR, [], devices=devices)
+        st, a = pc.handle_key(st, k, CUR, devices=devices)
         actions += a
     return st, actions
 
@@ -39,7 +39,7 @@ def at(target, devices=None):
 
 
 def screen(st, devices=None, width=100, height=40):
-    return pc.render_screen(st, CUR, None, [], width, height, devices=dv() if devices is None else devices)
+    return pc.render_screen(st, CUR, None, width, height, devices=dv() if devices is None else devices)
 
 
 def body(lines):
@@ -128,7 +128,7 @@ def test_scrolls_to_keep_cursor_visible():
 
 
 def test_loading_when_devices_missing():
-    lines, _ = pc.render_screen(pc.UIState(tab="devices"), CUR, None, [], 80, 20, devices=None)
+    lines, _ = pc.render_screen(pc.UIState(tab="devices"), CUR, None, 80, 20, devices=None)
     assert "loading" in body(lines)
 
 
@@ -184,7 +184,7 @@ def test_apply_writes_without_confirm_and_R_restarts_with_warning():
 
 def test_nothing_happens_until_devices_load():
     for k in ("d", "right", " ", "enter", "p", "h", "a", "x", "v", "A", "t", "down"):
-        _, actions = pc.handle_key(pc.UIState(tab="devices"), k, CUR, [], devices=None)
+        _, actions = pc.handle_key(pc.UIState(tab="devices"), k, CUR, devices=None)
         assert actions == []
 
 
@@ -193,7 +193,7 @@ def test_nothing_happens_until_devices_load():
 def click(st, target, event="click"):
     lines, hits = screen(st)
     row, c0, _ = hit_for(hits, target)
-    return pc.handle_mouse(st, hits, row, c0, event, CUR, [], devices=dv())
+    return pc.handle_mouse(st, hits, row, c0, event, CUR, devices=dv())
 
 
 def test_apply_is_a_chip():
@@ -213,7 +213,7 @@ def test_note_follows_the_list_after_one_blank_line():
 def test_rows_show_connections():
     links = pi.inventory(json.loads((FIX / "pwdump_links.json").read_text()))
     d = pc.devices_view(links, pcfg.default_config())
-    text = body(pc.render_screen(pc.UIState(tab="devices"), CUR, None, [], 120, 50, devices=d)[0])
+    text = body(pc.render_screen(pc.UIState(tab="devices"), CUR, None, 120, 50, devices=d)[0])
     assert "← Brave" in next(line for line in text.splitlines() if "GCS-8 CH USB" in line and " out " in line)
     assert "→ cinnamon" in next(line for line in text.splitlines() if "GCS-8 CH 2 " in line)
 
@@ -333,7 +333,7 @@ def test_click_on_a_menu_item_picks_it():
     lines, hits = screen(st, d, height=60)
     k = menu_labels(st, d).index("Hide")
     row, c0, _ = hit_for(hits, ("dev_menu_item", k))
-    _, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, [], devices=d)
+    _, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, devices=d)
     assert actions == [("dev_hide", "SYSTEM")]
 
 def test_click_selects_double_click_opens_actions_wheel_moves():

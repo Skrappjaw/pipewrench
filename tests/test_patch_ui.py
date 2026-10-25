@@ -24,7 +24,7 @@ def di(label):
 def key(st, *keys, g=G):
     actions = []
     for k in keys:
-        st, a = pc.handle_key(st, k, CUR, [], patch=g)
+        st, a = pc.handle_key(st, k, CUR, patch=g)
         actions += a
     return st, actions
 
@@ -34,7 +34,7 @@ def at(src, dst=None, **kw):
 
 
 def screen(st, width=100, height=40, g=G):
-    return pc.render_screen(st, CUR, None, [], width, height, patch=g)
+    return pc.render_screen(st, CUR, None, width, height, patch=g)
 
 
 def body(lines):
@@ -61,10 +61,10 @@ def test_patch_tab_by_number():
 
 
 def test_loading_when_graph_missing():
-    lines, _ = pc.render_screen(pc.UIState(tab="patch"), CUR, None, [], 80, 20, patch=None)
+    lines, _ = pc.render_screen(pc.UIState(tab="patch"), CUR, None, 80, 20, patch=None)
     assert "loading" in body(lines)
     for k in ("enter", "g", "p", "down", "right"):
-        assert pc.handle_key(pc.UIState(tab="patch"), k, CUR, [], patch=None)[1] == []
+        assert pc.handle_key(pc.UIState(tab="patch"), k, CUR, patch=None)[1] == []
 
 
 # --- column view -------------------------------------------------------------------------
@@ -213,9 +213,9 @@ def test_click_port_cell():
     st, s, d = reaper_ports_state()
     lines, hits = screen(st, g=GR)
     row, c0, _ = hit_for(hits, ("patch_pcell", 1, 3))
-    st2, _ = pc.handle_mouse(st, hits, row, c0, "click", CUR, [], patch=GR)
+    st2, _ = pc.handle_mouse(st, hits, row, c0, "click", CUR, patch=GR)
     assert (st2.patch_port_row, st2.patch_port_col) == (1, 3)
-    _, actions = pc.handle_mouse(st, hits, row, c0, "double", CUR, [], patch=GR)
+    _, actions = pc.handle_mouse(st, hits, row, c0, "double", CUR, patch=GR)
     assert actions == [("patch_cmds", [pp.port_toggle_cmd(GR, s.ports[1], d.ports[3])])]
 
 
@@ -241,7 +241,7 @@ def test_scrolls_to_keep_cursor_visible():
 def click(st, target, event="click"):
     lines, hits = screen(st)
     row, c0, _ = hit_for(hits, target)
-    return pc.handle_mouse(st, hits, row, c0, event, CUR, [], patch=G)
+    return pc.handle_mouse(st, hits, row, c0, event, CUR, patch=G)
 
 
 def test_click_rows_and_double_click_toggles():
@@ -336,7 +336,7 @@ def test_clicking_a_slot_picks_it():
     st, _ = reaper_menu()
     _, hits = screen(st, g=GR)
     row, c0, _, t = next(h for h in hits if h[3] == ("patch_slot", 1))
-    st, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, [], patch=GR)
+    st, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, patch=GR)
     assert not st.patch_menu and actions[0][0] == "patch_cmds"
 
 
@@ -355,10 +355,10 @@ def test_wheel_scrolls_the_column_under_the_mouse():
     # The wheel scrolls everywhere; on Patch it scrolls the column it's over, without moving the other.
     st = pc.UIState(tab="patch", patch_src=0, patch_dst=0)
     g = G
-    lines, hits = pc.render_screen(st, CUR, None, [], 120, 40, patch=g)
+    lines, hits = pc.render_screen(st, CUR, None, 120, 40, patch=g)
     row, c0, _, _ = next(h for h in hits if h[3] == ("patch_dst", 3))
-    st2, actions = pc.handle_mouse(st, hits, row, c0, "wheel_down", CUR, [], patch=g)
+    st2, actions = pc.handle_mouse(st, hits, row, c0, "wheel_down", CUR, patch=g)
     assert actions == [] and st2.patch_side == "dst" and st2.patch_dst == 1 and st2.patch_src == 0
     row, c0, _, _ = next(h for h in hits if h[3] == ("patch_src", 2))
-    st3, _ = pc.handle_mouse(st2, hits, row, c0, "wheel_down", CUR, [], patch=g)
+    st3, _ = pc.handle_mouse(st2, hits, row, c0, "wheel_down", CUR, patch=g)
     assert st3.patch_side == "src" and st3.patch_src == 1 and st3.patch_dst == 1

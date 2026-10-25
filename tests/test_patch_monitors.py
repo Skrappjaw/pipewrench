@@ -72,7 +72,7 @@ def test_unlinked_monitors_stay_hidden_with_m_off():
 
 
 def render(dump, width=140, height=60, **st):
-    return pc.render_screen(pc.UIState(tab="patch", **st), {}, None, [], width, height, patch=pp.graph(dump))[0]
+    return pc.render_screen(pc.UIState(tab="patch", **st), {}, None, width, height, patch=pp.graph(dump))[0]
 
 
 def test_column_view_has_a_monitors_heading_above_the_monitors():
@@ -87,7 +87,7 @@ def test_column_view_has_a_monitors_heading_above_the_monitors():
 
 def test_monitors_heading_is_a_title_and_not_clickable():
     dump, _ = with_monitor_link()
-    lines, hits = pc.render_screen(pc.UIState(tab="patch"), {}, None, [], 140, 60, patch=pp.graph(dump))
+    lines, hits = pc.render_screen(pc.UIState(tab="patch"), {}, None, 140, 60, patch=pp.graph(dump))
     i = next(n for n, (t, _) in enumerate(lines) if t.split("│")[0].strip() == "Monitors")
     assert ("title" in str(lines[i][1]))
     assert not [h for h in hits if h[0] == i and h[3][0] == "patch_src"]

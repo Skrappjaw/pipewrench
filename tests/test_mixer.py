@@ -22,7 +22,7 @@ MX = mx()
 
 
 def screen(st, m=MX, width=100, height=60):
-    return pc.render_screen(st, CUR, None, [], width, height, mixer=m)
+    return pc.render_screen(st, CUR, None, width, height, mixer=m)
 
 
 def body(lines):
@@ -32,7 +32,7 @@ def body(lines):
 def key(st, *keys, m=MX):
     actions = []
     for k in keys:
-        st, a = pc.handle_key(st, k, CUR, [], mixer=m)
+        st, a = pc.handle_key(st, k, CUR, mixer=m)
         actions += a
     return st, actions
 
@@ -110,7 +110,7 @@ def test_cursor_bar_covers_the_name_not_the_volume():
 
 
 def test_loading_before_the_first_dump():
-    assert "loading the mixer" in body(pc.render_screen(pc.UIState(), CUR, None, [], 80, 20)[0])
+    assert "loading the mixer" in body(pc.render_screen(pc.UIState(), CUR, None, 80, 20)[0])
 
 
 def test_rows_fit_the_width():
@@ -226,7 +226,7 @@ def test_click_on_a_menu_item_picks_it():
     st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
     _, hits = screen(st)
     row, c0, _ = next((r, a, b) for r, a, b, t in hits if t == ("mix_menu_item", 1))
-    _, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, [], mixer=MX)
+    _, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR, mixer=MX)
     assert actions[0][1][1] == "set-mute"
 
 
@@ -248,9 +248,9 @@ def test_wheel_scrolls_and_never_changes_volume():
     st = pc.UIState(mix_cursor=3)
     _, hits = screen(st)
     row, c0, _, _ = next(h for h in hits if h[3] == ("mix_row", 0))  # the mouse over a different row
-    st2, actions = pc.handle_mouse(st, hits, row, c0, "wheel_down", CUR, [], mixer=MX)
+    st2, actions = pc.handle_mouse(st, hits, row, c0, "wheel_down", CUR, mixer=MX)
     assert actions == [] and st2.mix_cursor == 4                     # moved from the selection, not the mouse
-    st2, actions = pc.handle_mouse(st2, hits, row, c0, "wheel_up", CUR, [], mixer=MX)
+    st2, actions = pc.handle_mouse(st2, hits, row, c0, "wheel_up", CUR, mixer=MX)
     assert actions == [] and st2.mix_cursor == 3
 
 
@@ -258,9 +258,9 @@ def test_double_click_opens_the_menu():
     st = pc.UIState()
     _, hits = screen(st)
     row, c0, _, _ = next(h for h in hits if h[3] == ("mix_row", 0))
-    st2, actions = pc.handle_mouse(st, hits, row, c0, "double", CUR, [], mixer=MX)
+    st2, actions = pc.handle_mouse(st, hits, row, c0, "double", CUR, mixer=MX)
     assert actions == [] and st2.mix_menu is not None
-    st3, _ = pc.handle_mouse(st2, hits, row, c0, "click", CUR, [], mixer=MX)
+    st3, _ = pc.handle_mouse(st2, hits, row, c0, "click", CUR, mixer=MX)
     assert st3.mix_menu is None  # a click on a row closes the menu
 
 

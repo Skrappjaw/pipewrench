@@ -26,7 +26,7 @@ APP = HERE.parent / "pipewrench.py"
 class Pty:
     def __init__(self, tmp_path, term="xterm-256color"):
         env = {**os.environ, "TERM": term, "PIPEWRENCH_FIXTURES": str(HERE / "fixtures"),
-               "PIPEWRENCH_PRESETS": str(tmp_path / "presets.json"), "XDG_CONFIG_HOME": str(tmp_path)}
+               "XDG_CONFIG_HOME": str(tmp_path)}
         env.pop("PIPEWRENCH_DEVICES", None)
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
@@ -95,19 +95,19 @@ def test_tab_key_mouse_click_and_quit(app):
     assert app.wait_exit() == 0
 
 
-def test_save_preset_via_prompt(app, tmp_path):
+def test_save_keeps_the_clock_for_the_next_pipewire_start(app, tmp_path):
     app.expect("Playback")  # PipeWrench opens on the Mixer
     app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send("s")
-    app.expect("preset name")
-    app.send("tracking\r")
-    app.expect("label for tracking")
-    app.send("Low latency\r")
-    app.expect("saved preset tracking")
+    app.expect("next time PipeWire starts")
     app.send("q")
     assert app.wait_exit() == 0
-    assert "Low latency" in (tmp_path / "presets.json").read_text()
+    saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
+    assert saved["clock_rate"] == 48000 and saved["clock_quantum"] == 128
+    dropin = (tmp_path / "pipewire" / "pipewire.conf.d" / "50-pipewrench-devices.conf").read_text()
+    assert "default.clock.rate = 48000" in dropin and "default.clock.quantum = 128" in dropin
+    assert not (tmp_path / "wireplumber").exists()  # the label rules wait for Devices' A
 
 
 def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
@@ -198,8 +198,9 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
     try:
         app.expect("Playback")
         app.send(tab("settings"))
+        app.send("\x1bOB")  # Preferences
         app.expect("light")
-        app.send("\x1bOB" * pc.THEME_ROW + "\x1bOD")  # down to the theme row, then left: light → dark
+        app.send("\r" + "\x1bOB" * pc.THEME_ROW + "\x1bOD")  # into it, the theme row, left: light → dark
         app.expect("theme: dark")
         assert json.loads((tmp_path / "pipewrench" / "ui.json").read_text()) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
         app.send(tab("patch"))
@@ -222,6 +223,7 @@ def test_crowbar_theme_starts(tmp_path, term):
     try:
         app.expect("needs 256 colours" if term == "xterm" else "Playback")
         app.send(tab("settings"))
+        app.send("\x1bOB")  # Preferences
         app.expect("crowbar")
         app.send("q")
         assert app.wait_exit() == 0
@@ -246,7 +248,7 @@ def test_rebind_a_key_in_settings(app, tmp_path):
     app.expect("Playback")
     app.send(tab("settings"))
     app.expect("Force sample rate")
-    app.send("\x1bOB" * (pc.KEYS_ROW + 1))  # Devices · show hidden, the second Keys row
+    app.send("\x1bOB\r" + "\x1bOB" * (pc.KEYS_ROW + 1))  # Preferences, then Devices · show hidden, the second Keys row
     app.expect("Devices · show hidden")
     app.send("\r")
     app.expect("press a key")

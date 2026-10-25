@@ -185,7 +185,7 @@ def studio_dump():
 
 
 def frame(st, height=H, **kw):
-    lines, _ = pc.render_screen(st, CUR, kw.pop("block", None), kw.pop("presets", PRESETS), W, height, **kw)
+    lines, _ = pc.render_screen(st, CUR, kw.pop("block", None), W, height, **kw)
     return lines
 
 
@@ -195,8 +195,6 @@ def prompt(lines, question):
 
 
 CUR = pc.parse_settings((FIX / "settings.txt").read_text())
-PRESETS = [{"name": "tracking", "label": "Tracking (low latency)", "values": {"clock.force-quantum": 128}},
-           {"name": "mixing", "label": "Mixing", "values": {"clock.force-quantum": 1024}}]
 DUMP = studio_dump()
 INV = pi.inventory(DUMP)
 STREAMS = pi.streams(DUMP)
@@ -262,7 +260,7 @@ def shots():
                                    mixer=m, media=MEDIA)
     yield "mixer-bar-off", frame(pc.UIState(tab="mixer", volume_bar=False, mix_cursor=mix_at(m, "GCS-8 CH USB")),
                                  mixer=m, media=MEDIA)
-    st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH 2", "recording")), "enter", CUR, [], mixer=m)
+    st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH 2", "recording")), "enter", CUR, mixer=m)
     yield "mixer-menu", frame(st, mixer=m, media=MEDIA)
     st.mix_menu = None
     yield "mixer-rename", prompt(frame(st, mixer=m, media=MEDIA), "new name for GCS-8 CH 2 (empty restores the default): Mic")
@@ -272,7 +270,7 @@ def shots():
     st = pc.focus_device(pc.UIState(tab="devices", dev_focus=("card", BUS_INV.find_card("GCS-8").id)), d)
     yield "devices-profile", frame(st, devices=d, media=MEDIA)
     st = pc.UIState(tab="devices", dev_cursor=dev_at(d, "row", "SYSTEM Audio/Duplex sink"))
-    st, _ = pc.handle_key(st, "enter", CUR, [], devices=d)
+    st, _ = pc.handle_key(st, "enter", CUR, devices=d)
     yield "devices-bus", frame(st, devices=d, media=MEDIA)
     add = next(n for n, (k, _) in enumerate(pc.dev_selectable(d, pc.UIState(tab="devices"))) if k == "addbus")
     yield "devices-add-bus", prompt(frame(pc.UIState(tab="devices", dev_cursor=add), devices=d, media=MEDIA),
@@ -291,15 +289,18 @@ def shots():
     yield "patch-ports", frame(st, patch=g, media=MEDIA)
 
     # Settings scrolls to the cursor; these are taken on a taller terminal (40 rows) to show more of it.
-    yield "settings", frame(pc.UIState(tab="settings", cursor=1, pending={"clock.min-quantum": 64}), height=40,
+    yield "settings", frame(pc.UIState(tab="settings", settings_focus="pane", cursor=1,
+                                       pending={"clock.min-quantum": 64}), height=40,
                             media=MEDIA, realtime=realtime_status(False))
-    yield "settings-realtime-ok", frame(pc.UIState(tab="settings", cursor=pc.BAR_ROW), height=40, media=MEDIA,
+    yield "settings-realtime-ok", frame(pc.UIState(tab="settings", settings_focus="pane", cursor=pc.CLOCK_BUTTONS_ROW,
+                                                   clock_button=1), height=40, media=MEDIA,
                                         realtime=realtime_status(True))
-    yield "settings-presets", frame(pc.UIState(tab="settings", cursor=pc.PRESETS_ROW), height=40, media=MEDIA,
-                                    realtime=realtime_status(True))
-    yield "settings-keys", frame(pc.UIState(tab="settings", cursor=pc.KEYS_ROW + 1,
+    yield "settings-preferences", frame(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane",
+                                                   cursor=pc.BAR_ROW), height=40, media=MEDIA)
+    yield "settings-keys", frame(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane",
+                                            cursor=pc.KEYS_ROW + 1,
                                             keys={"devices.show_hidden": "z", "mixer.meters": None}),
-                                 height=40, media=MEDIA, realtime=realtime_status(True))
+                                 height=40, media=MEDIA)
     yield "about-pipecraft", frame(pc.UIState(tab="about", theme="pipecraft"), media=MEDIA,
                                    about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"})
     yield "top", frame(pc.UIState(tab="top"), block=block, media=MEDIA)
