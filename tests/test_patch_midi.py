@@ -100,3 +100,10 @@ def test_find_by_alias_and_by_media(g):
     assert g.find_source("REAPER").media == "audio"  # its node.name; the MIDI ports go by alias
     assert g.find_source("REAPER:MIDI Output 5").media == "midi"
     assert g.find_source("1000") is None  # the bridge's node id names no one device
+
+
+def test_no_slot_menu_between_audio_and_midi(g):
+    nano = one(midi(g.sources), "nanoKONTROL2 _ CTRL")
+    many_inputs = pp.Endpoint(1, False, "REAPER", "REAPER", "app",
+                              tuple(pp.Port(900 + k, 1, f"in{k}", f"in{k}", "input") for k in range(8)))
+    assert pp.slots(nano, many_inputs) is None

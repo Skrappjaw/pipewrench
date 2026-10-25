@@ -1689,14 +1689,28 @@ def patch_sources(g, st):
     return [s for s in g.sources if st.patch_monitors or not s.monitor or g.targets(s)]
 
 
-def _with_monitor_head(srcs, indices):
-    """The source indices to draw, with "head" before the first monitor (monitors sort last)."""
+def _section(e):
+    return "MIDI" if e.media == "midi" else "Monitors" if e.monitor else None
+
+
+def _with_heads(items, indices):
+    """The indices to draw, with a heading (a str) before the first monitor and the first MIDI endpoint;
+    both sort after the rest, monitors first. A window that opens inside a section starts with its heading."""
     out = []
     for i in indices:
-        if srcs[i].monitor and (not out or out[-1] == "head" or not srcs[out[-1]].monitor):
-            out.append("head")
+        sec = _section(items[i])
+        prev = next((x for x in reversed(out) if not isinstance(x, str)), None)
+        if sec and (prev is None or _section(items[prev]) != sec):
+            out.append(sec)
         out.append(i)
     return out
+
+
+def _n_heads(items):
+    return len({_section(e) for e in items} - {None})
+
+
+MIXED = "MIDI connects only to MIDI"
 
 
 def _patch_pair(g, st):
@@ -1710,6 +1724,9 @@ def _patch_pair(g, st):
 
 
 def _toggle(g, st, s, d):
+    if s.media != d.media:
+        st.message = st.failed = f"{s.label} → {d.label}: {MIXED}"
+        return st, []
     cmds = pp.toggle_cmds(g, s, d)
     if not cmds:
         st.message = st.failed = f"nothing to link between {s.label} and {d.label}"
@@ -1764,6 +1781,8 @@ def _key_patch(st, key, g):
             st.patch_port_row = max(0, min(len(s.ports) - 1, st.patch_port_row + (1 if key == "down" else -1)))
         elif key in ("left", "right"):
             st.patch_port_col = max(0, min(len(d.ports) - 1, st.patch_port_col + (1 if key == "right" else -1)))
+        elif key == "enter" and s.media != d.media:
+            st.message = st.failed = f"{s.label} → {d.label}: {MIXED}"
         elif key == "enter" and s.ports and d.ports:
             a, b = s.ports[st.patch_port_row], d.ports[st.patch_port_col]
             return st, [("patch_cmds", [pp.port_toggle_cmd(g, a, b)])]
@@ -1809,6 +1828,8 @@ def _enter_dests(g, st, s):
     targets = g.targets(s)
     if targets and g.dests[st.patch_dst] not in targets:
         st.patch_dst = g.dests.index(targets[0])
+    elif not targets and g.dests[st.patch_dst].media != s.media:
+        st.patch_dst = next((j for j, d in enumerate(g.dests) if d.media == s.media), st.patch_dst)
 
 
 def _window(n, cursor, room):
@@ -1818,6 +1839,8 @@ def _window(n, cursor, room):
 
 def _pair_status(g, s, d):
     state = g.state(s, d)
+    if state == "n/a":
+        return f"  {s.label} → {d.label}: {MIXED}"
     if state == "none":
         return f"  {s.label} → {d.label}: not connected"
     linked = ", ".join(f"{a.channel}→{b.channel}" for a, b, on in pp.port_pairs(g, s, d) if on)
@@ -1845,7 +1868,7 @@ def _render_patch(cv, st, g, body_h):
         cv.add(f"  {s.label} → {', '.join(x.label for x in targets)}" if targets
                else f"  {s.label}: not connected", "alert" if targets else "dim")
     else:
-        cv.add(_pair_status(g, s, d), "alert" if g.state(s, d) != "none" else "dim")
+        cv.add(_pair_status(g, s, d), "alert" if g.state(s, d) not in ("none", "n/a") else "dim")
 
 
 def _slot_menu(g, st, s, d, avail):
@@ -1875,10 +1898,13 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
     cv.add(f"  {'Sources':<{half - 2}}│ Destinations", ("title", [(2, 9, "head_src"), (half + 2, half + 14, "head_dst")]))
     on_dst = st.patch_side == "dst"
     menu = _slot_menu(g, st, s, g.dests[st.patch_dst], cv.width - half - 2) if on_dst else []
-    has_mon = any(s_.monitor for s_ in srcs)
-    left = _with_monitor_head(srcs, list(_window(len(srcs), st.patch_src, room - 1 - has_mon)))
+    left = _with_heads(srcs, list(_window(len(srcs), st.patch_src, room - 1 - _n_heads(srcs))))
     right = []  # (text, highlighted, hit target); the slot menu sits under its destination
-    for j in _window(len(g.dests), st.patch_dst, max(1, room - 1 - len(menu))):
+    for j in _with_heads(g.dests, list(_window(len(g.dests), st.patch_dst,
+                                               max(1, room - 1 - len(menu) - _n_heads(g.dests))))):
+        if isinstance(j, str):
+            right.append((f"  {j}", "title", None, None))
+            continue
         mark = "> " if j == st.patch_dst and on_dst else "  "
         state = g.state(s, g.dests[j])
         rt = f"{mark}{_STATE_MARK[state].replace('·', ' ')} {_fit(g.dests[j].label, half - 4)}"
@@ -1888,8 +1914,8 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
             right += menu
     for n in range(max(len(left), len(right))):
         lt, spans = "", []
-        if n < len(left) and left[n] == "head":
-            lt, spans = "  Monitors", [(0, half, "title")]
+        if n < len(left) and isinstance(left[n], str):
+            lt, spans = f"  {left[n]}", [(0, half, "title")]
         elif n < len(left):
             i = left[n]
             count = len(g.targets(srcs[i]))
@@ -1906,7 +1932,7 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
         if dot:
             spans.append((half + 2 + 2, half + 2 + 3, f"{dot}@{lit}" if lit in ("bar_dst", "anchor_dst") else dot))
         row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), ("normal", spans))
-        if n < len(left) and left[n] != "head":
+        if n < len(left) and not isinstance(left[n], str):
             cv.hit(row, 0, half, ("patch_src", left[n]))
         if target:
             cv.hit(row, half + 1, cv.width, target)
@@ -1918,12 +1944,11 @@ def _render_patch_grid(cv, st, g, srcs, s, d, room):
     cols = list(_window(len(g.dests), st.patch_dst, cols_fit))
     key_rows = -(-len(cols) // max(1, (cv.width - 2) // 35))
     menu = _slot_menu(g, st, s, d, cv.width - 4)
-    has_mon = any(s_.monitor for s_ in srcs)
-    rows = list(_window(len(srcs), st.patch_src, max(1, room - 2 - key_rows - len(menu) - has_mon)))
+    rows = list(_window(len(srcs), st.patch_src, max(1, room - 2 - key_rows - len(menu) - _n_heads(srcs))))
     cv.add(" " * (label_w + 2) + "".join(f"{j + 1:>3}" for j in cols), "title")
-    for i in _with_monitor_head(srcs, rows):
-        if i == "head":
-            cv.add("  Monitors", "title")
+    for i in _with_heads(srcs, rows):
+        if isinstance(i, str):
+            cv.add(f"  {i}", "title")
             continue
         cells = ""
         for j in cols:

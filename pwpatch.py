@@ -57,7 +57,7 @@ def slots(s, d):
     """Where a source can land on a destination whose inputs have no channel names (REAPER's in1…in8,
     AUXn): aligned runs of as many inputs as the source has outputs. None when there's no choice."""
     k, n = len(s.ports), len(d.ports)
-    if not k or n <= k or any(p.channel in _CHANNELS for p in d.ports):
+    if s.media != d.media or not k or n <= k or any(p.channel in _CHANNELS for p in d.ports):
         return None
     return [d.ports[i:i + k] for i in range(0, n - k + 1, k)]
 
