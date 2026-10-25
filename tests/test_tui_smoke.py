@@ -99,7 +99,6 @@ def test_save_preset_via_prompt(app, tmp_path):
     app.expect("Playback")  # pwctl opens on the Mixer
     app.send(tab("settings"))
     app.expect("Force sample rate")
-    app.expect("no presets")  # Presets sit inside Settings
     app.send("s")
     app.expect("preset name")
     app.send("tracking\r")

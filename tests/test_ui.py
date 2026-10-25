@@ -105,7 +105,7 @@ def test_top_render_waiting_for_data():
 
 
 def test_presets_render_lists_labels():
-    lines, _ = screen(UIState(tab="settings"), height=40)
+    lines, _ = screen(UIState(tab="settings"), height=80)
     body = "\n".join(t for t, _ in lines)
     assert "Clock" in body and "Display" in body and "Presets" in body
     assert body.index("Clock") < body.index("Display") < body.index("Presets")
@@ -113,8 +113,20 @@ def test_presets_render_lists_labels():
 
 
 def test_presets_render_empty_hint():
-    lines, _ = pc.render_screen(UIState(tab="settings"), CUR, None, [], 80, 30)
+    lines, _ = pc.render_screen(UIState(tab="settings", cursor=pc.RESET_KEYS_ROW), CUR, None, [], 80, 30)
     assert any("no presets" in t for t, _ in lines)
+
+
+def test_settings_scrolls_to_the_cursor():
+    top = "\n".join(t for t, _ in screen(UIState(tab="settings"), height=30)[0])
+    assert "Clock" in top and "Low-latency tracking" not in top
+    st = UIState(tab="settings", cursor=pc.PRESETS_ROW + 1)
+    lines, hits = screen(st, height=30)
+    body = "\n".join(t for t, _ in lines)
+    assert "Mixing" in body and "  Clock" not in body
+    assert len(lines) == 30
+    row, _, _ = hit_for(hits, ("preset", 1))
+    assert "Mixing" in lines[row][0]
 
 
 # --- 7. keys -----------------------------------------------------------------
@@ -122,7 +134,7 @@ def test_presets_render_empty_hint():
 def test_up_down_moves_cursor_and_clamps():
     st, _ = key(UIState(), "up")
     assert st.cursor == 0
-    st, _ = key(st, *["down"] * 20)
+    st, _ = key(st, *["down"] * 60)
     assert st.cursor == pc.PRESETS_ROW + len(PRESETS) - 1  # clock rows, Display, then the presets
 
 
@@ -323,7 +335,7 @@ def test_click_outside_targets_does_nothing():
 
 
 def test_presets_mouse():
-    st = UIState(tab="settings")
+    st = UIState(tab="settings", cursor=pc.PRESETS_ROW)
     _, hits = screen(st, height=40)
     st, actions = click(st, hits, ("preset", 1))
     assert st.cursor == pc.PRESETS_ROW + 1 and actions == []
@@ -443,7 +455,7 @@ def test_meter_frame_rate_steps_and_saves():
     assert st.meter_fps == 60  # stops at the top
     st, _ = key(st, *["left"] * 8)
     assert st.meter_fps == 5
-    text = "\n".join(t for t, _ in screen(st, height=40)[0])
+    text = "\n".join(t for t, _ in screen(st, height=80)[0])
     assert "Meter frame rate" in text and "5 fps" in text
     assert text.index("Theme") < text.index("Meter frame rate") < text.index("Presets")
 
@@ -455,7 +467,7 @@ def test_meter_fall_steps_and_saves():
     st, _ = key(st, *["left"] * 6)
     assert st.meter_fall == 10
     assert pc.ui_prefs(st) == {"theme": "dark", "meter_fps": 10, "meter_fall": 10, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
-    text = "\n".join(t for t, _ in screen(st, height=40)[0])
+    text = "\n".join(t for t, _ in screen(st, height=80)[0])
     assert "Meter fall" in text and "10 dB/s" in text
     assert text.index("Meter frame rate") < text.index("Meter fall") < text.index("Peak hold") < text.index("Presets")
 

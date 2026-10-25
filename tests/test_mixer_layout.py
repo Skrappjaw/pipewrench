@@ -134,5 +134,5 @@ def test_load_ui_defaults_bar_on(tmp_path):
     assert pc.load_ui(tmp_path / "ui.json")["volume_bar"] is False
 
 
-def test_presets_row_follows_the_bar_row():
-    assert pc.PRESETS_ROW == pc.BAR_ROW + 1
+def test_keys_then_presets_follow_the_bar_row():
+    assert pc.KEYS_ROW == pc.BAR_ROW + 1 and pc.PRESETS_ROW == pc.RESET_KEYS_ROW + 1

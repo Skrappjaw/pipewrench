@@ -887,7 +887,8 @@ class Tui:
         c = self.curses
         named = {c.KEY_UP: "up", c.KEY_DOWN: "down", c.KEY_LEFT: "left", c.KEY_RIGHT: "right",
                  c.KEY_PPAGE: "pgup", c.KEY_NPAGE: "pgdn", c.KEY_ENTER: "enter", 10: "enter", 13: "enter",
-                 27: "esc", 9: "tab"}
+                 27: "esc", 9: "tab", c.KEY_BACKSPACE: "backspace", 127: "backspace", 8: "backspace",
+                 c.KEY_DC: "delete"}
         if ch in named:
             return named[ch]
         if 32 <= ch < 127:

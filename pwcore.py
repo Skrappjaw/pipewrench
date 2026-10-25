@@ -427,6 +427,7 @@ class UIState:
     peak_hold: float = 1.5       # seconds; 0 is off
     volume_bar: bool = True      # the bar under each Mixer channel; off leaves just the %
     keys: dict = field(default_factory=dict)  # key binding overrides {action id: key or None} (pwkeys)
+    key_capture: str = None      # Settings → Keys: the action id waiting for its new key
 
 
 # The now-playing bar's keys work on every tab; no tab uses these characters. * - + sit on the numpad.
@@ -442,10 +443,15 @@ def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
     devices is the Devices tab's view: {"model", "status", "buses", "dirty"}, or None until loaded.
     """
     st = dataclasses.replace(st, pending=dict(st.pending))
+    if st.key_capture:
+        return _capture_key(st, key)
     if st.confirm:
         if key == "y":
             kind = st.confirm
             st.confirm = None
+            if kind == ("reset_keys",):
+                st.keys, st.message = {}, "keys reset to the defaults"
+                return st, [("save_ui",)]
             # confirm tuples name their action, except the two v1 ones
             return st, [{"restart": ("restart_wireplumber",), "restart_labels": ("restart_wireplumber",),
                          "delete": ("delete_preset", *kind[1:])}.get(kind[0], kind)]
@@ -483,7 +489,33 @@ FPS_ROW = THEME_ROW + 1
 FALL_ROW = FPS_ROW + 1
 HOLD_ROW = FALL_ROW + 1
 BAR_ROW = HOLD_ROW + 1
-PRESETS_ROW = BAR_ROW + 1  # the first preset
+KEYS_ROW = BAR_ROW + 1     # one row per pwkeys action
+RESET_KEYS_ROW = KEYS_ROW + len(pk.ACTIONS)
+PRESETS_ROW = RESET_KEYS_ROW + 1  # the first preset
+
+
+def _bind(st, action_id, new):
+    b = pk.bindings(st.keys)
+    b[action_id] = new
+    st.keys = pk.overrides(b)
+    a = pk.BY_ID[action_id]
+    st.message = f"{pk.label(a)}: {new if new else 'no key'}"
+    return st, [("save_ui",)]
+
+
+def _capture_key(st, key):
+    """The key pressed after Enter on a Keys row. Global and taken keys are refused, not bound."""
+    action_id, st.key_capture = st.key_capture, None
+    if key == "esc":
+        st.message = "cancelled"
+        return st, []
+    if key in ("backspace", "delete"):
+        return _bind(st, action_id, None)
+    why = pk.refuse(pk.bindings(st.keys), action_id, key)
+    if why:
+        st.message = st.failed = why
+        return st, []
+    return _bind(st, action_id, key)
 
 
 def _key_settings(st, key, current, presets):
@@ -491,6 +523,17 @@ def _key_settings(st, key, current, presets):
     st.cursor = max(0, min(last, st.cursor))
     if key == "s":
         return st, [("prompt_save",)]
+    if KEYS_ROW <= st.cursor < RESET_KEYS_ROW and key in ("enter", "backspace", "delete", "left", "right"):
+        a = pk.ACTIONS[st.cursor - KEYS_ROW]
+        if key == "enter":
+            st.key_capture = a.id
+            st.message = f"press a key for {pk.label(a)} (Esc cancels, Backspace unbinds)"
+            return st, []
+        return _bind(st, a.id, None) if key in ("backspace", "delete") else (st, [])
+    if st.cursor == RESET_KEYS_ROW and key in ("enter", "left", "right"):
+        if key == "enter":
+            st.confirm = ("reset_keys",)
+        return st, []
     if st.cursor >= PRESETS_ROW and key in ("enter", "e", "d", "left", "right"):
         return _key_preset_row(st, key, presets[st.cursor - PRESETS_ROW]["name"])
     if key in ("left", "right") and st.cursor == BAR_ROW:
@@ -717,6 +760,8 @@ LEGENDS = {
     "presets": [("Enter", "apply"), ("↑↓", "select"), ("s", "save current"), ("e", "edit label"),
                 ("d", "delete")] + TAB_KEYS,
     "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("h", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
+    "keys": [("Enter", "rebind"), ("↑↓", "select"), ("Bksp", "unbind")] + TAB_KEYS,
+    "keys capture": [("Esc", "cancel"), ("Bksp", "unbind")],
     "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
     "mixer menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
     "patch cols": [("Enter", "connect/disconnect"), ("↑↓", "select"), ("←→", "column"), ("p", "ports"),
@@ -784,6 +829,10 @@ def _legend(st):
         return LEGENDS["devices menu"]
     if st.tab == "mixer" and st.mix_menu:
         return LEGENDS["mixer menu"]
+    if st.tab == "settings" and st.key_capture:
+        return LEGENDS["keys capture"]
+    if st.tab == "settings" and KEYS_ROW <= st.cursor < RESET_KEYS_ROW:
+        return LEGENDS["keys"]
     if st.tab == "settings" and st.cursor >= PRESETS_ROW:
         return LEGENDS["presets"]
     if st.tab == "patch" and st.patch_menu:
@@ -817,6 +866,16 @@ class _Canvas:
             self.hits.append((row, c0, min(c1, self.width), target))
 
 
+def _paste_window(cv, sub, room):
+    """Copy the part of sub that fits in room lines, scrolled so the cursor row (the selected one) shows."""
+    cursor = next((n for n, (_, style) in enumerate(sub.lines) if style == "selected"), 0)
+    rows = _window(len(sub.lines), min(len(sub.lines) - 1, cursor + 3), max(1, room))  # and a little below it
+    top = len(cv.lines)
+    for n in rows:
+        cv.lines.append(sub.lines[n])
+    cv.hits += [(top + r - rows.start, c0, c1, t) for r, c0, c1, t in sub.hits if r in rows]
+
+
 def _confirm_question(confirm, devices=None):
     kind, arg = confirm[0], (confirm[1] if len(confirm) > 1 else None)
     if kind == "dev_profile":
@@ -825,7 +884,8 @@ def _confirm_question(confirm, devices=None):
     return {"restart": "Restart WirePlumber?",
             "restart_labels": "Restart WirePlumber now to show it? Apps like Discord may lose their audio.",
             "delete": f"Delete preset {arg!r}?",
-            "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now."}[kind]
+            "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now.",
+            "reset_keys": "Reset every key to its default?"}[kind]
 
 
 def render_screen(st, current, block, presets, width, height, devices=None, patch=None, mixer=None, media=None,
@@ -851,9 +911,12 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
         _render_patch(cv, dataclasses.replace(st), patch, body_h)
     elif st.tab == "about":
         _render_about(cv, about)
+    elif st.tab == "settings":
+        sub = _Canvas(width)
+        _render_settings(sub, st, current, block, presets, body_h, realtime)
+        _paste_window(cv, sub, body_h)
     else:
-        {"settings": _render_settings, "top": _render_top}[st.tab](
-            cv, st, current, block, presets, body_h, realtime)
+        _render_top(cv, st, current, block, presets, body_h, realtime)
     body_end = height - 2 - len(footer)
     cv.lines = cv.lines[:body_end]
     cv.hits = [h for h in cv.hits if h[0] < body_end]
@@ -947,8 +1010,28 @@ def _render_settings(cv, st, current, block, presets, body_h, realtime=None):
                  f"a peak marker hangs, then falls {PEAK_FALL} dB/s")
     _display_row(cv, st, BAR_ROW, "Volume bar", "on" if st.volume_bar else "off", "the bar under each Mixer channel")
     cv.add("")
+    _render_keys(cv, st)
+    cv.add("")
     cv.add("  Presets", "title")
     _render_presets(cv, st, presets)
+
+
+def _render_keys(cv, st):
+    """One row per shortcut: its key, * when changed, and why it can't fire when it clashes."""
+    cv.add("  Keys", "title")
+    b = pk.bindings(st.keys)
+    bad = pk.clashes(b)
+    for n, a in enumerate(pk.ACTIONS):
+        idx = KEYS_ROW + n
+        k = "…" if st.key_capture == a.id else (b[a.id] or "—")
+        mark = "*" if b[a.id] != a.default else " "
+        note = bad.get(a.id) or ("press a key" if st.key_capture == a.id else "")
+        line = f"{'> ' if st.cursor == idx else '  '}{pk.label(a):<34} {k:^5} {mark} {note}".rstrip()
+        row = cv.add(line, "selected" if st.cursor == idx else "alert" if a.id in bad else "normal")
+        cv.hit(row, 0, len(line), ("setting", idx))
+    line = f"{'> ' if st.cursor == RESET_KEYS_ROW else '  '}Reset all keys"
+    row = cv.add(line, "selected" if st.cursor == RESET_KEYS_ROW else "normal")
+    cv.hit(row, 0, len(line), ("setting", RESET_KEYS_ROW))
 
 
 def _render_realtime(cv, status):
