@@ -229,13 +229,25 @@ def _sort(rows):
 _INTERPRETERS = re.compile(r"^(python[\d.]*|node|java|sh|bash|perl|ruby|wine.*)$")
 
 
+# media.name values that say nothing about the stream (Brave "Playback", Discord "recStream").
+_GENERIC_MEDIA = re.compile(r"(?i)^((alsa )?(playback|capture|record(ing)?|output|input|audio)( stream)?"
+                            r"|(play|rec|audio) ?stream|stream)$")
+
+
 def display_name(props):
     """What to call a node: an app by its process when that's clearer than the name its audio library
-    gives (Discord rather than 'WEBRTC VoiceEngine'), else its description."""
+    gives (Discord rather than 'WEBRTC VoiceEngine'), else its description. An app stream adds its own
+    media.name when that says something, so OBS's four inputs read OBS · Desktop Audio, OBS · Mic/Aux…"""
     app, binary = props.get("application.name"), props.get("application.process.binary")
     if app and binary and binary.lower() not in app.lower() and not _INTERPRETERS.match(binary):
-        return binary
-    return app or props.get("node.description") or props.get("node.nick") or props.get("node.name") or "?"
+        name = binary
+    else:
+        name = app or props.get("node.description") or props.get("node.nick") or props.get("node.name") or "?"
+    media = (props.get("media.name") or "").strip()
+    if str(props.get("media.class", "")).startswith("Stream/") and media and not _GENERIC_MEDIA.match(media) \
+            and media.lower() not in (name.lower(), str(app).lower()):
+        return f"{name} · {media}"
+    return name
 
 
 _peer_name = display_name

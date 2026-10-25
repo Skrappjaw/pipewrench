@@ -155,7 +155,11 @@ How it works:
 - **Connecting** links matching channels (FL→FL, FR→FR); a mono source feeds both channels.
 - **Ports:** `p` opens a port matrix for the selected pair: source ports down the side,
   destination ports across the top. Use it for fine patches, e.g. CH 2's FL into REAPER in3.
-- **Monitors:** outputs' monitors are hidden until `m`.
+- **Monitors** sit last, under their own **Monitors** heading. One that something records from (OBS's
+  Desktop Audio records an output's monitor) always shows; `m` adds the rest.
+- **App streams** carry their own name when it says something: OBS's inputs read `OBS · Desktop Audio`,
+  `OBS · Mic/Aux`. Generic names (Brave's "Playback", Discord's "recStream") are left off. This applies
+  on every tab and in `pwctl patch` names.
 - **JACK apps** (e.g. REAPER via `pw-jack`) appear as apps. Their ports are named `out1`, `in1`…, so
   they pair by position (out1/out2 → FL/FR, FL/FR → in1/in2); `p` reaches the other inputs.
 

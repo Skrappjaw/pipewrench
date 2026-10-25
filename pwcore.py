@@ -1398,7 +1398,18 @@ _STATE_MARK = {"full": "●", "partial": "◐", "none": "·"}
 
 
 def patch_sources(g, st):
-    return [s for s in g.sources if st.patch_monitors or not s.monitor]
+    """Monitors only with m, except one something records from (OBS's Desktop Audio): a live link never hides."""
+    return [s for s in g.sources if st.patch_monitors or not s.monitor or g.targets(s)]
+
+
+def _with_monitor_head(srcs, indices):
+    """The source indices to draw, with "head" before the first monitor (monitors sort last)."""
+    out = []
+    for i in indices:
+        if srcs[i].monitor and (not out or out[-1] == "head" or not srcs[out[-1]].monitor):
+            out.append("head")
+        out.append(i)
+    return out
 
 
 def _patch_pair(g, st):
@@ -1577,7 +1588,8 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
     cv.add(f"  {'Sources':<{half - 2}}│ Destinations", "title")
     on_dst = st.patch_side == "dst"
     menu = _slot_menu(g, st, s, g.dests[st.patch_dst], cv.width - half - 2) if on_dst else []
-    left = list(_window(len(srcs), st.patch_src, room - 1))
+    has_mon = any(s_.monitor for s_ in srcs)
+    left = _with_monitor_head(srcs, list(_window(len(srcs), st.patch_src, room - 1 - has_mon)))
     right = []  # (text, highlighted, hit target); the slot menu sits under its destination
     for j in _window(len(g.dests), st.patch_dst, max(1, room - 1 - len(menu))):
         mark = "> " if j == st.patch_dst and on_dst else "  "
@@ -1588,7 +1600,9 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
             right += menu
     for n in range(max(len(left), len(right))):
         lt, spans = "", []
-        if n < len(left):
+        if n < len(left) and left[n] == "head":
+            lt, spans = "  Monitors", [(0, half, "title")]
+        elif n < len(left):
             i = left[n]
             count = len(g.targets(srcs[i]))
             mark = "> " if i == st.patch_src and not on_dst else "* " if i == st.patch_src else "  "
@@ -1599,7 +1613,7 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
         if lit:
             spans.append((half + 2, cv.width if target[0] == "patch_dst" else half + 2 + len(rt), lit))
         row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), ("normal", spans))
-        if n < len(left):
+        if n < len(left) and left[n] != "head":
             cv.hit(row, 0, half, ("patch_src", left[n]))
         if target:
             cv.hit(row, half + 1, cv.width, target)
@@ -1611,9 +1625,13 @@ def _render_patch_grid(cv, st, g, srcs, s, d, room):
     cols = list(_window(len(g.dests), st.patch_dst, cols_fit))
     key_rows = -(-len(cols) // max(1, (cv.width - 2) // 35))
     menu = _slot_menu(g, st, s, d, cv.width - 4)
-    rows = list(_window(len(srcs), st.patch_src, max(1, room - 2 - key_rows - len(menu))))
+    has_mon = any(s_.monitor for s_ in srcs)
+    rows = list(_window(len(srcs), st.patch_src, max(1, room - 2 - key_rows - len(menu) - has_mon)))
     cv.add(" " * (label_w + 2) + "".join(f"{j + 1:>3}" for j in cols), "title")
-    for i in rows:
+    for i in _with_monitor_head(srcs, rows):
+        if i == "head":
+            cv.add("  Monitors", "title")
+            continue
         cells = ""
         for j in cols:
             mark = _STATE_MARK[g.state(srcs[i], g.dests[j])]

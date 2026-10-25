@@ -189,7 +189,7 @@ def _link(lid, out_id, in_id, state="active"):
 def test_live_links_name_apps_on_each_side():
     inv = pi.inventory(links_dump())
     assert inv.find(CH_USB_OUT).inputs == ("Brave",)          # Brave plays into CH USB
-    assert inv.find(CH2_IN).outputs == ("cinnamon",)           # the sound applet meters CH 2
+    assert inv.find(CH2_IN).outputs == ("cinnamon · Peak detect",)           # the sound applet meters CH 2
     assert inv.find(CH2_IN).inputs == () and inv.find(CH_USB_OUT).outputs == ()
 
 
@@ -213,7 +213,7 @@ def test_monitor_readers_and_device_to_device_links():
           _link(904, 900, 901)]    # OBS records the bus
     inv = pi.inventory(d)
     assert inv.find(CH_USB_OUT).outputs == ("OBS",)
-    assert inv.find(CH2_IN).outputs == ("cinnamon", "OBS bus")  # case-insensitive order
+    assert inv.find(CH2_IN).outputs == ("cinnamon · Peak detect", "OBS bus")  # case-insensitive order
     assert inv.find("OBS_BUS").inputs == ("GCS-8 CH 2",) and inv.find("OBS_BUS").outputs == ("OBS",)
 
 
@@ -231,7 +231,7 @@ def test_connections_text_per_direction():
     d += [_node(901, "Stream/Input/Audio", **{"application.name": "OBS"}), _link(902, sink, 901)]
     inv = pi.inventory(d)
     assert pi.connections(inv.find(CH_USB_OUT)) == "← Brave  → OBS (monitor)"
-    assert pi.connections(inv.find(CH2_IN)) == "→ cinnamon"
+    assert pi.connections(inv.find(CH2_IN)) == "→ cinnamon · Peak detect"
     assert pi.connections(inv.find("alsa_output.usb-BOSS_GCS-8-01.HiFi__gcs8_stereo_out_GCS8_0_2_3__sink")) == ""
 
 
