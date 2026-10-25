@@ -14,3 +14,7 @@ venv/
 
 # atomic-write temp files
 *.tmp
+
+# Internal notes: plans, mockups, handoff and developer reference. Kept in the vault, never pushed.
+notes/
+HANDOFF.md

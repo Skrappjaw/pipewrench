@@ -22,7 +22,7 @@ import pwrealtime as prt
 READ_CMD = ["pw-metadata", "-n", "settings", "0"]
 RESTART_CMD = ["systemctl", "--user", "restart", "wireplumber"]
 
-# Colour roles (docs/ui-conventions.md) as (fg, bg, attr) per theme; None is the screen's own colour.
+# Colour roles (notes/ui-conventions.md) as (fg, bg, attr) per theme; None is the screen's own colour.
 # One bar on screen is ever "selected": that's where the keys go. "anchor" is selected but not active.
 # Never bold on black text: terminals draw bold black as grey.
 THEMES = {
@@ -1063,7 +1063,7 @@ def _display_row(cv, st, idx, label, value, note):
 
 # --- About ---------------------------------------------------------------------
 
-# The wordmarks from docs/about-art.md (TAAG: ANSI Compact, Pagga). The widest that fits is drawn.
+# The wordmarks from notes/about-art.md (TAAG: ANSI Compact, Pagga). The widest that fits is drawn.
 LOGO_ANSI = [
     "█████▄ ▄▄ ▄▄▄▄  ▄▄▄▄▄ ██     ██ ▄▄▄▄  ▄▄▄▄▄ ▄▄  ▄▄  ▄▄▄▄ ▄▄ ▄▄",
     "██▄▄█▀ ██ ██▄█▀ ██▄▄  ██ ▄█▄ ██ ██▄█▄ ██▄▄  ███▄██ ██▀▀▀ ██▄██",
@@ -1223,7 +1223,7 @@ def _render_devices(cv, st, devices, body_h):
         cv.add("  generated files match devices.json", "dim")
 
 
-# --- Mixer tab: everyday volume, mute and defaults (docs/mixer-plan.md) --------------------------
+# --- Mixer tab: everyday volume, mute and defaults (notes/mixer-plan.md) --------------------------
 
 def mixer_view(inv, config, streams):
     """What the Mixer lists: devices (not hidden, not monitors) and app streams, by direction."""

@@ -1,4 +1,4 @@
-"""The About tab: the PipeWrench wordmark (docs/about-art.md) over a short info block. The font follows the
+"""The About tab: the PipeWrench wordmark (notes/about-art.md) over a short info block. The font follows the
 width: ANSI Compact where it fits, Pagga where it's narrower, the letterspaced line below that."""
 import pytest
 

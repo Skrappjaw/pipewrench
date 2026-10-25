@@ -4,8 +4,8 @@ PipeWrench is a terminal control panel for PipeWire: volume and mute, the defaul
 profiles, virtual buses, a patch bay, the clock and buffer settings, and a realtime check. It changes
 PipeWire live and never restarts anything unless you ask.
 
-Start it with `pwrench` (or `pipewrench`). The command line, files and code are described in
-[`README.md`](../README.md); this guide is about using the screen.
+Start it with `pwrench`. The command line and where files live are in [`README.md`](../README.md); this
+guide is about using the screen.
 
 > The pictures are drawn from the test data by `tools/screenshots.py`, so device names are from the
 > author's BOSS GCS-8 setup. Yours will show your own devices.

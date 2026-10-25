@@ -584,7 +584,7 @@ _NUMPAD = {b"kpMUL": "*", b"kpSUB": "-", b"kpADD": "+", b"kpDOT": "."}
 
 class Meters:
     """Live peak levels for Mixer rows: one pw-record per target, each read on its own thread.
-    Started only while the Mixer is open; stop() ends every one (docs/mixer-plan.md)."""
+    Started only while the Mixer is open; stop() ends every one (notes/mixer-plan.md)."""
 
     def __init__(self):
         self.procs, self.levels, self.lock = {}, {}, threading.Lock()  # key -> (level, when, peak, peak_at)

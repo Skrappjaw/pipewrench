@@ -1,6 +1,6 @@
 """Pure logic for the Patch tab: sources, destinations and their ports from a pw-dump, connection
 state per stereo pair, and the pw-link commands that connect or disconnect them. Runtime links only;
-saved patch sets belong to scenes. No curses and no subprocess calls here. Plan: docs/patchbay-plan.md.
+saved patch sets belong to scenes. No curses and no subprocess calls here. Plan: notes/patchbay-plan.md.
 """
 import re
 from dataclasses import dataclass

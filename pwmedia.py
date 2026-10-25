@@ -1,5 +1,5 @@
 """Pure logic for the now-playing bar: media players over MPRIS (D-Bus), through busctl's JSON output.
-No curses and no subprocess calls here; callers pass a runner. Plan: docs/media-bar-plan.md.
+No curses and no subprocess calls here; callers pass a runner. Plan: notes/media-bar-plan.md.
 """
 import json
 from dataclasses import dataclass
