@@ -71,15 +71,17 @@ THEMES = {
     # Light: a clean test chamber, white panels and grey trim.
     "pipeos-lite": {"screen": ("#2b2f33", "#f2f4f5", ""),
                      "normal": (None, None, ""), "dim": ("#8a9399", None, ""),
-                     "selected": ("#ffffff", "#4f5b63", ""), "anchor": ("#2b2f33", "#d5dadd", ""),
-                     "title": ("#1b1e21", None, "bold"),
-                     "ok": ("#2f9e44", None, "bold"), "pending": ("#8a6d00", None, "bold"),
+                     # the cursor, tabs, titles and key chips are portal blue (Skrappjaw, 2026-10-25); ok is ink, not green
+                     "selected": ("#0b2540", "#bcdcff", ""), "anchor": ("#2b2f33", "#e3efff", ""),
+                     "title": ("#0a84ff", None, "bold"),
+                     "ok": ("#1b1e21", None, "bold"), "pending": ("#8a6d00", None, "bold"),
                      "alert": ("#d62828", None, "bold"),
-                     "chip": ("#ffffff", "#2b2f33", ""),
+                     "chip": ("#ffffff", "#0a84ff", ""),
                      "bar_ok": ("#ffffff", "#5b6770", ""), "bar_alert": ("#ffffff", "#ff7a00", ""),
                      "bar_dim": ("#8a9399", "#e1e5e8", ""),
                      "src": ("#0a84ff", None, "bold"), "dst": ("#ff7a00", None, "bold"),
                      "dst_partial": ("#ff7a00", None, ""),
+                     "dir_out": ("#0a84ff", None, ""), "dir_in": ("#ff7a00", None, ""),
                      "bar_src": ("#0b2540", "#bcdcff", ""), "anchor_src": ("#2b2f33", "#e3efff", ""),
                      "bar_dst": ("#3a1f00", "#ffd9b3", ""), "anchor_dst": ("#2b2f33", "#fff0e0", ""),
                      "head_play": ("#0a84ff", None, "bold"), "head_rec": ("#ff7a00", None, "bold"),
@@ -90,15 +92,17 @@ THEMES = {
     # Dark: Portal 2's moody chambers, dark panels with the portals glowing.
     "pipeos-dark": {"screen": ("#c9d1d6", "#14181b", ""),
                     "normal": (None, None, ""), "dim": ("#5f6b73", None, ""),
-                    "selected": ("#e8eef2", "#2f4250", ""), "anchor": ("#c9d1d6", "#222a30", ""),
-                    "title": ("#e8eef2", None, "bold"),
-                    "ok": ("#5fbf6a", None, "bold"), "pending": ("#d8c35a", None, "bold"),
+                    # the cursor, tabs, titles and key chips are portal blue (Skrappjaw, 2026-10-25); ok is white, not green
+                    "selected": ("#ffffff", "#0b4a80", ""), "anchor": ("#c9d1d6", "#16283a", ""),
+                    "title": ("#28a7ff", None, "bold"),
+                    "ok": ("#e8eef2", None, "bold"), "pending": ("#d8c35a", None, "bold"),
                     "alert": ("#e5484d", None, "bold"),
-                    "chip": ("#e8eef2", "#2f4250", ""),
+                    "chip": ("#ffffff", "#0b4a80", ""),
                     "bar_ok": ("#14181b", "#b8c4cc", ""), "bar_alert": ("#14181b", "#ff9a1f", ""),
                     "bar_dim": ("#5f6b73", "#1d2327", ""),
                     "src": ("#28a7ff", None, "bold"), "dst": ("#ff9a1f", None, "bold"),
                     "dst_partial": ("#ff9a1f", None, ""),
+                    "dir_out": ("#28a7ff", None, ""), "dir_in": ("#ff9a1f", None, ""),
                     "bar_src": ("#ffffff", "#0b4a80", ""), "anchor_src": ("#c9d1d6", "#16283a", ""),
                     "bar_dst": ("#ffffff", "#7a3d00", ""), "anchor_dst": ("#c9d1d6", "#3a2410", ""),
                     "head_play": ("#28a7ff", None, "bold"), "head_rec": ("#ff9a1f", None, "bold"),
@@ -145,7 +149,7 @@ for _t in THEMES.values():
         # a dot under a bar keeps its colour on the bar's background (pipeOS); elsewhere the bar covers it
         _t[f"{_dot}@{_bar}"] = (_t[_dot][0], _t[_bar][1], _t[_dot][2]) if _own else _t[_bar]
     for _new, _old in (("head_play", "title"), ("head_rec", "title"), ("head_src", "title"), ("head_dst", "title"),
-                       ("vol", "ok"), ("vol_over", "alert"),
+                       ("vol", "ok"), ("vol_over", "alert"), ("dir_out", "dim"), ("dir_in", "dim"),
                        ("meter_low", "ok"), ("meter_mid", "pending"), ("meter_high", "alert")):
         _t.setdefault(_new, _t[_old])
 THEME_NAMES = list(THEMES)
@@ -934,12 +938,13 @@ class _Canvas:
     def add(self, text, style="normal"):
         """style is a role, or (base role, [(c0, c1, role), ...]) drawn in order over the base."""
         text = text[:self.width]
-        marks = [(n, n + 1, _MARK_ROLE[ch]) for n, ch in enumerate(text) if ch in _MARK_ROLE]
-        if marks and style != "selected":
-            base, spans = style if isinstance(style, tuple) else (style, [])
+        base, spans = style if isinstance(style, tuple) else (style, [])
+        chosen = {a for a, b, _ in spans if b == a + 1}  # a one-cell span over a dot: a status dot, not a connection
+        marks = [(n, n + 1, _MARK_ROLE[ch]) for n, ch in enumerate(text) if ch in _MARK_ROLE and n not in chosen]
+        if marks:
             spans = list(spans)
             for c0, c1, role in marks:  # a dot under a bar keeps its colour on the bar's background
-                under = next((r for a, b, r in reversed(spans) if a <= c0 < b), None)
+                under = next((r for a, b, r in reversed(spans) if a <= c0 < b), base if base in _BARS else None)
                 if under in _BARS:
                     spans.append((c0, c1, f"{role}@{under}"))
             style = (base, marks + spans)
@@ -1166,8 +1171,9 @@ def _render_realtime(cv, status):
     if status == "fixtures":
         cv.add("  not checked (fixtures)", "dim")
         return
-    for label, mark, text in prt.rows(status):
-        cv.add(f"  {label:<20} {mark + ' ' if mark else ''}{text}", "normal" if mark else "dim")
+    for label, mark, text in prt.rows(status):  # the dot is a status (ok or a problem), never a portal colour
+        cv.add(f"  {label:<20} {mark + ' ' if mark else ''}{text}",
+               ("normal", [(23, 24, "ok" if mark == "●" else "pending")]) if mark else "dim")
     for n, line in enumerate(prt.fix(status)):
         head = "  fix: " if n == 0 else "       "
         for k, part in enumerate(textwrap.wrap(line, max(10, cv.width - len(head)), break_on_hyphens=False)):
@@ -1368,7 +1374,9 @@ def _render_devices(cv, st, devices, body_h):
     for kind, obj in _dev_lines(devices, st):
         idx = None if kind in ("virtual", "off", "chan") else n_sel
         text, style = _device_line_text("row" if kind == "chan" else kind, obj, devices, idx == cursor)
-        style = "dim" if kind == "chan" else style
+        if kind == "chan":  # read-only; in pipeOS its direction word is the portal colour
+            role = {"out": "dir_out", "in": "dir_in"}.get(obj.direction)
+            style = ("dim", [(4, 4 + len(obj.direction), role)]) if role else "dim"
         menu_open = idx == cursor and _menu_target(devices, st) is not None
         lines.append((text, "anchor" if menu_open else "selected" if idx == cursor else style, idx))
         if idx is not None:
@@ -1651,11 +1659,13 @@ def _render_mixer(cv, st, mx, body_h):
             m0 = c0 + len(bar) + 2
             bar += "  " + cells
             spans += [(m0 + a, m0 + b, r) for a, b, r in cell_spans]
+        side = "src" if section == "playback" else "dst"  # playback blue, recording orange (pipeOS)
         if sel:  # the cursor bar covers the name; the volume keeps its colours
-            spans = [(0, c0 - 1, "anchor" if target else "selected")] + spans
+            spans = [(0, c0 - 1, f"anchor_{side}" if target else f"bar_{side}")] + spans
         out.append((head + bar, ("normal", spans), n_sel))
         if sel and target:
-            out += _menu_box(row.label, [label for label, _ in mix_menu_items(mx, st)], st.mix_menu_cursor)
+            out += _menu_box(row.label, [label for label, _ in mix_menu_items(mx, st)], st.mix_menu_cursor,
+                             f"bar_{side}", "head_play" if section == "playback" else "head_rec")
         n_sel += 1
     cursor_at = next((k for k, line in enumerate(out) if line[2] == st.mix_cursor), 0)
     if target:  # keep the whole box in view: scroll to its foot
@@ -1851,12 +1861,12 @@ def _slot_menu(g, st, s, d, avail):
         on = g.slot_sources(r)
         items.append(f"{'●' if s in on else ' '} {name:<8} {', '.join(x.label for x in on) or 'free'}")
     w = max(10, min(avail - 2, max([len(s.label) + 4] + [len(t) + 3 for t in items])))
-    out = [("┌" + f"─ {_fit(s.label, w - 3)} ".ljust(w, "─") + "┐", None, None)]
+    out = [("┌" + f"─ {_fit(s.label, w - 3)} ".ljust(w, "─") + "┐", "head_dst", None)]
     for k, text in enumerate(items):
         sel = k == st.patch_menu_cursor
         out.append(("│" + f"{'>' if sel else ' '} {_fit(text, w - 2)}".ljust(w) + "│", "bar_dst" if sel else None,
                     ("patch_slot", k)))
-    out.append(("└" + "─" * w + "┘", None, None))
+    out.append(("└" + "─" * w + "┘", "head_dst", None))
     return out
 
 
@@ -1892,7 +1902,7 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
                 spans.append((lt.index("●"), lt.index("●") + 1, f"src@{bar}" if bar else "src"))
         rt, lit, target, dot = (right[n] + (None,))[:4] if n < len(right) else ("", None, None, None)
         if lit:
-            spans.append((half + 2, cv.width if target[0] == "patch_dst" else half + 2 + len(rt), lit))
+            spans.append((half + 2, cv.width if target and target[0] == "patch_dst" else half + 2 + len(rt), lit))
         if dot:
             spans.append((half + 2 + 2, half + 2 + 3, f"{dot}@{lit}" if lit in ("bar_dst", "anchor_dst") else dot))
         row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), ("normal", spans))
@@ -2070,14 +2080,18 @@ def _menu_lines(devices, st, title):
     return _menu_box(title, [label for label, _ in dev_menu_items(devices, st)], st.dev_menu_cursor)
 
 
-def _menu_box(title, labels, cursor):
+def _menu_box(title, labels, cursor, bar="selected", edge="title"):
     """A box under the selected row (Devices and Mixer). Every line shares one interior width, so the
-    edges line up. Item lines carry ("menu", k) for their click target."""
+    edges line up. Item lines carry ("menu", k) for their click target. bar and edge are the row's direction
+    (bar_src/head_play, bar_dst/head_rec); a profile's ●/○ is a choice, not a connection, so it stays plain."""
     width = max(26, len(title) + 4, max((len(label) for label in labels), default=0) + 5)
-    lines = [("    ┌" + f"─ {title} ".ljust(width, "─") + "┐", "title", None)]
+    lines = [("    ┌" + f"─ {title} ".ljust(width, "─") + "┐", edge, None)]
     for k, label in enumerate(labels):
         sel = k == cursor
+        role = bar if sel else "normal"
+        sides = [(4, 5, edge), (5 + width, 6 + width, edge)]  # the box's edges, in the edge colour
         lines.append(("    │" + f" {'> ' if sel else '  '}{label}".ljust(width) + "│",
-                      "selected" if sel else "normal", ("menu", k)))
-    lines.append(("    └" + "─" * width + "┘", "title", None))
+                      ("normal", [(5, 5 + width, role)] + sides + ([(8, 9, role)] if label[:1] in "●○" else [])),
+                      ("menu", k)))  # the bar stays inside the box
+    lines.append(("    └" + "─" * width + "┘", edge, None))
     return lines

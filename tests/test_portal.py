@@ -183,3 +183,118 @@ def test_volume_and_meters_use_their_roles():
     assert "vol" in roles and "vol_over" in roles and "ok" not in roles
     _, spans = pc._meter_cells(1.0)
     assert {r for *_, r in spans} >= {"meter_low", "meter_mid", "meter_high"}
+
+
+# --- accents everywhere (Skrappjaw, 2026-10-25): direction picks blue or orange; chrome is blue; status dots neutral ---
+
+import pwconfig as pcfg  # noqa: E402
+import pwinventory as pi  # noqa: E402
+
+INV = pi.inventory(json.loads((FIX / "pwdump_inventory.json").read_text()))
+CHROME = ("selected", "anchor", "title", "chip")
+
+
+def blue(c):
+    r, g, b = pc.hex_rgb(c)
+    return b > r and b > g
+
+
+@pytest.mark.parametrize("name", ["pipeos-lite", "pipeos-dark"])
+def test_pipeos_chrome_is_blue(name):
+    t = pc.THEMES[name]
+    assert t["selected"] == t["bar_src"] and t["anchor"] == t["anchor_src"]  # one blue cursor bar everywhere
+    assert t["title"][0] == t["src"][0] and blue(t["chip"][1])
+
+
+@pytest.mark.parametrize("name", ["pipeos-lite", "pipeos-dark"])
+def test_pipeos_ok_is_not_green(name):
+    r, g, b = pc.hex_rgb(pc.THEMES[name]["ok"][0])
+    assert not (g > r and g > b)
+
+
+def mixer_lines(theme, section, **kw):
+    mx = pc.mixer_view(INV, pcfg.default_config(), [])
+    rows = pc.mixer_selectable(mx)
+    cursor = next(n for n, line in enumerate(rows) if line[1] == section)
+    st = pc.UIState(tab="mixer", theme=theme, mix_cursor=cursor, **kw)
+    if kw.get("mix_menu") is True:
+        st.mix_menu = (section, rows[cursor][2].id)
+    return pc.render_screen(st, {}, None, 100, 60, mixer=mx)[0]
+
+
+@pytest.mark.parametrize("section, bar, anchor, edge", [("playback", "bar_src", "anchor_src", "head_play"),
+                                                         ("recording", "bar_dst", "anchor_dst", "head_rec")])
+def test_mixer_cursor_and_menu_follow_the_direction(section, bar, anchor, edge):
+    lines = mixer_lines("pipeos-dark", section)
+    text, style = next((t, s) for t, s in lines if t.startswith("> "))
+    assert role_at(style, 2) == bar
+    lines = mixer_lines("pipeos-dark", section, mix_menu=True)
+    assert role_at(next(s for t, s in lines if t.startswith("> ")), 2) == anchor
+    item = next((t, s) for t, s in lines if t.startswith("    │ > "))
+    assert role_at(item[1], 6) == bar
+    top = next((t, s) for t, s in lines if t.startswith("    ┌"))
+    assert role_at(top[1], 5) == edge
+    assert role_at(item[1], 4) == edge and role_at(item[1], len(item[0].rstrip()) - 1) == edge  # its sides too
+
+
+def devices_lines(theme, pick, **kw):
+    dv = pc.devices_view(INV, pcfg.default_config())
+    items = pc.dev_selectable(dv, pc.UIState(tab="devices"))
+    cursor = next(n for n, (k, o) in enumerate(items) if pick(k, o))
+    st = pc.UIState(tab="devices", theme=theme, dev_cursor=cursor, **kw)
+    return pc.render_screen(st, {}, None, 120, 60, devices=dv)[0], items[cursor]
+
+
+@pytest.mark.parametrize("direction, role", [("out", "dir_out"), ("in", "dir_in")])
+def test_devices_channel_rows_tint_their_direction(direction, role):
+    lines, _ = devices_lines("pipeos-dark", lambda k, o: k == "card")
+    text, style = next((t, s) for t, s in lines if t[4:].startswith(direction + " "))
+    assert role_at(style, 4) == role and role_at(style, 20) == "dim"
+    want = "src" if direction == "out" else "dst"
+    assert pc.THEMES["pipeos-dark"][role][0] == pc.THEMES["pipeos-dark"][want][0]
+
+
+@pytest.mark.parametrize("name", ["dark", "light", "crowbar", "pipeboy", "vaporware", "pipecraft"])
+def test_other_themes_keep_channel_rows_dim(name):
+    t = pc.THEMES[name]
+    assert t["dir_out"] == t["dir_in"] == t["dim"]
+
+
+def test_devices_card_bar_and_menu_are_neutral_blue_with_plain_profile_dots():
+    lines, (_, card) = devices_lines("pipeos-dark", lambda k, o: k == "card" and o.profiles,
+                                     dev_menu=None)
+    assert role_at(next(s for t, s in lines if t.startswith("> ")), 2) == "selected"
+    lines, _ = devices_lines("pipeos-dark", lambda k, o: k == "card" and o.profiles, dev_menu=("card", card.id))
+    for text, style in lines:
+        for n, ch in enumerate(text):
+            if ch in "●○" and text.lstrip().startswith("│"):
+                assert role_at(style, n).split("@")[0] not in ("src", "dst", "dst_partial"), text
+
+
+def test_patch_slot_menu_edges_are_orange():
+    from test_patch_ui import GR, reaper_menu  # REAPER's unnamed inputs open the slot menu
+    st, _ = reaper_menu()
+    st.theme = "pipeos-dark"
+    lines = pc.render_screen(st, {}, None, 100, 40, patch=GR)[0]
+    text, style = next((t, s) for t, s in lines if "┌─" in t)
+    assert role_at(style, text.index("┌")) == "head_dst"
+
+
+def test_realtime_dots_show_status_not_portal_colours():
+    import pwrealtime as prt
+    status = prt.Status(user="u", groups={"pipewire": 95}, member=True)  # a member, PipeWire not found: ● and ◐
+    lines = pc.render_screen(pc.UIState(tab="settings", theme="pipeos-dark"), {}, None, 100, 50,
+                             realtime=status)[0]
+    seen = set()
+    for text, style in lines:
+        for n, ch in enumerate(text):
+            if ch in "●◐":
+                seen.add(role_at(style, n))
+    assert seen and seen <= {"ok", "pending", "alert"}, seen
+
+
+@pytest.mark.parametrize("name", ["dark", "light", "crowbar", "pipeboy", "vaporware", "pipecraft"])
+def test_other_themes_direction_bars_look_like_the_cursor(name):
+    t = pc.THEMES[name]
+    assert t["bar_src"] == t["bar_dst"] == t["selected"] and t["anchor_src"] == t["anchor_dst"] == t["anchor"]
+    assert t["head_play"] == t["head_rec"] == t["title"]

@@ -117,7 +117,7 @@ def test_monitors_are_read_only_too():
 def test_channels_still_listed_dim():
     lines, hits = pc.render_screen(pc.UIState(tab="devices"), CUR, None, 120, 80, devices=dv())
     row = next((t, s) for t, s in lines if "GCS-8 CH 2 " in t or t.rstrip().endswith("GCS-8 CH 2"))
-    assert row[1] == "dim"
+    assert row[1][0] == "dim" and {r for *_, r in row[1][1]} <= {"dir_out", "dir_in"}  # dim; the direction word tinted
     n = next(i for i, (t, _) in enumerate(lines) if t == row[0])
     assert not [h for h in hits if h[0] == n]
 

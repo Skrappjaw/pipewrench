@@ -106,7 +106,7 @@ def test_cursor_bar_covers_the_name_not_the_volume():
     lines, _ = screen(at("Discord"))
     style = next(s for t, s in lines if "Discord →" in t)
     roles = [r for *_, r in style[1]]
-    assert roles[0] == "selected" and "vol" in roles
+    assert roles[0] == "bar_src" and "vol" in roles  # the playback cursor: blue in pipeOS, the plain cursor elsewhere
 
 
 def test_loading_before_the_first_dump():
@@ -216,7 +216,7 @@ def test_the_menu_box_sits_under_its_row_and_stays_in_view():
     text = [t for t, _ in lines]
     row = next(i for i, t in enumerate(text) if "GCS-8 CH 3-AUX" in t and "█" in t)
     assert "GCS-8 CH 3-AUX" in text[row + 1] and "> Set as system default" in text[row + 2]
-    assert lines[row][1][1][0][2] == "anchor"  # the row under an open menu is an anchor, not a cursor
+    assert lines[row][1][1][0][2] in ("anchor_src", "anchor_dst")  # the row under an open menu is an anchor, not a cursor
     st, _ = key(at("GCS-8 CH 4", "recording"), "enter")
     lines, _ = screen(st, height=20)
     assert any("Back" in t for t, _ in lines)

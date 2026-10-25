@@ -254,10 +254,17 @@ colours, status shows by style: good is bold, waiting is underlined, and a probl
 
 ![Pipecraft](guide/about-pipecraft.png)
 
-**pipeOS-lite** (a clean test chamber) and **pipeOS-dark** (Portal 2's moody chambers) colour Patch's dots
-like portals: blue on the sources, orange on the destinations, with a blue cursor bar on the sources and
-an orange one on the destinations, and blue and orange column headings. On the Mixer, Playback is blue and
-Recording orange, volume bars are panel grey, and the level meters run blue, orange, then red.
+**pipeOS-lite** (a clean test chamber) and **pipeOS-dark** (Portal 2's moody chambers) follow one rule:
+anything with a direction is a portal colour, blue for playback, outputs and sources and orange for
+recording, inputs and destinations. Everything else uses blue.
+
+- **Patch:** blue dots and cursor bar on the sources, orange on the destinations. The slot menu is orange.
+- **Mixer:** Playback's heading, cursor bar and menu are blue; Recording's are orange. Volume bars are
+  panel grey, and the level meters run blue, orange, then red.
+- **Devices:** each channel's `out` is blue and `in` orange.
+- **Everything else:** the cursor bar, tabs, titles, key chips and the Settings menu are blue.
+- **Status dots stay plain.** Realtime's dots, and the ● and ○ marking a card's profile, show their status in
+  white, yellow or red, never a portal colour. There's no green anywhere.
 
 ![pipeOS-dark](guide/patch-portal.png)
 
