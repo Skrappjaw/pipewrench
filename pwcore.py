@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pwinventory as pi
+import pwkeys as pk
 import pwmedia as pm
 import pwpatch as pp
 import pwrealtime as prt
@@ -92,13 +93,14 @@ def load_ui(path):
             "meter_fps": ui.get("meter_fps") if ui.get("meter_fps") in METER_FPS else 10,
             "meter_fall": ui.get("meter_fall") if ui.get("meter_fall") in METER_FALL else 20,
             "peak_hold": ui.get("peak_hold") if ui.get("peak_hold") in PEAK_HOLD else 1.5,
-            "volume_bar": ui.get("volume_bar") if isinstance(ui.get("volume_bar"), bool) else True}
+            "volume_bar": ui.get("volume_bar") if isinstance(ui.get("volume_bar"), bool) else True,
+            "keys": pk.clean(ui.get("keys"))}
 
 
 def ui_prefs(st):
     """What ui.json keeps, from the live state."""
     return {"theme": st.theme, "meter_fps": st.meter_fps, "meter_fall": st.meter_fall, "peak_hold": st.peak_hold,
-            "volume_bar": st.volume_bar}
+            "volume_bar": st.volume_bar, "keys": pk.overrides(pk.bindings(st.keys))}
 
 
 def save_ui(path, ui):
@@ -424,6 +426,7 @@ class UIState:
     meter_fall: int = 20         # dB a second
     peak_hold: float = 1.5       # seconds; 0 is off
     volume_bar: bool = True      # the bar under each Mixer channel; off leaves just the %
+    keys: dict = field(default_factory=dict)  # key binding overrides {action id: key or None} (pwkeys)
 
 
 # The now-playing bar's keys work on every tab; no tab uses these characters. * - + sit on the numpad.
@@ -459,6 +462,10 @@ def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
         return st, []
     if key in MEDIA_KEYS:
         return st, [MEDIA_KEYS[key]]
+    if st.tab in pk.SCREENS and not (st.dev_menu or st.mix_menu or st.patch_menu):
+        key = pk.translate(st.tab, key, pk.bindings(st.keys))
+        if key is None:
+            return st, []
     if st.tab == "mixer":
         return _key_mixer(st, key, mixer)
     if st.tab == "devices":
@@ -754,7 +761,25 @@ def _chip_key(label):
     return {"Enter": "enter", "Esc": "esc", "Space": " "}.get(label) or (label if len(label) == 1 else None)
 
 
+def _bound(items, screen, keys):
+    """A legend with each shortcut chip showing its bound key; unbound or clashing shortcuts drop out."""
+    b, out = pk.bindings(keys), []
+    for k, slug in items:
+        head, _, rest = k.partition(" ")
+        a = next((a for a in pk.ACTIONS if a.screen == screen and a.default == head), None)
+        if a is None:
+            out.append((k, slug))
+        elif pk.key_for(b, a.id):
+            out.append((pk.key_for(b, a.id) + (" " + rest if rest else ""), slug))
+    return out
+
+
 def legend(st):
+    items = _legend(st)
+    return _bound(items, st.tab, st.keys) if st.tab in pk.SCREENS and st.keys else items
+
+
+def _legend(st):
     if st.tab == "devices" and st.dev_menu:
         return LEGENDS["devices menu"]
     if st.tab == "mixer" and st.mix_menu:

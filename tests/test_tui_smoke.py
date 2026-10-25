@@ -202,7 +202,7 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
         app.expect("light")
         app.send("\x1bOB" * pc.THEME_ROW + "\x1bOD")  # down to the theme row, then left: light → dark
         app.expect("theme: dark")
-        assert json.loads((tmp_path / "pwctl" / "ui.json").read_text()) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True}
+        assert json.loads((tmp_path / "pwctl" / "ui.json").read_text()) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
         app.send(tab("patch"))
         app.expect("Destinations")
         app.send("q")
