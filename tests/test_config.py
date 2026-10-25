@@ -67,6 +67,9 @@ def test_config_path_honours_env(monkeypatch, tmp_path):
     ({"buses": [{"name": "has space", "label": "x"}]}, "bus name"),
     ({"buses": [{"name": "A", "label": "x"}, {"name": "A", "label": "y"}]}, "duplicate"),
     ({"buses": [{"name": "A", "label": ""}]}, "label"),
+    ({"clock_quantum": 100}, "buffer"),
+    ({"clock_min_quantum": 0}, "buffer"),
+    ({"clock_min_quantum": 1024, "clock_max_quantum": 256}, "min buffer"),
 ])
 def test_validate_rejects(changes, words):
     with pytest.raises(ValueError, match=words):
@@ -117,6 +120,28 @@ def test_edits_do_not_mutate_input():
 def test_dropin_buses_and_clock_match_golden():
     c = cfg(clock_rate=48000, buses=[{"name": "SYSTEM", "label": "SYSTEM"}])
     assert pc.render_dropin(c) == (GOLDEN / "dropin_v2.conf").read_text()
+
+
+def test_dropin_writes_saved_clock_settings():
+    c = cfg(clock_rate=96000, clock_quantum=128, clock_min_quantum=64, clock_max_quantum=1024)
+    text = pc.render_dropin(c)
+    assert ("context.properties = {\n    default.clock.rate = 96000\n    default.clock.quantum = 128\n"
+            "    default.clock.min-quantum = 64\n    default.clock.max-quantum = 1024\n}\n") in text
+
+
+def test_saved_clock_keys_survive_load(xdg):
+    c = cfg(clock_quantum=256, clock_max_quantum=4096)
+    pc.save_config(pc.config_path(), c)
+    assert pc.load_config(pc.config_path()) == c
+
+
+def test_clock_fields_from_live_settings_leave_out_unforced_and_stock():
+    live = {"clock.force-rate": 0, "clock.force-quantum": 0, "clock.min-quantum": 32, "clock.max-quantum": 2048}
+    assert pc.clock_fields(live) == {"clock_rate": None, "clock_quantum": None,
+                                     "clock_min_quantum": None, "clock_max_quantum": None}
+    live = {"clock.force-rate": 48000, "clock.force-quantum": 128, "clock.min-quantum": 64, "clock.max-quantum": 1024}
+    assert pc.clock_fields(live) == {"clock_rate": 48000, "clock_quantum": 128,
+                                     "clock_min_quantum": 64, "clock_max_quantum": 1024}
 
 
 def test_dropin_empty_config_is_header_only():

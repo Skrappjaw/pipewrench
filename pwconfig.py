@@ -10,6 +10,13 @@ import shutil
 from pathlib import Path
 
 RATES = [44100, 48000, 88200, 96000, 176400, 192000]  # pwcore force-rate choices, minus "do not force"
+QUANTA = [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]  # pwcore's buffer choices
+# Saved clock settings (Settings → Save): devices.json key, drop-in property, live settings key, stock value.
+# A key left None is not written, so PipeWire's own default holds. The rate key is the older clock_rate.
+CLOCK = [("clock_rate", "default.clock.rate", "clock.force-rate", 0),
+         ("clock_quantum", "default.clock.quantum", "clock.force-quantum", 0),
+         ("clock_min_quantum", "default.clock.min-quantum", "clock.min-quantum", 32),
+         ("clock_max_quantum", "default.clock.max-quantum", "clock.max-quantum", 2048)]
 RESTART_PIPEWIRE = ["systemctl", "--user", "restart", "pipewire", "pipewire-pulse", "wireplumber"]
 RESTART_WIREPLUMBER = ["systemctl", "--user", "restart", "wireplumber"]
 VERSION_CMD = ["wireplumber", "--version"]
@@ -61,6 +68,12 @@ def _check_text(text, what):
 def validate_config(c):
     if c.get("clock_rate") is not None and c["clock_rate"] not in RATES:
         raise ValueError(f"clock rate {c['clock_rate']!r} is not one of {RATES}")
+    for key, *_ in CLOCK[1:]:
+        if c.get(key) is not None and c[key] not in QUANTA:
+            raise ValueError(f"{key}: buffer {c[key]!r} is not one of {QUANTA}")
+    lo, hi = c.get("clock_min_quantum"), c.get("clock_max_quantum")
+    if lo is not None and hi is not None and lo > hi:
+        raise ValueError(f"min buffer {lo} is larger than max buffer {hi}")
     seen = set()
     for b in c.get("buses", []):
         if not isinstance(b.get("name"), str) or not _BUS.fullmatch(b["name"]):
@@ -82,8 +95,10 @@ def validate_config(c):
 
 def migrate(c):
     """v1 (GCS-8 loopback pairs) → v2. The pairs went to the gcs-8-linux UCM profile."""
-    return {"version": 2, "clock_rate": c.get("clock_rate"), "buses": c.get("buses", []),
-            "labels": c.get("labels", {}), "hidden": c.get("hidden", [])}
+    out = {"version": 2, "clock_rate": c.get("clock_rate"), "buses": c.get("buses", []),
+           "labels": c.get("labels", {}), "hidden": c.get("hidden", [])}
+    out.update({key: c[key] for key, *_ in CLOCK[1:] if key in c})  # saved buffers; absent until first saved
+    return out
 
 
 def load_config(path):
@@ -105,6 +120,19 @@ def save_config(path, c):
 
 
 # --- edits: each returns a new, validated config ---------------------------------
+
+def clock_fields(live):
+    """devices.json clock keys from the live settings: an unforced (0) or stock value saves as None."""
+    out = {}
+    for key, _, live_key, stock in CLOCK:
+        v = live.get(live_key)
+        out[key] = v if isinstance(v, int) and v and v != stock else None
+    return out
+
+
+def has_clock(c):
+    return any(c.get(key) for key, *_ in CLOCK)
+
 
 def _copy(c):
     return json.loads(json.dumps(c))
@@ -171,8 +199,9 @@ def render_dropin(c):
     validate_config(c)
     parts = [f"# {MARK} from devices.json. Do not edit by hand:\n"
              "# change buses with `pwrench devices`, then apply.\n"]
-    if c.get("clock_rate"):
-        parts.append(f"context.properties = {{\n    default.clock.rate = {c['clock_rate']}\n}}\n")
+    props = [f"    {prop} = {c[key]}\n" for key, prop, _, _ in CLOCK if c.get(key)]
+    if props:
+        parts.append("context.properties = {\n" + "".join(props) + "}\n")
     if c.get("buses"):
         parts.append("context.objects = [\n" + "".join(render_bus(b) for b in c["buses"]) + "]\n")
     return "\n".join(parts)

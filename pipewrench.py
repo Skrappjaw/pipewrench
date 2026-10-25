@@ -322,7 +322,7 @@ def _generated(runner, c, version=None):
     are created, but an existing file is always kept in step."""
     version = version or _wp_version(runner)
     files = [(pcfg.dropin_path(), pcfg.render_dropin(c), pcfg.RESTART_PIPEWIRE,
-              bool(c["buses"] or c["clock_rate"])),
+              bool(c["buses"] or pcfg.has_clock(c))),
              (pcfg.labels_path(version), pcfg.render_labels(c, version), pcfg.RESTART_WIREPLUMBER,
               bool(c["labels"]))]
     pending = []
