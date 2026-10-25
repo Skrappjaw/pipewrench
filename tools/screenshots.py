@@ -280,6 +280,7 @@ def shots():
 
     st = patch_at(g, pc.UIState(tab="patch"), source="GCS-8 CH 2")
     yield "patch", frame(st, patch=g, media=MEDIA)
+    yield "patch-portal", frame(st, patch=g, media=MEDIA)
     st = patch_at(g, pc.UIState(tab="patch"), source="GCS-8 CH USB (monitor)")
     yield "patch-monitors", frame(st, patch=g, media=MEDIA)
     st = patch_at(g, pc.UIState(tab="patch", patch_view="grid"), source="GCS-8 CH 2", dest="REAPER")
@@ -306,7 +307,8 @@ def shots():
                          about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"})
 
 
-SHOT_THEMES = {"mixer-pipeboy": "pipeboy", "mixer-vaporware": "vaporware", "about-pipecraft": "pipecraft"}  # the rest are drawn in the dark theme
+SHOT_THEMES = {"mixer-pipeboy": "pipeboy", "mixer-vaporware": "vaporware", "about-pipecraft": "pipecraft",
+               "patch-portal": "portal-dark"}  # the rest are drawn in the dark theme
 
 
 def main(out=OUT):

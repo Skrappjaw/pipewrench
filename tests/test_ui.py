@@ -374,7 +374,7 @@ def test_theme_row_switches_at_once_and_reports_it():
     st, actions = key(st, *["right"] * (len(pc.THEME_NAMES) - 1))
     assert st.theme == "dark"  # the list wraps round
     assert pc.THEME_NAMES == ["dark", "light", "crowbar", "pipeboy", "pipeboy-amber", "pipeboy-cyan",
-                              "pipeboy-white", "vaporware", "pipecraft"]
+                              "pipeboy-white", "vaporware", "pipecraft", "portal-light", "portal-dark"]
 
 
 def _rgb(colour):
@@ -426,7 +426,7 @@ def test_vaporware_has_vaporwave_colours():
 def test_theme_labels():
     assert [pc.theme_label(n) for n in pc.THEME_NAMES] == ["dark", "light", "crowbar", "Pipe Boy", "Pipe Boy Amber",
                                                            "Pipe Boy Cyan", "Pipe Boy White", "Vaporware",
-                                                           "Pipecraft"]
+                                                           "Pipecraft", "Portal Light", "Portal Dark"]
 
 
 def test_pipecraft_uses_minecraft_text_colours():

@@ -67,6 +67,31 @@ THEMES = {
                   "chip": ("#ffffff", "#555555", ""),
                   "bar_ok": ("#ffffff", "#5d9632", ""), "bar_alert": ("#ffffff", "#aa0000", ""),
                   "bar_dim": ("#aaaaaa", "#4a3624", "")},
+    # Portal: Patch's source dots are the blue portal, destination dots the orange one.
+    # Light: a clean test chamber, white panels and grey trim.
+    "portal-light": {"screen": ("#2b2f33", "#f2f4f5", ""),
+                     "normal": (None, None, ""), "dim": ("#8a9399", None, ""),
+                     "selected": ("#ffffff", "#4f5b63", ""), "anchor": ("#2b2f33", "#d5dadd", ""),
+                     "title": ("#1b1e21", None, "bold"),
+                     "ok": ("#2f9e44", None, "bold"), "pending": ("#8a6d00", None, "bold"),
+                     "alert": ("#d62828", None, "bold"),
+                     "chip": ("#ffffff", "#2b2f33", ""),
+                     "bar_ok": ("#ffffff", "#6c7a84", ""), "bar_alert": ("#ffffff", "#d62828", ""),
+                     "bar_dim": ("#8a9399", "#e1e5e8", ""),
+                     "src": ("#0a84ff", None, "bold"), "dst": ("#ff7a00", None, "bold"),
+                     "dst_partial": ("#ff7a00", None, "")},
+    # Dark: Portal 2's moody chambers, dark panels with the portals glowing.
+    "portal-dark": {"screen": ("#c9d1d6", "#14181b", ""),
+                    "normal": (None, None, ""), "dim": ("#5f6b73", None, ""),
+                    "selected": ("#e8eef2", "#2f4250", ""), "anchor": ("#c9d1d6", "#222a30", ""),
+                    "title": ("#e8eef2", None, "bold"),
+                    "ok": ("#5fbf6a", None, "bold"), "pending": ("#d8c35a", None, "bold"),
+                    "alert": ("#e5484d", None, "bold"),
+                    "chip": ("#e8eef2", "#2f4250", ""),
+                    "bar_ok": ("#e8eef2", "#3d5566", ""), "bar_alert": ("#ffffff", "#b3261e", ""),
+                    "bar_dim": ("#5f6b73", "#1d2327", ""),
+                    "src": ("#28a7ff", None, "bold"), "dst": ("#ff9a1f", None, "bold"),
+                    "dst_partial": ("#ff9a1f", None, "")},
 }
 
 
@@ -87,12 +112,18 @@ _PIPE_BOYS = {"pipeboy": ("#3cff62", "#b6ffc2", "#1f8a35", "#13401c", "#0b1a0d")
               "pipeboy-amber": ("#ffb000", "#ffe0a0", "#9a6a00", "#4a3300", "#1a1000"),
               "pipeboy-cyan": ("#33f0ff", "#b8f9ff", "#1a8a94", "#0d3f45", "#071a1c"),
               "pipeboy-white": ("#e6e6e6", "#ffffff", "#8c8c8c", "#3a3a3a", "#121212")}
-THEMES = {**{k: v for k, v in THEMES.items() if k not in ("vaporware", "pipecraft")},
+THEMES = {**{k: v for k, v in THEMES.items() if k not in ("vaporware", "pipecraft", "portal-light", "portal-dark")},
           **{name: _pipe_boy(*colours) for name, colours in _PIPE_BOYS.items()},
-          "vaporware": THEMES["vaporware"], "pipecraft": THEMES["pipecraft"]}
+          "vaporware": THEMES["vaporware"], "pipecraft": THEMES["pipecraft"],
+          "portal-light": THEMES["portal-light"], "portal-dark": THEMES["portal-dark"]}
+for _t in THEMES.values():  # Patch's dots: the theme's ok and pending, unless it sets its own (Portal)
+    _t.setdefault("src", _t["ok"])
+    _t.setdefault("dst", _t["ok"])
+    _t.setdefault("dst_partial", _t["pending"])
 THEME_NAMES = list(THEMES)
 THEME_LABELS = {"pipeboy": "Pipe Boy", "pipeboy-amber": "Pipe Boy Amber", "pipeboy-cyan": "Pipe Boy Cyan",
-                "pipeboy-white": "Pipe Boy White", "vaporware": "Vaporware", "pipecraft": "Pipecraft"}
+                "pipeboy-white": "Pipe Boy White", "vaporware": "Vaporware", "pipecraft": "Pipecraft",
+                "portal-light": "Portal Light", "portal-dark": "Portal Dark"}
 
 
 def theme_label(name):
@@ -1804,9 +1835,10 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
     right = []  # (text, highlighted, hit target); the slot menu sits under its destination
     for j in _window(len(g.dests), st.patch_dst, max(1, room - 1 - len(menu))):
         mark = "> " if j == st.patch_dst and on_dst else "  "
-        rt = f"{mark}{_STATE_MARK[g.state(s, g.dests[j])].replace('·', ' ')} {_fit(g.dests[j].label, half - 4)}"
+        state = g.state(s, g.dests[j])
+        rt = f"{mark}{_STATE_MARK[state].replace('·', ' ')} {_fit(g.dests[j].label, half - 4)}"
         lit = ("anchor" if menu else "selected") if j == st.patch_dst and on_dst else None
-        right.append((rt, lit, ("patch_dst", j)))
+        right.append((rt, lit, ("patch_dst", j), {"full": "dst", "partial": "dst_partial"}.get(state)))
         if j == st.patch_dst:
             right += menu
     for n in range(max(len(left), len(right))):
@@ -1818,9 +1850,13 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
             count = len(g.targets(srcs[i]))
             mark = "> " if i == st.patch_src and not on_dst else "* " if i == st.patch_src else "  "
             lt = f"{mark}{_fit(srcs[i].label, half - 7):<{half - 7}} {('●' + str(count)) if count else '':>3}"
+            if count:  # the source's dot: blue in Portal; dots go first so a cursor bar still covers them
+                spans.append((lt.index("●"), lt.index("●") + 1, "src"))
             if i == st.patch_src:  # each bar covers only its own column; the source's stays as the anchor
                 spans.append((0, half, "anchor" if on_dst else "selected"))
-        rt, lit, target = right[n] if n < len(right) else ("", None, None)
+        rt, lit, target, dot = (right[n] + (None,))[:4] if n < len(right) else ("", None, None, None)
+        if dot:
+            spans.append((half + 2 + 2, half + 2 + 3, dot))
         if lit:
             spans.append((half + 2, cv.width if target[0] == "patch_dst" else half + 2 + len(rt), lit))
         row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), ("normal", spans))
