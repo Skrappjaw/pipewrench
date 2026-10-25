@@ -232,7 +232,8 @@ colours, status shows by style: good is bold, waiting is underlined, and a probl
 ![Pipecraft](guide/about-pipecraft.png)
 
 **pipeOS-lite** (a clean test chamber) and **pipeOS-dark** (Portal 2's moody chambers) colour Patch's dots
-like portals: blue on the sources, orange on the destinations.
+like portals: blue on the sources, orange on the destinations, with a blue cursor bar on the sources and
+an orange one on the destinations. On the Mixer, Playback is blue and Recording orange.
 
 ![pipeOS-dark](guide/patch-portal.png)
 

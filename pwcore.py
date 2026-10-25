@@ -79,7 +79,10 @@ THEMES = {
                      "bar_ok": ("#ffffff", "#6c7a84", ""), "bar_alert": ("#ffffff", "#d62828", ""),
                      "bar_dim": ("#8a9399", "#e1e5e8", ""),
                      "src": ("#0a84ff", None, "bold"), "dst": ("#ff7a00", None, "bold"),
-                     "dst_partial": ("#ff7a00", None, "")},
+                     "dst_partial": ("#ff7a00", None, ""),
+                     "bar_src": ("#0b2540", "#bcdcff", ""), "anchor_src": ("#2b2f33", "#e3efff", ""),
+                     "bar_dst": ("#3a1f00", "#ffd9b3", ""), "anchor_dst": ("#2b2f33", "#fff0e0", ""),
+                     "head_play": ("#0a84ff", None, "bold"), "head_rec": ("#ff7a00", None, "bold")},
     # Dark: Portal 2's moody chambers, dark panels with the portals glowing.
     "pipeos-dark": {"screen": ("#c9d1d6", "#14181b", ""),
                     "normal": (None, None, ""), "dim": ("#5f6b73", None, ""),
@@ -91,7 +94,10 @@ THEMES = {
                     "bar_ok": ("#e8eef2", "#3d5566", ""), "bar_alert": ("#ffffff", "#b3261e", ""),
                     "bar_dim": ("#5f6b73", "#1d2327", ""),
                     "src": ("#28a7ff", None, "bold"), "dst": ("#ff9a1f", None, "bold"),
-                    "dst_partial": ("#ff9a1f", None, "")},
+                    "dst_partial": ("#ff9a1f", None, ""),
+                    "bar_src": ("#ffffff", "#0b4a80", ""), "anchor_src": ("#c9d1d6", "#16283a", ""),
+                    "bar_dst": ("#ffffff", "#7a3d00", ""), "anchor_dst": ("#c9d1d6", "#3a2410", ""),
+                    "head_play": ("#28a7ff", None, "bold"), "head_rec": ("#ff9a1f", None, "bold")},
 }
 
 
@@ -116,10 +122,22 @@ THEMES = {**{k: v for k, v in THEMES.items() if k not in ("vaporware", "pipecraf
           **{name: _pipe_boy(*colours) for name, colours in _PIPE_BOYS.items()},
           "vaporware": THEMES["vaporware"], "pipecraft": THEMES["pipecraft"],
           "pipeos-lite": THEMES["pipeos-lite"], "pipeos-dark": THEMES["pipeos-dark"]}
-for _t in THEMES.values():  # Patch's dots: the theme's ok and pending, unless it sets its own (Portal)
+for _t in THEMES.values():
+    # Patch's dots and bars, and the Mixer's section headings: pipeOS sets its own (portal blue and orange);
+    # every other theme reuses ok/pending, selected/anchor and title, so it looks as it did.
+    _own = "src" in _t
     _t.setdefault("src", _t["ok"])
     _t.setdefault("dst", _t["ok"])
     _t.setdefault("dst_partial", _t["pending"])
+    for _bar, _base in (("bar_src", "selected"), ("bar_dst", "selected"), ("anchor_src", "anchor"),
+                        ("anchor_dst", "anchor")):
+        _t.setdefault(_bar, _t[_base])
+    for _dot, _bar in (("src", "bar_src"), ("src", "anchor_src"), ("dst", "bar_dst"), ("dst", "anchor_dst"),
+                       ("dst_partial", "bar_dst"), ("dst_partial", "anchor_dst")):
+        # a dot under a bar keeps its colour on the bar's background (pipeOS); elsewhere the bar covers it
+        _t[f"{_dot}@{_bar}"] = (_t[_dot][0], _t[_bar][1], _t[_dot][2]) if _own else _t[_bar]
+    _t.setdefault("head_play", _t["title"])
+    _t.setdefault("head_rec", _t["title"])
 THEME_NAMES = list(THEMES)
 THEME_LABELS = {"pipeboy": "Pipe Boy", "pipeboy-amber": "Pipe Boy Amber", "pipeboy-cyan": "Pipe Boy Cyan",
                 "pipeboy-white": "Pipe Boy White", "vaporware": "Vaporware", "pipecraft": "Pipecraft",
@@ -1590,7 +1608,7 @@ def _render_mixer(cv, st, mx, body_h):
     out, n_sel = [], 0
     for kind, section, row in _mixer_lines(mx):
         if kind == "head":
-            out.append((f"  {section}", "title", None))
+            out.append((f"  {section}", "head_play" if section == "Playback" else "head_rec", None))
             continue
         if kind == "sub":
             out.append((f"    {section}", "dim", None))
@@ -1837,7 +1855,7 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
         mark = "> " if j == st.patch_dst and on_dst else "  "
         state = g.state(s, g.dests[j])
         rt = f"{mark}{_STATE_MARK[state].replace('·', ' ')} {_fit(g.dests[j].label, half - 4)}"
-        lit = ("anchor" if menu else "selected") if j == st.patch_dst and on_dst else None
+        lit = ("anchor_dst" if menu else "bar_dst") if j == st.patch_dst and on_dst else None
         right.append((rt, lit, ("patch_dst", j), {"full": "dst", "partial": "dst_partial"}.get(state)))
         if j == st.patch_dst:
             right += menu
@@ -1850,15 +1868,16 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
             count = len(g.targets(srcs[i]))
             mark = "> " if i == st.patch_src and not on_dst else "* " if i == st.patch_src else "  "
             lt = f"{mark}{_fit(srcs[i].label, half - 7):<{half - 7}} {('●' + str(count)) if count else '':>3}"
-            if count:  # the source's dot: blue in Portal; dots go first so a cursor bar still covers them
-                spans.append((lt.index("●"), lt.index("●") + 1, "src"))
-            if i == st.patch_src:  # each bar covers only its own column; the source's stays as the anchor
-                spans.append((0, half, "anchor" if on_dst else "selected"))
+            bar = ("anchor_src" if on_dst else "bar_src") if i == st.patch_src else None
+            if bar:  # each bar covers only its own column; the source's stays as the anchor
+                spans.append((0, half, bar))
+            if count:  # the source's dot, drawn over its bar (src@bar_src) so it keeps its colour
+                spans.append((lt.index("●"), lt.index("●") + 1, f"src@{bar}" if bar else "src"))
         rt, lit, target, dot = (right[n] + (None,))[:4] if n < len(right) else ("", None, None, None)
-        if dot:
-            spans.append((half + 2 + 2, half + 2 + 3, dot))
         if lit:
             spans.append((half + 2, cv.width if target[0] == "patch_dst" else half + 2 + len(rt), lit))
+        if dot:
+            spans.append((half + 2 + 2, half + 2 + 3, f"{dot}@{lit}" if lit in ("bar_dst", "anchor_dst") else dot))
         row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), ("normal", spans))
         if n < len(left) and left[n] != "head":
             cv.hit(row, 0, half, ("patch_src", left[n]))

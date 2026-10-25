@@ -82,15 +82,15 @@ def test_columns_mark_targets_of_selected_source():
 def bars(st, g=G):
     """Every highlight bar in the body as (c0, c1, role); the tab bar's own is left out."""
     return [sp for _, style in screen(st, g=g)[0][1:] if isinstance(style, tuple)
-            for sp in style[1] if sp[2] in ("selected", "anchor")]
+            for sp in style[1] if sp[2] in ("selected", "anchor", "bar_src", "bar_dst", "anchor_src", "anchor_dst")]
 
 
 def test_highlight_covers_only_the_active_column():
     (src,) = bars(at("Discord"))
-    assert src == (0, src[1], "selected") and src[1] < 60  # left column only
+    assert src == (0, src[1], "bar_src") and src[1] < 60  # left column only
     src, dst = bars(at("Discord", "GCS-8 CH 4-AUX", patch_side="dst"))
-    assert src[0] == 0 and src[1] < 60 and src[2] == "anchor"  # the source stays lit, as the anchor
-    assert dst[0] > 40 and dst[1] == 100 and dst[2] == "selected"  # the cursor, right column only
+    assert src[0] == 0 and src[1] < 60 and src[2] == "anchor_src"  # the source stays lit, as the anchor
+    assert dst[0] > 40 and dst[1] == 100 and dst[2] == "bar_dst"  # the cursor, right column only
 
 
 def test_monitors_hidden_until_m():
