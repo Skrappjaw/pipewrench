@@ -6,6 +6,9 @@ defaults, volume, card profiles, labels and persistent buses.
 
 Standard library Python only. The UI is curses, with keyboard and mouse.
 
+**New here? Read the user guide, with screenshots: [`docs/guide.md`](docs/guide.md).** This README is
+the reference (every key, the CLI, files, code map).
+
 ## Install and launch
 
 ```
@@ -491,6 +494,7 @@ PWCTL_LIVE=1 python3 -m pytest tests/test_live.py # read-only checks against the
 | `test_patch.py`, `test_patch_cli.py`, `test_patch_ui.py` | patch graph, pairing, commands, CLI, both views, ports, mouse (fixture: a live `pw-dump` with ports and links) |
 | `test_devices_ui.py` | Devices tab keys, mouse, rendering, scrolling, key legend |
 | `test_realtime.py` | realtime check against a fake `/proc` and limits files, fix rules, Settings section, CLI |
+| `test_screenshots.py` | the user guide's pictures: each one it shows is drawn, frames fit, no personal names |
 | `test_about.py` | About tab: wordmark by width, colours, info block, version reads |
 | `test_tui_smoke.py` | the real curses UI in a pty against fixtures |
 | `test_live.py` | opt-in; writes back only the values already set |
