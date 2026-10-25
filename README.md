@@ -128,7 +128,7 @@ Enter and pick from the menu with ↑↓ and Enter. Esc or ← closes the menu, 
   - `a` add bus, `x` delete bus (hide is Enter → Hide only; `h` has no shortcut)
   - `v` preview, `A` write files, `R` restart WirePlumber
 
-View toggles: **H** shows hidden cards and buses (dimmed), **m** lists a "(monitor)" input per output, as
+View toggles: **h** shows hidden cards and buses (dimmed), **m** lists a "(monitor)" input per output, as
 capture apps such as OBS see them.
 
 **Nothing restarts unless you ask.** A restart drops app connections, and some apps (Discord,

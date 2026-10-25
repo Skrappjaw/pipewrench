@@ -84,7 +84,7 @@ levels) is on the Mixer.
 |---|---|
 | Enter | the card's or bus's menu |
 | p | the card's profile menu |
-| H | show hidden cards and buses (dimmed) |
+| h | show hidden cards and buses (dimmed) |
 | a | add a bus |
 | x | delete a bus (after y/n) |
 | t | test sound on a bus |
@@ -105,7 +105,7 @@ turns the card off completely.
 
 ### Hide a device you never use
 
-Select its card and press Enter → Hide card (there's no shortcut, so a stray key can't hide a card). Hidden cards leave the Mixer too. `H` shows
+Select its card and press Enter → Hide card (there's no shortcut, so a stray key can't hide a card). Hidden cards leave the Mixer too. `h` shows
 them again, dimmed, so you can unhide one. Most people want every channel; hiding is for whole
 devices, like onboard audio you never plug into.
 

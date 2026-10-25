@@ -92,11 +92,14 @@ def test_no_off_heading_when_every_off_card_is_hidden():
     assert "  Off" not in [t for t, _ in screen(pc.UIState(tab="devices"), dv(c), height=60)[0]]
 
 
-def test_hidden_rows_vanish_until_H():
+def test_hidden_rows_vanish_until_h():
     d = dv(pcfg.toggle_hidden(pcfg.default_config(), CH2_IN))
     assert "GCS-8 CH 2 " not in body(screen(pc.UIState(tab="devices"), d)[0])
     st, _ = key(pc.UIState(tab="devices"), "H", devices=d)
-    assert st.dev_show_hidden
+    assert not st.dev_show_hidden  # H is gone (Skrappjaw, 2026-10-24)
+    st, actions = key(pc.UIState(tab="devices"), "h", devices=d)
+    assert st.dev_show_hidden and actions == []
+    assert not key(st, "h", devices=d)[0].dev_show_hidden
     lines, _ = screen(st, d)
     assert any("GCS-8 CH 2 " in t and (s[0] if isinstance(s, tuple) else s) == "dim" for t, s in lines)
 
@@ -156,11 +159,10 @@ def test_test_noise_on_bus_outputs_only():
 
 # --- keys: config edits ------------------------------------------------------------------
 
-def test_h_hides_nothing_and_points_to_the_menu():
-    # Skrappjaw hid the GCS-8 with a stray h (2026-10-24); hiding goes through Enter → Hide only.
+def test_h_never_hides():
+    # Skrappjaw hid the GCS-8 with a stray h (2026-10-24); hiding goes through Enter → Hide only. h shows hidden.
     for name in ("SYSTEM", "GCS-8"):
-        st, actions = key(at(name), "h")
-        assert actions == [] and st.message == "hide is in the Enter menu"
+        assert key(at(name), "h")[1] == []
 
 def test_bus_add_and_live_delete_with_confirm():
     assert key(pc.UIState(tab="devices"), "a")[1] == [("dev_prompt_bus",)]
@@ -219,7 +221,7 @@ def test_rows_show_connections():
 def test_legend_leads_with_enter_and_fits_80():
     lines, _ = screen(pc.UIState(tab="devices", message="hello"), width=80)
     text = re.sub(r"[ │]+", " ", body(lines))  # chips pad keys with spaces
-    for k in ("↑↓ select", "Enter actions", "m monitors", "H show hidden", "q quit"):
+    for k in ("↑↓ select", "Enter actions", "m monitors", "h show hidden", "q quit"):
         assert k in text, k
     for gone in ("←→ volume", "Space mute", "d default"):
         assert gone not in text, gone

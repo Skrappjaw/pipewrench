@@ -596,7 +596,7 @@ def _key_devices(st, key, devices):
     if key == "R":
         st.confirm = ("restart",)
         return st, []
-    if key == "H":
+    if key == "h":  # show hidden; nothing hides on a key (a stray h hid the GCS-8, Skrappjaw 2026-10-24)
         st.dev_show_hidden = not st.dev_show_hidden
         return st, []
     if key == "m":
@@ -624,8 +624,6 @@ def _key_devices(st, key, devices):
             st.message = st.failed = "virtual devices have no card profile"
             return st, []
         _open_menu(st, "card", card)
-    elif key == "h":  # no hide shortcut: a stray h hid the GCS-8 (Skrappjaw, 2026-10-24)
-        st.message = "hide is in the Enter menu"
     elif key == "x":
         if kind == "pending" or (kind == "row" and obj.kind == "virtual"):
             st.confirm = ("dev_delete_bus", obj["name"] if kind == "pending" else obj.name)
@@ -711,7 +709,7 @@ LEGENDS = {
     "about": TAB_KEYS,
     "presets": [("Enter", "apply"), ("↑↓", "select"), ("s", "save current"), ("e", "edit label"),
                 ("d", "delete")] + TAB_KEYS,
-    "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("H", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
+    "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("h", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
     "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
     "mixer menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
     "patch cols": [("Enter", "connect/disconnect"), ("↑↓", "select"), ("←→", "column"), ("p", "ports"),
