@@ -24,7 +24,7 @@ ln -s "$PWD/pipewrench.py" ~/.local/bin/pwrench
 pwrench
 ```
 
-Six tabs: **Mixer** (levels and mute), **Devices** (cards and buses), **Patch** (what goes where),
+Six tabs: **Mixer** (levels and mute), **Devices** (cards, buses and MIDI devices), **Patch** (what goes where, audio and MIDI),
 **Settings** (audio clock and realtime; display and keys), **Top** (`pw-top`) and **About**. `Tab` or `1`–`6` switches, `q`
 quits, and every tab lists its keys at the bottom. The mouse works too.
 

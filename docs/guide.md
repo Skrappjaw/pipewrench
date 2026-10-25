@@ -95,6 +95,10 @@ levels) is on the Mixer.
 Cards on profile `off` (unused HDMI, a webcam you don't use for sound) wait at the bottom under
 **Off**.
 
+MIDI devices (a controller, the GCS-8's MIDI ports, a macro pad) are listed under **MIDI**, after the
+cards. They're read-only: each shows its ALSA card (`hw:3`) and what it's connected to
+(`← REAPER  → REAPER`). Connect them on Patch.
+
 ### Switch a card's profile
 
 ![A card's profile menu](guide/devices-profile.png)
@@ -158,6 +162,16 @@ So if OBS is set to GCS-8 CH USB but the CH USB input looks unconnected, look un
 
 App streams carry their own names when they give one: OBS's inputs read `OBS · Desktop Audio`,
 `OBS · Mic/Aux`.
+
+### MIDI
+
+MIDI ports are listed after the audio, under a **MIDI** heading on both sides: controllers and
+interfaces by their port name (`nanoKONTROL2 _ CTRL`, `GCS-8 MIDI 1`), and apps like REAPER by name.
+Connect them the same way, with Enter. MIDI only connects to MIDI; Enter on an audio destination says
+so and changes nothing.
+
+From the command line, a MIDI source picks the app's MIDI input:
+`pwrench patch connect "nanoKONTROL2 _ CTRL" REAPER`.
 
 ### Grid view
 
