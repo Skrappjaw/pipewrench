@@ -49,20 +49,41 @@ THEMES = {
                "chip": ("#2e2e33", "#dedee0", ""),
                "bar_ok": ("#2e2e33", "#73d216", ""), "bar_alert": ("#2e2e33", "#fc4138", ""),
                "bar_dim": (None, None, "reverse dim")},
-    # Pipe Boy: Fallout's Pip-Boy, one phosphor green. Without hue, status reads by style: ok bold, pending
-    # underlined, alert a pale block.
-    "pipeboy": {"screen": ("#3cff62", "#0b1a0d", ""),
-                "normal": (None, None, ""), "dim": ("#1f8a35", None, ""),
-                "selected": ("#0b1a0d", "#3cff62", ""), "anchor": ("#3cff62", "#13401c", ""),
-                "title": ("#b6ffc2", None, "bold"),
-                "ok": ("#3cff62", None, "bold"), "pending": ("#3cff62", None, "underline"),
-                "alert": ("#0b1a0d", "#b6ffc2", ""),
-                "chip": ("#b6ffc2", "#13401c", "bold"),
-                "bar_ok": ("#0b1a0d", "#1f8a35", ""), "bar_alert": ("#0b1a0d", "#b6ffc2", ""),
-                "bar_dim": ("#1f8a35", "#13401c", "")},
+    # Vaporware: vaporwave colours on dark purple.
+    "vaporware": {"screen": ("#e8d9ff", "#1b0d33", ""),
+                  "normal": (None, None, ""), "dim": ("#8a6fb3", None, ""),
+                  "selected": ("#1b0d33", "#01cdfe", ""), "anchor": ("#01cdfe", "#3a1d5c", ""),
+                  "title": ("#ff71ce", None, "bold"),
+                  "ok": ("#05ffa1", None, "bold"), "pending": ("#fffb96", None, "bold"), "alert": ("#ff4f81", None, "bold"),
+                  "chip": ("#1b0d33", "#b967ff", ""),
+                  "bar_ok": ("#1b0d33", "#05ffa1", ""), "bar_alert": ("#1b0d33", "#ff4f81", ""),
+                  "bar_dim": ("#8a6fb3", "#3a1d5c", "")},
 }
+
+
+def _pipe_boy(text, pale, mid, deep, back):
+    """Pipe Boy, after Fallout's Pip-Boy: one phosphor colour at five brightnesses. Without hue, status reads by
+    style: ok bold, pending underlined, alert a pale block."""
+    return {"screen": (text, back, ""),
+            "normal": (None, None, ""), "dim": (mid, None, ""),
+            "selected": (back, text, ""), "anchor": (text, deep, ""),
+            "title": (pale, None, "bold"),
+            "ok": (text, None, "bold"), "pending": (text, None, "underline"), "alert": (back, pale, ""),
+            "chip": (pale, deep, "bold"),
+            "bar_ok": (back, mid, ""), "bar_alert": (back, pale, ""), "bar_dim": (mid, deep, "")}
+
+
+# The Pipe Boys sit after crowbar and before vaporware in the cycle.
+_PIPE_BOYS = {"pipeboy": ("#3cff62", "#b6ffc2", "#1f8a35", "#13401c", "#0b1a0d"),        # green
+              "pipeboy-amber": ("#ffb000", "#ffe0a0", "#9a6a00", "#4a3300", "#1a1000"),
+              "pipeboy-cyan": ("#33f0ff", "#b8f9ff", "#1a8a94", "#0d3f45", "#071a1c"),
+              "pipeboy-white": ("#e6e6e6", "#ffffff", "#8c8c8c", "#3a3a3a", "#121212")}
+THEMES = {**{k: v for k, v in THEMES.items() if k != "vaporware"},
+          **{name: _pipe_boy(*colours) for name, colours in _PIPE_BOYS.items()},
+          "vaporware": THEMES["vaporware"]}
 THEME_NAMES = list(THEMES)
-THEME_LABELS = {"pipeboy": "Pipe Boy"}
+THEME_LABELS = {"pipeboy": "Pipe Boy", "pipeboy-amber": "Pipe Boy Amber", "pipeboy-cyan": "Pipe Boy Cyan",
+                "pipeboy-white": "Pipe Boy White", "vaporware": "Vaporware"}
 
 
 def theme_label(name):
@@ -72,7 +93,7 @@ METER_FALL = [10, 20, 40, 80]  # dB a second: slow, VU-like, through fast
 PEAK_HOLD = [0, 0.5, 1, 1.5, 2, 3]  # seconds a peak marker hangs before it falls; 0 is off
 PEAK_FALL = 20  # dB a second, once the hold is over
 METER_FPS = [5, 10, 15, 20, 30, 45, 60]  # new audio lands once per graph cycle (21 ms at 1024/48k); falls redraw every frame
-THEME_MIN_COLOURS = {"crowbar": 256, "pipeboy": 256}  # below this the theme falls back to dark
+THEME_MIN_COLOURS = {name: 256 for name in THEME_NAMES if name not in ("dark", "light")}  # exact hex  # below this the theme falls back to dark
 
 
 def hex_rgb(colour):

@@ -3,7 +3,7 @@
 
 Each picture is the frame pwrench paints: pwcore.render_screen gives the same lines and colour roles the
 curses UI draws, and this script paints them as PNG in the dark theme, one character per cell in DejaVu
-Sans Mono (one shot shows the Pipe Boy theme). Fixtures only, so nothing from a live machine ends up in the docs, and the pictures can be
+Sans Mono (two shots show the Pipe Boy and Vaporware themes). Fixtures only, so nothing from a live machine ends up in the docs, and the pictures can be
 redrawn whenever the UI changes:
 
     python3 tools/screenshots.py            # writes docs/guide/*.png
@@ -258,6 +258,8 @@ def shots():
     yield "mixer", frame(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH USB")), mixer=m, media=MEDIA)
     yield "mixer-pipeboy", frame(pc.UIState(tab="mixer", theme="pipeboy", mix_cursor=mix_at(m, "GCS-8 CH USB")),
                                  mixer=m, media=MEDIA)
+    yield "mixer-vaporware", frame(pc.UIState(tab="mixer", theme="vaporware", mix_cursor=mix_at(m, "GCS-8 CH USB")),
+                                   mixer=m, media=MEDIA)
     yield "mixer-bar-off", frame(pc.UIState(tab="mixer", volume_bar=False, mix_cursor=mix_at(m, "GCS-8 CH USB")),
                                  mixer=m, media=MEDIA)
     st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH 2", "recording")), "enter", CUR, [], mixer=m)
@@ -302,7 +304,7 @@ def shots():
                          about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"})
 
 
-SHOT_THEMES = {"mixer-pipeboy": "pipeboy"}  # the rest are drawn in the dark theme
+SHOT_THEMES = {"mixer-pipeboy": "pipeboy", "mixer-vaporware": "vaporware"}  # the rest are drawn in the dark theme
 
 
 def main(out=OUT):

@@ -371,8 +371,10 @@ def test_theme_row_switches_at_once_and_reports_it():
     st, actions = key(st, "right")
     assert st.theme == "light" and actions == [("set_theme", "light")]
     assert "light" in "\n".join(t for t, _ in screen(st)[0])
-    st, actions = key(st, "right", "right", "right")
-    assert st.theme == "dark"  # dark → light → crowbar → pipeboy → dark
+    st, actions = key(st, *["right"] * (len(pc.THEME_NAMES) - 1))
+    assert st.theme == "dark"  # the list wraps round
+    assert pc.THEME_NAMES == ["dark", "light", "crowbar", "pipeboy", "pipeboy-amber", "pipeboy-cyan",
+                              "pipeboy-white", "vaporware"]
 
 
 def _rgb(colour):
@@ -390,6 +392,40 @@ def test_pipe_boy_is_monochrome_green():
     # without hue, status reads by style: ok bold, pending underlined, alert a block
     assert "bold" in t["ok"][2] and "underline" in t["pending"][2] and t["alert"][1]
     assert t["selected"] != t["alert"] and t["selected"] != t["chip"]
+
+
+def _hsv(c):
+    import colorsys
+    return colorsys.rgb_to_hsv(*(v / 255 for v in pc.hex_rgb(c)))
+
+
+@pytest.mark.parametrize("name,hue", [("pipeboy", 0.37), ("pipeboy-amber", 0.11), ("pipeboy-cyan", 0.51),
+                                      ("pipeboy-white", None)])
+def test_each_pipe_boy_is_one_hue(name, hue):
+    t = pc.THEMES[name]
+    assert pc.THEME_MIN_COLOURS[name] == 256
+    hexes = {c for fg, bg, _ in t.values() for c in (fg, bg) if c}
+    for c in hexes:
+        h, sat, _ = _hsv(c)
+        if hue is None:
+            assert sat < 0.1, c                      # white: greys only
+        else:
+            assert abs(h - hue) < 0.04, (c, h)      # one hue, many brightnesses
+    # every Pipe Boy shares the same layout of roles; only the hue changes
+    assert {r: (fg is None, bg is None, a) for r, (fg, bg, a) in t.items()} == \
+           {r: (fg is None, bg is None, a) for r, (fg, bg, a) in pc.THEMES["pipeboy"].items()}
+
+
+def test_vaporware_has_vaporwave_colours():
+    t = pc.THEMES["vaporware"]
+    assert pc.THEME_MIN_COLOURS["vaporware"] == 256 and pc.theme_label("vaporware") == "Vaporware"
+    assert t["title"][0] == "#ff71ce" and t["selected"][1] == "#01cdfe" and t["ok"][0] == "#05ffa1"
+    assert len({t["ok"][0], t["pending"][0], t["alert"][0]}) == 3
+
+
+def test_theme_labels():
+    assert [pc.theme_label(n) for n in pc.THEME_NAMES] == ["dark", "light", "crowbar", "Pipe Boy", "Pipe Boy Amber",
+                                                           "Pipe Boy Cyan", "Pipe Boy White", "Vaporware"]
 
 
 def test_pipe_boy_shows_its_name():
