@@ -156,9 +156,11 @@ def test_test_noise_on_bus_outputs_only():
 
 # --- keys: config edits ------------------------------------------------------------------
 
-def test_hide_buses_and_cards():
-    assert key(at("SYSTEM"), "h")[1] == [("dev_hide", "SYSTEM")]
-    assert key(at("GCS-8"), "h")[1] == [("dev_hide", INV.find_card("GCS-8").name)]
+def test_h_hides_nothing_and_points_to_the_menu():
+    # Skrappjaw hid the GCS-8 with a stray h (2026-10-24); hiding goes through Enter → Hide only.
+    for name in ("SYSTEM", "GCS-8"):
+        st, actions = key(at(name), "h")
+        assert actions == [] and st.message == "hide is in the Enter menu"
 
 def test_bus_add_and_live_delete_with_confirm():
     assert key(pc.UIState(tab="devices"), "a")[1] == [("dev_prompt_bus",)]

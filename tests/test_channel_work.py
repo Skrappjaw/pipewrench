@@ -146,11 +146,11 @@ def test_card_menu_has_no_unhide_channels_normally():
     assert not any(label.startswith("Unhide ") and "channel" in label for label, _ in pc.dev_menu_items(dv(), st))
 
 
-def test_h_hides_a_card():
+def test_h_does_not_hide_a_card():
     st = pc.focus_device(pc.UIState(tab="devices", dev_focus=("card", 193)), dv())
     st.dev_menu = None
     _, actions = dkey(st, "h")
-    assert actions == [("dev_hide", next(c.name for c in INV.cards if c.id == 193))]
+    assert actions == []
 
 
 def test_d_points_to_the_mixer():

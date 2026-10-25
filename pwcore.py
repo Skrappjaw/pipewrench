@@ -624,11 +624,8 @@ def _key_devices(st, key, devices):
             st.message = st.failed = "virtual devices have no card profile"
             return st, []
         _open_menu(st, "card", card)
-    elif key == "h":
-        if kind in ("pending", "addbus"):
-            st.message = st.failed = "a pending bus isn't running yet; x deletes it"
-            return st, []
-        return st, [("dev_hide", obj.name)]
+    elif key == "h":  # no hide shortcut: a stray h hid the GCS-8 (Skrappjaw, 2026-10-24)
+        st.message = "hide is in the Enter menu"
     elif key == "x":
         if kind == "pending" or (kind == "row" and obj.kind == "virtual"):
             st.confirm = ("dev_delete_bus", obj["name"] if kind == "pending" else obj.name)

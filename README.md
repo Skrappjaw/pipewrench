@@ -125,7 +125,7 @@ Enter and pick from the menu with ↑↓ and Enter. Esc or ← closes the menu, 
 - **Shortcuts for the other menu items:**
   - `t` test (a bus)
   - `p` the card's profile menu
-  - `h` hide a card or bus, `a` add bus, `x` delete bus
+  - `a` add bus, `x` delete bus (hide is Enter → Hide only; `h` has no shortcut)
   - `v` preview, `A` write files, `R` restart WirePlumber
 
 View toggles: **H** shows hidden cards and buses (dimmed), **m** lists a "(monitor)" input per output, as
