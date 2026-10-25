@@ -259,7 +259,8 @@ it to see what's running and whether anything is dropping out. ↑↓ and PgUp/P
 
 ## About
 
-The versions of PipeWire and WirePlumber, and where PipeWrench keeps its settings.
+The versions of PipeWire and WirePlumber, and where PipeWrench keeps its settings. The logo changes with
+the theme: Crowbar, the Pipe Boys and Vaporware each have their own lettering.
 
 ![About](guide/about.png)
 

@@ -948,7 +948,7 @@ def render_screen(st, current, block, presets, width, height, devices=None, patc
     elif st.tab == "patch":
         _render_patch(cv, dataclasses.replace(st), patch, body_h)
     elif st.tab == "about":
-        _render_about(cv, about)
+        _render_about(cv, about, st.theme)
     elif st.tab == "settings":
         sub = _Canvas(width)
         _render_settings(sub, st, current, block, presets, body_h, realtime)
@@ -1113,6 +1113,41 @@ LOGO_PAGGA = [
     "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀",
 ]
 LOGO_PLAIN = ["P I P E W R E N C H"]
+# A wordmark per theme (Skrappjaw, 2026-10-24), from figlet fonts: Doom for crowbar, Computer for every Pipe Boy,
+# Slant for Vaporware. Rows are padded to one width so the logo centres as a block.
+LOGO_DOOM = [
+    '______ _             _    _                     _     ',
+    '| ___ (_)           | |  | |                   | |    ',
+    '| |_/ /_ _ __   ___ | |  | |_ __ ___ _ __   ___| |__  ',
+    "|  __/| | '_ \\ / _ \\| |/\\| | '__/ _ \\ '_ \\ / __| '_ \\ ",
+    '| |   | | |_) |  __/\\  /\\  / | |  __/ | | | (__| | | |',
+    '\\_|   |_| .__/ \\___| \\/  \\/|_|  \\___|_| |_|\\___|_| |_|',
+    '        | |                                           ',
+    '        |_|                                           ',
+]
+LOGO_COMPUTER = [
+    '8""""8               8   8  8                             ',
+    '8    8 e  eeeee eeee 8   8  8 eeeee  eeee eeeee eeee e   e',
+    '8eeee8 8  8   8 8    8e  8  8 8   8  8    8   8 8  8 8   8',
+    '88     8e 8eee8 8eee 88  8  8 8eee8e 8eee 8e  8 8e   8eee8',
+    '88     88 88    88   88  8  8 88   8 88   88  8 88   88  8',
+    '88     88 88    88ee 88ee8ee8 88   8 88ee 88  8 88e8 88  8',
+]
+LOGO_SLANT = [
+    '    ____  _          _       __                     __  ',
+    '   / __ \\(_)___  ___| |     / /_______  ____  _____/ /_ ',
+    '  / /_/ / / __ \\/ _ \\ | /| / / ___/ _ \\/ __ \\/ ___/ __ \\',
+    ' / ____/ / /_/ /  __/ |/ |/ / /  /  __/ / / / /__/ / / /',
+    '/_/   /_/ .___/\\___/|__/|__/_/   \\___/_/ /_/\\___/_/ /_/ ',
+    '       /_/                                              ',
+]
+
+
+def theme_logo(theme):
+    """The wordmark for a theme when it fits; dark and light keep ANSI Compact."""
+    if theme.startswith("pipeboy"):
+        return LOGO_COMPUTER
+    return {"crowbar": LOGO_DOOM, "vaporware": LOGO_SLANT}.get(theme, LOGO_ANSI)
 ABOUT_LINK = "github.com/Skrappjaw/pipewrench"
 ABOUT_CMDS = {"pipewire": ["pipewire", "--version"], "wireplumber": ["wireplumber", "--version"]}
 
@@ -1133,9 +1168,9 @@ def about_info(run):
     return info
 
 
-def _render_about(cv, about):
+def _render_about(cv, about, theme="dark"):
     about = about or {}
-    logo = next((lg for lg in (LOGO_ANSI, LOGO_PAGGA) if len(lg[0]) + 4 <= cv.width), LOGO_PLAIN)
+    logo = next((lg for lg in (theme_logo(theme), LOGO_PAGGA) if len(lg[0]) + 4 <= cv.width), LOGO_PLAIN)
     pad = max(0, (cv.width - len(logo[0])) // 2)
     cv.add("")
     for row in logo:

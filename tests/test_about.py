@@ -1,5 +1,5 @@
-"""The About tab: the PipeWrench wordmark (notes/about-art.md) over a short info block. The font follows the
-width: ANSI Compact where it fits, Pagga where it's narrower, the letterspaced line below that."""
+"""The About tab: the PipeWrench wordmark over a short info block. The font follows the theme (ANSI Compact,
+Doom, Computer or Slant) where it fits, Pagga where it's narrower, the letterspaced line below that."""
 import pytest
 
 import pwcore as pc
@@ -108,3 +108,36 @@ def test_about_info_survives_missing_tools():
         raise OSError("not found")
     info = pc.about_info(run)
     assert info["pipewire"] == "?" and info["wireplumber"] == "?"
+
+
+# --- a wordmark per theme (Skrappjaw, 2026-10-24): dark/light ANSI Compact, crowbar Doom, Pipe Boy Computer,
+#     Vaporware Slant; narrow terminals fall back to Pagga, then the letterspaced line
+
+def themed(theme, width=100):
+    return body(pc.render_screen(UIState(tab="about", theme=theme), {}, [], [], width, 30, about=ABOUT)[0])
+
+
+@pytest.mark.parametrize("theme,logo", [("dark", "LOGO_ANSI"), ("light", "LOGO_ANSI"), ("crowbar", "LOGO_DOOM"),
+                                        ("pipeboy", "LOGO_COMPUTER"), ("pipeboy-amber", "LOGO_COMPUTER"),
+                                        ("pipeboy-cyan", "LOGO_COMPUTER"), ("pipeboy-white", "LOGO_COMPUTER"),
+                                        ("vaporware", "LOGO_SLANT")])
+def test_each_theme_has_its_wordmark(theme, logo):
+    text = themed(theme)
+    assert all(row.rstrip() in text for row in getattr(pc, logo))
+    others = {"LOGO_ANSI", "LOGO_DOOM", "LOGO_COMPUTER", "LOGO_SLANT"} - {logo}
+    assert not any(getattr(pc, o)[1].rstrip() in text for o in others)
+
+
+def test_every_theme_has_a_logo_entry():
+    assert all(pc.theme_logo(t) for t in pc.THEME_NAMES)
+
+
+@pytest.mark.parametrize("theme", ["crowbar", "pipeboy", "vaporware"])
+def test_themed_logos_fall_back_when_narrow(theme):
+    assert pc.LOGO_PAGGA[0] in themed(theme, width=50)
+    assert "P I P E W R E N C H" in themed(theme, width=40)
+
+
+def test_themed_logos_fit_80_columns_and_stay_aligned():
+    for logo in (pc.LOGO_DOOM, pc.LOGO_COMPUTER, pc.LOGO_SLANT):
+        assert len({len(row) for row in logo}) == 1 and len(logo[0]) + 4 <= 80
