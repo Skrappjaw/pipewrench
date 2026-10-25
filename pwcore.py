@@ -1551,8 +1551,28 @@ def meter_targets(mx, cursor):
         if not row.serial or (kind == "app" and section == "recording"):
             continue
         if n == cursor or row.state == "running":
-            picks.append((n != cursor, n, (section, row.id), (row.serial, kind == "dev" and section == "playback")))
+            target = (row.serial, kind == "dev" and section == "playback") + ((row.meter_ports,) if row.meter_ports else ())
+            picks.append((n != cursor, n, (section, row.id), target))
     return {k: target for _, _, k, target in sorted(picks)[:METER_CAP]}
+
+
+MIDI_CAP = 4      # MIDI activity taps at once (one pw-mididump each)
+MIDI_LIT = 0.3    # seconds the dot stays lit after an event
+
+
+def midi_targets(mx, cursor):
+    """{(section, row id): port ids} for app MIDI rows to watch: the selected one and every running one."""
+    picks = [(n != cursor, n, (section, row.id), row.midi) for n, (kind, section, row) in enumerate(mixer_selectable(mx))
+             if row.midi and (n == cursor or row.state == "running")]
+    return {k: ports for _, _, k, ports in sorted(picks)[:MIDI_CAP]}
+
+
+def _midi_dot(mx, key):
+    """(text, spans) for a MIDI row where the volume bar goes: ● lit for a moment after an event, else ○."""
+    seen, now = mx.get("midi_seen", {}).get(key), mx.get("now")
+    if seen is not None and now is not None and now - seen <= MIDI_LIT:
+        return "● MIDI", [(0, 1, "meter_low"), (2, 6, "normal")]
+    return "○ MIDI", [(0, 6, "dim")]
 
 
 def meter_level(prev, peak, dt, fall=20):
@@ -1655,7 +1675,7 @@ def _render_mixer(cv, st, mx, body_h):
         indent = "  " if kind == "app" else ""
         w = label_w - len(indent)  # app rows sit under their section; the bars still line up
         head = f"{'> ' if sel else '  '}{star} {indent}{_fit(name, w):<{w}} "
-        bar, spans = _volume_bar(row, st.volume_bar)
+        bar, spans = _midi_dot(mx, (section, row.id)) if row.media == "midi" else _volume_bar(row, st.volume_bar)
         bar = bar.ljust(vol_w)
         c0 = len(head)
         spans = [(c0 + a, c0 + b, r) for a, b, r in spans]

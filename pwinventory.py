@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, replace
 
 HW_APIS = ("alsa", "bluez5")
 METER_NAME = "pipewrench-meter"  # PipeWrench's own level-meter streams; never listed anywhere
+MIDI_TAP_NAME = "midi-dump"      # pw-mididump's node (it can't be renamed): the Mixer's MIDI activity taps
 METER_RATE = 3000  # Hz: peaks within ~3% of full rate in the spike (notes/mixer-plan.md); 1 kHz blunts them
 DUMP_CMD = ["pw-dump"]
 
@@ -72,6 +73,9 @@ class Row:
     serial: int = None        # object.serial, what pw-record --target takes
     pid: int = None           # application.process.id (app streams), to find a media player's stream
     alsa_card: int = None     # MIDI rows: the ALSA card number (hw:N)
+    media: str = "audio"      # audio | midi (an app's MIDI row on the Mixer)
+    midi: tuple = ()          # an app's MIDI row: the port ids whose traffic its activity dot shows
+    meter_ports: tuple = ()   # a JACK client: its linked audio outputs, which its meter links to itself
 
 
 @dataclass
@@ -162,14 +166,22 @@ def _row(obj, defaults):
 
 
 def is_meter(props):
-    return str(props.get("node.name", "")).startswith(METER_NAME)
+    """PipeWrench's own listeners: level meters and MIDI activity taps."""
+    name = str(props.get("node.name", ""))
+    return name.startswith(METER_NAME) or name == MIDI_TAP_NAME
 
 
-def meter_cmd(serial, monitor):
+def meter_cmd(serial, monitor, name=None):
     """A pw-record that streams a node's audio as raw stereo f32 on stdout; monitor reads a sink's output.
-    stdbuf -o0: into a pipe, pw-record otherwise holds 4 KB back, which at 3 kHz is a write every 170 ms."""
-    props = "{ node.name = " + METER_NAME + ", node.dont-reconnect = true" + (", stream.capture.sink = true" if monitor else "") + " }"
-    return ["stdbuf", "-o0", "pw-record", "--target", str(serial), "--rate", str(METER_RATE), "--channels", "2", "--format", "f32",
+    stdbuf -o0: into a pipe, pw-record otherwise holds 4 KB back, which at 3 kHz is a write every 170 ms.
+    With a name it links nowhere (--target 0) and the caller pw-links ports into it: a JACK client can't be
+    a target (WirePlumber falls back to the default input, so the meter showed the mic)."""
+    if name:
+        props, target = "{ node.name = " + name + ", node.autoconnect = false }", "0"
+    else:
+        props = "{ node.name = " + METER_NAME + ", node.dont-reconnect = true" + (", stream.capture.sink = true" if monitor else "") + " }"
+        target = str(serial)
+    return ["stdbuf", "-o0", "pw-record", "--target", target, "--rate", str(METER_RATE), "--channels", "2", "--format", "f32",
             "-P", props, "-"]
 
 
@@ -188,7 +200,8 @@ def streams(dump):
     """App rows for the Mixer: playback ("out") and recording ("in") streams, plus JACK clients, which
     have no media.class and no volume, listed by the way they're linked. Peak-detect streams are left out."""
     peers = _peers(dump)
-    rows = []
+    jack_outs = _jack_meter_ports(dump)
+    rows = _midi_apps(dump)
     for o in dump:
         if o.get("type") != "PipeWire:Interface:Node" or "id" not in o:
             continue
@@ -207,9 +220,67 @@ def streams(dump):
         volume, mute = _volume(info)
         rows += [Row(id=o["id"], name=p.get("node.name", str(o["id"])), label=display_name(p), direction=d,
                      kind="app", state=info.get("state"), volume=volume, mute=mute, inputs=ins, outputs=outs,
-                     serial=p.get("object.serial"), pid=p.get("application.process.id"))
+                     serial=p.get("object.serial"), pid=p.get("application.process.id"),
+                     meter_ports=jack_outs.get(o["id"], ()) if d == "out" else ())
                  for d in directions]
     return sorted(rows, key=lambda r: natural_key(r.label))
+
+
+def _ports(dump):
+    return {o["id"]: (_info(o).get("props") or {}, _info(o).get("direction")) for o in dump
+            if o.get("type") == "PipeWire:Interface:Port" and "id" in o}
+
+
+def _links(dump):
+    return [(_info(o).get("output-port-id"), _info(o).get("input-port-id")) for o in dump
+            if o.get("type") == "PipeWire:Interface:Link" and _info(o).get("state") != "error"]
+
+
+def _jack_meter_ports(dump):
+    """{JACK client node: its audio outputs for the meter}: the linked ones, else the first two."""
+    jack = {o["id"] for o in dump if o.get("type") == "PipeWire:Interface:Node" and "id" in o
+            and not (_info(o).get("props") or {}).get("media.class")}
+    linked = {a for a, _ in _links(dump)}
+    outs = {}
+    for pid, (p, direction) in sorted(_ports(dump).items()):
+        if p.get("node.id") in jack and direction == "output" and not is_midi_port(p):
+            outs.setdefault(p["node.id"], []).append(pid)
+    return {n: tuple([x for x in ps if x in linked] or ps[:2]) for n, ps in outs.items()}
+
+
+def _midi_apps(dump):
+    """An app's MIDI as its own Mixer rows, "<app> · MIDI", one per direction it has: what it sends to and
+    hears from, and the ports to tap for its activity dot (its outputs; for input, the ports feeding it)."""
+    nodes = {o["id"]: o for o in dump if o.get("type") == "PipeWire:Interface:Node" and "id" in o}
+    ports, links = _ports(dump), _links(dump)
+
+    def name(port):
+        p, _ = ports.get(port, ({}, None))
+        node = (_info(nodes.get(p.get("node.id"))).get("props")) or {}
+        return midi_label(p.get("port.alias") or p.get("port.name", "")) if is_midi_bridge(node) else display_name(node)
+
+    per_node = {}
+    for pid, (p, direction) in ports.items():
+        if is_midi_port(p) and direction in ("output", "input"):
+            per_node.setdefault(p.get("node.id"), {"output": [], "input": []})[direction].append(pid)
+    rows = []
+    order = lambda s: tuple(sorted(s, key=str.lower))
+    for node_id, dirs in per_node.items():
+        props = _info(nodes.get(node_id)).get("props") or {}
+        if node_id not in nodes or is_midi_bridge(props) or is_meter(props):
+            continue
+        label, state = display_name(props) + " · MIDI", _info(nodes[node_id]).get("state")
+        outs, ins = set(dirs["output"]), set(dirs["input"])
+        if outs:
+            rows.append(Row(id=min(outs), name=f"{props.get('node.name', node_id)}:midi-out", label=label,
+                            direction="out", kind="app", state=state, media="midi", midi=tuple(sorted(outs)),
+                            outputs=order({name(b) for a, b in links if a in outs})))
+        if ins:
+            feeding = {a for a, b in links if b in ins}
+            rows.append(Row(id=min(ins), name=f"{props.get('node.name', node_id)}:midi-in", label=label,
+                            direction="in", kind="app", state=state, media="midi", midi=tuple(sorted(feeding)),
+                            inputs=order({name(a) for a in feeding})))
+    return rows
 
 
 def _card(obj):
@@ -259,10 +330,12 @@ def _peers(dump):
     """{node id: (inputs, outputs)} from the link objects, one name per peer, error links skipped."""
     names = {o["id"]: _peer_name(_info(o).get("props") or {}) for o in dump
              if o.get("type") == "PipeWire:Interface:Node" and "id" in o and not is_meter(_info(o).get("props") or {})}
+    midi = {i for i, (p, _) in _ports(dump).items() if is_midi_port(p)}  # MIDI links aren't audio peers
     ins, outs = {}, {}
     for o in dump:
         info = _info(o)
-        if o.get("type") != "PipeWire:Interface:Link" or info.get("state") == "error":
+        if o.get("type") != "PipeWire:Interface:Link" or info.get("state") == "error" \
+                or info.get("output-port-id") in midi or info.get("input-port-id") in midi:
             continue
         a, b = info.get("output-node-id"), info.get("input-node-id")
         if a in names and b in names:
