@@ -1681,7 +1681,7 @@ def _render_mixer(cv, st, mx, body_h):
 
 # --- Patch tab -------------------------------------------------------------------------
 
-_STATE_MARK = {"full": "●", "partial": "◐", "none": "·"}
+_STATE_MARK = {"full": "●", "partial": "◐", "none": "·", "n/a": " "}  # n/a: audio with MIDI
 
 
 def patch_sources(g, st):

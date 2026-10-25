@@ -487,9 +487,9 @@ def _graph(runner):
     return pp.graph(_dump(runner))
 
 
-def _endpoint(find, key, what):
+def _endpoint(find, key, what, media=None):
     try:
-        e = find(key)
+        e = find(key, media)
     except LookupError as e:
         raise CliError(str(e), 2)
     if e is None:
@@ -510,7 +510,12 @@ def _patch(args, runner, out):
     if sub in ("connect", "disconnect") and len(rest) == 2:
         g = _graph(runner)
         s = _endpoint(g.find_source, rest[0], "source")
-        d = _endpoint(g.find_dest, rest[1], "destination")
+        try:  # "REAPER" after a MIDI source means REAPER's MIDI input
+            d = _endpoint(g.find_dest, rest[1], "destination", s.media)
+        except CliError:
+            d = _endpoint(g.find_dest, rest[1], "destination")
+        if s.media != d.media:
+            raise CliError(f"{s.label} → {d.label}: MIDI connects only to MIDI", 2)
         cmds = (pp.connect_cmds if sub == "connect" else pp.disconnect_cmds)(g, s, d)
         if not cmds:
             out.write(f"{s.label} → {d.label} is {'already connected' if sub == 'connect' else 'not connected'}\n")

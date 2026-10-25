@@ -77,3 +77,29 @@ def test_bad_input_exit_2(args):
 def test_pw_link_failure_exit_1():
     rc, _, err, _ = run("connect", "GCS-8 CH 1", "GCS-8 CH 3-AUX", runner=Runner(fail=True))
     assert rc == 1 and "Operation not permitted" in err
+
+
+# --- MIDI ------------------------------------------------------------------------------
+
+class MidiRunner(Runner):
+    def __call__(self, argv):
+        if argv == ["pw-dump"]:
+            self.calls.append(argv)
+            return 0, (FIX / "pwdump_midi.json").read_text()
+        return super().__call__(argv)
+
+
+def test_list_shows_midi_links():
+    _, out, _, _ = run("list", runner=MidiRunner())
+    assert "KB16-01 MIDI 1 → REAPER  (MIDI→MIDI)" in out and "REAPER → KB16-01 MIDI 1  (MIDI→MIDI)" in out
+
+
+def test_connect_midi_to_reaper_picks_its_midi_input():
+    rc, out, err, r = run("connect", "nanoKONTROL2 _ CTRL", "REAPER", runner=MidiRunner())
+    assert rc == 0, err
+    assert r.links() == [["pw-link", "1007", "1012"]] and "connected" in out
+
+
+def test_connect_audio_to_midi_says_why():
+    rc, _, err, r = run("connect", "GCS-8 CH 1", "KB16-01 MIDI 1", runner=MidiRunner())
+    assert rc == 2 and r.links() == [] and "MIDI connects only to MIDI" in err
