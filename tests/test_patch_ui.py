@@ -342,13 +342,13 @@ def test_clicking_a_slot_picks_it():
 
 def test_grid_marks_the_row_as_anchor_and_the_cell_as_cursor():
     roles = [b[2] for b in bars(at("Discord", patch_view="grid"))]
-    assert roles == ["anchor", "selected"]
+    assert roles == ["anchor_src", "bar_dst"]
 
 
 def test_link_marks_are_tinted():
     lines, _ = screen(at("Discord"))
     row = next(style for text, style in lines if "●1" in text)
-    assert any(r == "ok" for *_, r in row[1])
+    assert any(r.split("@")[0] in ("src", "dst") for *_, r in row[1])
 
 
 def test_wheel_scrolls_the_column_under_the_mouse():

@@ -132,8 +132,8 @@ for _t in THEMES.values():
     for _bar, _base in (("bar_src", "selected"), ("bar_dst", "selected"), ("anchor_src", "anchor"),
                         ("anchor_dst", "anchor")):
         _t.setdefault(_bar, _t[_base])
-    for _dot, _bar in (("src", "bar_src"), ("src", "anchor_src"), ("dst", "bar_dst"), ("dst", "anchor_dst"),
-                       ("dst_partial", "bar_dst"), ("dst_partial", "anchor_dst")):
+    for _dot, _bar in ((d, b) for d in ("src", "dst", "dst_partial")
+                       for b in ("selected", "anchor", "bar_src", "anchor_src", "bar_dst", "anchor_dst")):
         # a dot under a bar keeps its colour on the bar's background (pipeOS); elsewhere the bar covers it
         _t[f"{_dot}@{_bar}"] = (_t[_dot][0], _t[_bar][1], _t[_dot][2]) if _own else _t[_bar]
     _t.setdefault("head_play", _t["title"])
@@ -938,7 +938,8 @@ def _legend(st):
     return LEGENDS[st.tab]
 
 
-_MARK_ROLE = {"●": "ok", "◐": "pending"}
+_MARK_ROLE = {"●": "dst", "◐": "dst_partial"}  # connection dots; dst/dst_partial are ok/pending outside pipeOS
+_BARS = ("selected", "anchor", "bar_src", "anchor_src", "bar_dst", "anchor_dst")
 
 
 class _Canvas:
@@ -953,7 +954,12 @@ class _Canvas:
         marks = [(n, n + 1, _MARK_ROLE[ch]) for n, ch in enumerate(text) if ch in _MARK_ROLE]
         if marks and style != "selected":
             base, spans = style if isinstance(style, tuple) else (style, [])
-            style = (base, marks + list(spans))  # explicit spans last, so a cursor bar stays one colour
+            spans = list(spans)
+            for c0, c1, role in marks:  # a dot under a bar keeps its colour on the bar's background
+                under = next((r for a, b, r in reversed(spans) if a <= c0 < b), None)
+                if under in _BARS:
+                    spans.append((c0, c1, f"{role}@{under}"))
+            style = (base, marks + spans)
         self.lines.append((text, style))
         return len(self.lines) - 1
 
@@ -1837,7 +1843,7 @@ def _slot_menu(g, st, s, d, avail):
     out = [("┌" + f"─ {_fit(s.label, w - 3)} ".ljust(w, "─") + "┐", None, None)]
     for k, text in enumerate(items):
         sel = k == st.patch_menu_cursor
-        out.append(("│" + f"{'>' if sel else ' '} {_fit(text, w - 2)}".ljust(w) + "│", "selected" if sel else None,
+        out.append(("│" + f"{'>' if sel else ' '} {_fit(text, w - 2)}".ljust(w) + "│", "bar_dst" if sel else None,
                     ("patch_slot", k)))
     out.append(("└" + "─" * w + "┘", None, None))
     return out
@@ -1906,7 +1912,7 @@ def _render_patch_grid(cv, st, g, srcs, s, d, room):
         spans = []
         if sel:
             c0 = 2 + label_w + 3 * cols.index(st.patch_dst) if st.patch_dst in cols else None
-            spans = [(0, 2 + label_w, "anchor")] + ([(c0, c0 + 3, "selected")] if c0 is not None else [])
+            spans = [(0, 2 + label_w, "anchor_src")] + ([(c0, c0 + 3, "bar_dst")] if c0 is not None else [])
         row = cv.add(f"{'> ' if sel else '  '}{_fit(srcs[i].label, label_w):<{label_w}}{cells}", ("normal", spans))
         for k, j in enumerate(cols):
             c0 = 2 + label_w + 3 * k
@@ -1940,7 +1946,7 @@ def _render_port_matrix(cv, st, g, s, d, room):
         spans = []
         if sel:
             c0 = 2 + row_w + cell_w * cols.index(st.patch_port_col) if st.patch_port_col in cols else None
-            spans = [(0, 2 + row_w, "anchor")] + ([(c0, c0 + cell_w, "selected")] if c0 is not None else [])
+            spans = [(0, 2 + row_w, "anchor_src")] + ([(c0, c0 + cell_w, "bar_dst")] if c0 is not None else [])
         row = cv.add(f"{'> ' if sel else '  '}{s.ports[i].channel:<{row_w}}{cells}", ("normal", spans))
         for k, j in enumerate(cols):
             c0 = 2 + row_w + cell_w * k

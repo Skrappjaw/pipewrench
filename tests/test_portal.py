@@ -134,3 +134,13 @@ def test_placeholder_names_still_load(tmp_path):
     for old, new in (("portal-light", "pipeos-lite"), ("portal-dark", "pipeos-dark")):
         p.write_text(f'{{"theme": "{old}"}}')
         assert pc.load_ui(p)["theme"] == new
+
+
+@pytest.mark.parametrize("view", [dict(), dict(patch_view="grid"), dict(patch_ports=True)])
+def test_no_connection_dot_is_drawn_in_ok_green(view):
+    lines = patch_lines(theme="pipeos-dark", **view)
+    for text, style in lines[2:-6]:  # the body; the key box and status line are left out
+        for n, ch in enumerate(text):
+            if ch in "●◐":
+                role = role_at(style, n)
+                assert role.split("@")[0] in ("src", "dst", "dst_partial"), (text, role)
