@@ -1206,6 +1206,20 @@ LOGO_PAGGA = [
     "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀",
 ]
 LOGO_PLAIN = ["P I P E W R E N C H"]
+# Skrappjaw's own wordmark for dark and light (2026-10-25): the P's stem runs down as the wrench handle.
+# ▒ and ░ are the shading, drawn dim; █ is the lettering.
+LOGO_WRENCH = [
+    '▒██████ ▒██▒████  ▒████▒██  ▒█▒█████ ▒████▒████  ▒███▒██ ▒█',
+    '     ░██      ▒██▒██   ▒██  ▒█▒██ ▒█▒██   ▒██▒██▒██  ▒██ ▒█',
+    '▒███████▒██▒█████▒████ ▒██  ▒█▒█████▒████ ▒██ ▒█▒██  ▒█████',
+    '  ▒██░█ ▒██▒██   ▒██   ▒██▒█▒█▒██ █ ▒██   ▒██ ▒█▒██  ▒██ ▒█',
+    '  ▒██   ▒██▒██    ▒████▒███▒██▒██ ██ ▒████▒██ ▒█ ▒███▒██ ▒█',
+    '  ▒██                                                      ',
+    '  ▒██                                                      ',
+    '  ▒█                                                       ',
+    '  ▒█                                                       ',
+    '  ▒                                                        ',
+]
 # A wordmark per theme (Skrappjaw, 2026-10-24), from figlet fonts: Doom for crowbar, Computer for every Pipe Boy,
 # Slant for Vaporware. Rows are padded to one width so the logo centres as a block.
 LOGO_DOOM = [
@@ -1251,10 +1265,11 @@ LOGO_PIPECRAFT_SMALL = [
 
 
 def theme_logo(theme):
-    """The wordmark for a theme when it fits; dark and light keep ANSI Compact."""
+    """The wordmark for a theme when it fits; dark and light have Skrappjaw's wrench, the rest ANSI Compact."""
     if theme.startswith("pipeboy"):
         return LOGO_COMPUTER
-    return {"crowbar": LOGO_DOOM, "vaporware": LOGO_SLANT, "pipecraft": LOGO_PIPECRAFT}.get(theme, LOGO_ANSI)
+    return {"dark": LOGO_WRENCH, "light": LOGO_WRENCH, "crowbar": LOGO_DOOM, "vaporware": LOGO_SLANT,
+            "pipecraft": LOGO_PIPECRAFT}.get(theme, LOGO_ANSI)
 
 
 def logo_chain(theme):
@@ -1289,7 +1304,7 @@ def _render_about(cv, about, theme="dark"):
     pad = max(0, (cv.width - len(logo[0])) // 2)
     cv.add("")
     for row in logo:
-        plate = [(pad + n, pad + n + 1, "dim") for n, ch in enumerate(row) if ch == "░"]
+        plate = [(pad + n, pad + n + 1, "dim") for n, ch in enumerate(row) if ch in "░▒"]
         cv.add(" " * pad + row, ("title", plate) if plate else "title")
     cv.add("")
     tagline = "terminal control for PipeWire"

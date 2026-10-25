@@ -23,9 +23,9 @@ def test_about_is_the_last_tab():
     assert st.tab == "about"
 
 
-def test_wide_terminal_gets_ansi_compact():
+def test_wide_terminal_gets_the_wrench():
     lines, _ = screen(width=100)
-    assert pc.LOGO_ANSI[0] in body(lines)
+    assert all(row.rstrip() in body(lines) for row in pc.LOGO_WRENCH) and pc.LOGO_ANSI[0] not in body(lines)
     assert pc.LOGO_PAGGA[0] not in body(lines)
 
 
@@ -49,9 +49,19 @@ def test_logo_rows_are_one_width():
 
 def test_logo_is_centred_in_the_accent():
     lines, _ = screen(width=100)
-    row = next((t, s) for t, s in lines if pc.LOGO_ANSI[0] in t)
-    assert row[0].index(pc.LOGO_ANSI[0]) == (100 - 62) // 2
-    assert row[1] == "title"
+    text, (base, spans) = next((t, s) for t, s in lines if pc.LOGO_WRENCH[0] in t)
+    assert text.index(pc.LOGO_WRENCH[0]) == (100 - 59) // 2 and base == "title"
+
+
+def test_wrench_shading_is_dim_and_letters_accent():
+    lines, _ = screen(width=100)
+    text, (_, spans) = next((t, s) for t, s in lines if pc.LOGO_WRENCH[1] in t)
+    dim = {a for a, b, role in spans if role == "dim"}
+    assert {text.index("░"), text.index("▒")} <= dim and text.index("█") not in dim
+
+
+def test_wrench_rows_are_one_width_and_fit_80_columns():
+    assert len({len(row) for row in pc.LOGO_WRENCH}) == 1 and len(pc.LOGO_WRENCH[0]) + 4 <= 80
 
 
 def test_pagga_plate_is_dim_and_letters_accent():
@@ -117,14 +127,14 @@ def themed(theme, width=100):
     return body(pc.render_screen(UIState(tab="about", theme=theme), {}, [], width, 30, about=ABOUT)[0])
 
 
-@pytest.mark.parametrize("theme,logo", [("dark", "LOGO_ANSI"), ("light", "LOGO_ANSI"), ("crowbar", "LOGO_DOOM"),
+@pytest.mark.parametrize("theme,logo", [("dark", "LOGO_WRENCH"), ("light", "LOGO_WRENCH"), ("pipeos-dark", "LOGO_ANSI"), ("crowbar", "LOGO_DOOM"),
                                         ("pipeboy", "LOGO_COMPUTER"), ("pipeboy-amber", "LOGO_COMPUTER"),
                                         ("pipeboy-cyan", "LOGO_COMPUTER"), ("pipeboy-white", "LOGO_COMPUTER"),
                                         ("vaporware", "LOGO_SLANT")])
 def test_each_theme_has_its_wordmark(theme, logo):
     text = themed(theme)
     assert all(row.rstrip() in text for row in getattr(pc, logo))
-    others = {"LOGO_ANSI", "LOGO_DOOM", "LOGO_COMPUTER", "LOGO_SLANT"} - {logo}
+    others = {"LOGO_WRENCH", "LOGO_ANSI", "LOGO_DOOM", "LOGO_COMPUTER", "LOGO_SLANT"} - {logo}
     assert not any(getattr(pc, o)[1].rstrip() in text for o in others)
 
 
@@ -132,7 +142,7 @@ def test_every_theme_has_a_logo_entry():
     assert all(pc.theme_logo(t) for t in pc.THEME_NAMES)
 
 
-@pytest.mark.parametrize("theme", ["crowbar", "pipeboy", "vaporware"])
+@pytest.mark.parametrize("theme", ["dark", "light", "crowbar", "pipeboy", "vaporware"])
 def test_themed_logos_fall_back_when_narrow(theme):
     assert pc.LOGO_PAGGA[0] in themed(theme, width=50)
     assert "P I P E W R E N C H" in themed(theme, width=40)
