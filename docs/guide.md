@@ -47,6 +47,11 @@ The volume % sits inside the bar. Green is up to 100%, red past it, grey when mu
 right shows the live level of running channels (yellow past −18 dB, red past −6 dB) with a short peak
 hold.
 
+An app with MIDI (REAPER) gets a second row for it, `REAPER · MIDI`, under its audio row: where its
+MIDI goes (`→ KB16-01 MIDI 1, nanoKONTROL2 _ CTRL`) or comes from (`←`). Where the volume would be, a
+dot lights (● MIDI) as MIDI passes and goes dim (○ MIDI) when it stops. The dot works while meters
+are on (`v`).
+
 **Prefer numbers?** Settings → Display → Volume bar off leaves just the %, and the meter moves in
 beside it:
 
