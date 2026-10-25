@@ -1,4 +1,4 @@
-"""Pure logic for pwctl: PipeWire settings metadata, pw-top parsing, presets, and the TUI
+"""Pure logic for PipeWrench: PipeWire settings metadata, pw-top parsing, presets, and the TUI
 state machine. No curses and no subprocess calls here; callers pass a runner.
 
 Behaviour follows PipeControl (github.com/portaloffreedom/pipecontrol v0.3.0):
@@ -74,14 +74,14 @@ def nearest_256(colour):
 
 
 def ui_path():
-    if os.environ.get("PWCTL_UI"):
-        return Path(os.environ["PWCTL_UI"])
+    if os.environ.get("PIPEWRENCH_UI"):
+        return Path(os.environ["PIPEWRENCH_UI"])
     base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
-    return Path(base) / "pwctl" / "ui.json"
+    return Path(base) / "pipewrench" / "ui.json"
 
 
 def load_ui(path):
-    """pwctl's own display preferences; a missing or broken file gives the defaults."""
+    """PipeWrench's own display preferences; a missing or broken file gives the defaults."""
     try:
         ui = json.loads(Path(path).read_text())
     except (OSError, ValueError):
@@ -304,10 +304,10 @@ _NAME = re.compile(r"[A-Za-z0-9_-]{1,32}")
 
 
 def presets_path():
-    if os.environ.get("PWCTL_PRESETS"):
-        return Path(os.environ["PWCTL_PRESETS"])
+    if os.environ.get("PIPEWRENCH_PRESETS"):
+        return Path(os.environ["PIPEWRENCH_PRESETS"])
     base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
-    return Path(base) / "pwctl" / "presets.json"
+    return Path(base) / "pipewrench" / "presets.json"
 
 
 def validate_preset(p):
@@ -483,7 +483,7 @@ def handle_key(st, key, current, presets, devices=None, patch=None, mixer=None):
     return {"settings": _key_settings, "top": _key_top}[st.tab](st, key, current, presets)
 
 
-# Settings is one list: the clock rows, then Display (pwctl's own rows; they apply at once), then presets.
+# Settings is one list: the clock rows, then Display (PipeWrench's own rows; they apply at once), then presets.
 THEME_ROW = len(SETTINGS)
 FPS_ROW = THEME_ROW + 1
 FALL_ROW = FPS_ROW + 1
@@ -597,7 +597,7 @@ def _key_preset_row(st, key, name):
 
 def devices_view(inv, config, dirty=False, owned=(), clash=(), pending=()):
     """Everything the Devices tab draws: the live inventory, devices.json, whether the generated
-    files are behind it, and bus status (pwctl-owned, clashing with a bus made elsewhere, pending)."""
+    files are behind it, and bus status (PipeWrench-owned, clashing with a bus made elsewhere, pending)."""
     return {"inv": inv, "config": config, "dirty": dirty, "owned": set(owned), "clash": set(clash),
             "pending": list(pending)}
 
@@ -1075,7 +1075,7 @@ LOGO_PAGGA = [
     "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀",
 ]
 LOGO_PLAIN = ["P I P E W R E N C H"]
-ABOUT_LINK = "github.com/Skrappjaw/pwctl"
+ABOUT_LINK = "github.com/Skrappjaw/pipewrench"
 ABOUT_CMDS = {"pipewire": ["pipewire", "--version"], "wireplumber": ["wireplumber", "--version"]}
 
 
@@ -1168,7 +1168,7 @@ def _device_line_text(kind, obj, devices, selected):
     vol = "muted" if obj.mute else "" if obj.volume is None else f"{round(obj.volume * 100)}%"
     pending = c["labels"].get(obj.name)
     hidden = obj.name in c["hidden"]
-    tags = [t for t, on in (("pwctl", obj.name in devices["owned"]), ("made outside pwctl", obj.name in devices["clash"]),
+    tags = [t for t, on in (("PipeWrench", obj.name in devices["owned"]), ("made outside PipeWrench", obj.name in devices["clash"]),
                             ("hidden", hidden), (f"label → {pending}", bool(pending) and pending != obj.label)) if on]
     text = (f"{prefix}{'★' if obj.default else ' '} {obj.direction:<6} {_fit(obj.label, 30):<30} "
             f"{obj.state or '?':<9} {vol:<6} {obj.id:>5}" + (f"  [{', '.join(tags)}]" if tags else "")
@@ -1179,7 +1179,7 @@ def _device_line_text(kind, obj, devices, selected):
 def _tag_spans(text):
     """Tags in their roles: a clash reads as danger, a label not yet written as pending."""
     spans = []
-    for tag, role in (("made outside pwctl", "alert"), ("label → ", "pending")):
+    for tag, role in (("made outside PipeWrench", "alert"), ("label → ", "pending")):
         a = text.find(tag)
         if a >= 0:
             b = min((n for n in (text.find(",", a), text.find("]", a)) if n >= 0), default=len(text))

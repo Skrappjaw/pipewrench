@@ -1,4 +1,4 @@
-"""Pure logic for pwctl's key bindings: which single key runs each shortcut, and what clashes.
+"""Pure logic for PipeWrench's key bindings: which single key runs each shortcut, and what clashes.
 
 The tab handlers in pwcore only know each action's default key. translate() maps the key Skrappjaw pressed onto
 that default, so rebinding needs no change in the handlers. Bindings are kept in ui.json as overrides only.

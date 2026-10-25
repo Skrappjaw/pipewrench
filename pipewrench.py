@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""pwctl: terminal PipeControl. Change PipeWire sample rate and buffer size live,
+"""PipeWrench (pwrench): terminal PipeWire control. Change PipeWire sample rate and buffer size live,
 watch pw-top, and keep labelled presets.
 
-    pwctl                      interactive UI (keyboard + mouse)
-    pwctl status
-    pwctl rate N | buf N | min N | max N | log N
-    pwctl reset                stop forcing rate and buffer
-    pwctl top                  run pw-top
-    pwctl preset list | save NAME [LABEL] | apply NAME | delete NAME
-    pwctl devices [list] | default | volume | mute | profile | label | hide | bus | apply …
-    pwctl patch [list] | connect SRC DST | disconnect SRC DST
-    pwctl realtime             is PipeWire's audio realtime? and the fix if not
+    pwrench                      interactive UI (keyboard + mouse)
+    pwrench status
+    pwrench rate N | buf N | min N | max N | log N
+    pwrench reset                stop forcing rate and buffer
+    pwrench top                  run pw-top
+    pwrench preset list | save NAME [LABEL] | apply NAME | delete NAME
+    pwrench devices [list] | default | volume | mute | profile | label | hide | bus | apply …
+    pwrench patch [list] | connect SRC DST | disconnect SRC DST
+    pwrench realtime             is PipeWire's audio realtime? and the fix if not
 """
 import array
 import os
@@ -56,7 +56,7 @@ def default_runner(argv):
 
 
 def fixture_runner(fixdir):
-    """PWCTL_FIXTURES mode: reads come from recorded output, writes are accepted and dropped."""
+    """PIPEWRENCH_FIXTURES mode: reads come from recorded output, writes are accepted and dropped."""
     def run(argv):
         if argv == pc.READ_CMD:
             return 0, (Path(fixdir) / "settings.txt").read_text()
@@ -69,7 +69,7 @@ def fixture_runner(fixdir):
 
 
 def pwtop_proc(iterations=None):
-    fixdir = os.environ.get("PWCTL_FIXTURES")
+    fixdir = os.environ.get("PIPEWRENCH_FIXTURES")
     if fixdir:
         argv = ["cat", str(Path(fixdir) / "pwtop_batch.txt")]
     else:
@@ -136,7 +136,7 @@ def _cli(argv, runner, out, err, execvp, ask):
         return 0
     if cmd in SETTERS:
         if len(args) != 1:
-            raise CliError(f"usage: pwctl {cmd} N", 2)
+            raise CliError(f"usage: pwrench {cmd} N", 2)
         key, value = SETTERS[cmd], _int(args[0])
         try:
             cmds = [pc.set_cmd(key, value)]
@@ -200,7 +200,7 @@ def _preset(args, runner, out):
             pc.save_presets(path, pc.delete_preset(presets, p["name"]))
             out.write(f"deleted {p['name']}\n")
         return 0
-    raise CliError("usage: pwctl preset list | save NAME [LABEL] | apply NAME | delete NAME", 2)
+    raise CliError("usage: pwrench preset list | save NAME [LABEL] | apply NAME | delete NAME", 2)
 
 
 
@@ -227,19 +227,19 @@ def write_noise(path, seconds=1.0, rate=48000, peak=4000):
         w.writeframes(samples.tobytes())
 
 
-DEVICES_USAGE = """usage: pwctl devices [list] [--hidden] [--monitors]
-       pwctl devices default DEV | volume DEV STEP | mute DEV | test DEV
-       pwctl devices profile CARD PROFILE
-       pwctl devices label DEV TEXT | label DEV --clear | hide NAME | unhide NAME
-       pwctl devices bus add NAME [LABEL] | bus delete NAME
-       pwctl devices preview | apply [--restart] | rollback | restart"""
+DEVICES_USAGE = """usage: pwrench devices [list] [--hidden] [--monitors]
+       pwrench devices default DEV | volume DEV STEP | mute DEV | test DEV
+       pwrench devices profile CARD PROFILE
+       pwrench devices label DEV TEXT | label DEV --clear | hide NAME | unhide NAME
+       pwrench devices bus add NAME [LABEL] | bus delete NAME
+       pwrench devices preview | apply [--restart] | rollback | restart"""
 
 
 def _play_noise(runner, row):
     if row.kind == "monitor" or row.direction not in ("out", "duplex"):
         raise CliError(f"{row.label} is not an output", 2)
     with tempfile.TemporaryDirectory() as tmp:
-        wav = Path(tmp) / "pwctl-test.wav"
+        wav = Path(tmp) / "pipewrench-test.wav"
         write_noise(wav)
         _run(runner, ["pw-cat", "--playback", "--target", row.name, str(wav)])
     return f"played noise on {row.label}"
@@ -258,7 +258,7 @@ def _config():
 
 def _save(c, out, message):
     pcfg.save_config(pcfg.config_path(), c)
-    out.write(f"{message}; `pwctl devices apply` to use it\n")
+    out.write(f"{message}; `pwrench devices apply` to use it\n")
 
 
 def _row(inv, key):
@@ -267,7 +267,7 @@ def _row(inv, key):
     except LookupError as e:
         raise CliError(str(e), 2)
     if row is None:
-        raise CliError(f"no device {key!r}; see `pwctl devices list`", 2)
+        raise CliError(f"no device {key!r}; see `pwrench devices list`", 2)
     return row
 
 
@@ -298,7 +298,7 @@ def device_line(row, c, hidden=False, owned=(), clash=()):
                                str(row.rate) if row.rate else None) if x)
     vol = "muted" if row.mute else "" if row.volume is None else f"vol {round(row.volume * 100)}%"
     pending = c["labels"].get(row.name)
-    tags = [t for t, on in (("pwctl", row.name in owned), ("made outside pwctl; in devices.json too", row.name in clash),
+    tags = [t for t, on in (("PipeWrench", row.name in owned), ("made outside PipeWrench; in devices.json too", row.name in clash),
                             ("hidden", hidden), (f"label → {pending}", bool(pending) and pending != row.label)) if on]
     return (f"  {'★' if row.default else ' '} {row.direction:<6} {_fit(row.label, 30):<30} {row.state or '?':<9} "
             f"{fmt:<16} {vol:<9} {row.id:>5}  {_fit(pi.connections(row), 32):<32}  {row.name}"
@@ -306,9 +306,9 @@ def device_line(row, c, hidden=False, owned=(), clash=()):
 
 
 def _bus_status(c, inv):
-    """(owned, clash, pending): buses pwctl's drop-in defines, live buses with a devices.json name that
-    pwctl didn't make, and devices.json buses not running yet."""
-    dropin = pcfg.dropin_path()
+    """(owned, clash, pending): buses PipeWrench's drop-in defines, live buses with a devices.json name that
+    pwrench didn't make, and devices.json buses not running yet."""
+    dropin = pcfg.live_path(pcfg.dropin_path())  # the old pwctl name until the next apply
     applied = dropin.read_text() if dropin.exists() else ""
     live = {r.name for r in inv.rows()}
     owned = {b["name"] for b in c["buses"] if f'node.name = "{b["name"]}"' in applied}
@@ -331,7 +331,8 @@ def _generated(runner, c, version=None):
             pcfg.check_ours(path)
         except pcfg.ConfigError as e:
             raise CliError(str(e), 1)
-        if (path.exists() or has_content) and pcfg.diff_generated(path, text):
+        moving = pcfg.legacy_path(path).exists()  # an old pwctl-named file moves to the new name
+        if (path.exists() or has_content or moving) and (moving or pcfg.diff_generated(path, text)):
             pending.append((path, text, restart))
     return pending
 
@@ -383,7 +384,7 @@ def _bus_add(runner, c, inv, name, label=None):
 
 
 def _bus_delete(runner, c, inv, name):
-    """Destroy a virtual bus live and forget it, whether or not pwctl made it."""
+    """Destroy a virtual bus live and forget it, whether or not PipeWrench made it."""
     live = next((r for r in inv.rows() if r.name == name), None)
     saved = any(b["name"] == name for b in c["buses"])
     if live is None and not saved:
@@ -410,7 +411,7 @@ def _devices(args, runner, out, err, ask):
             out.write(f"{heading}\n" if row is None else device_line(row, c, row.name in hidden, owned, clash) + "\n")
         for b in pending:
             out.write(f"  + {'duplex':<6} {_fit(b['label'], 30):<30} pending: in devices.json, "
-                      f"`pwctl devices apply` creates it  {b['name']}\n")
+                      f"`pwrench devices apply` creates it  {b['name']}\n")
         return 0
     if sub in ("default", "mute", "test") and len(rest) == 1 or sub == "volume" and len(rest) == 2:
         row = _row(_inventory(runner), rest[0])
@@ -427,7 +428,7 @@ def _devices(args, runner, out, err, ask):
     if sub == "profile" and len(rest) == 2:
         card = _inventory(runner).find_card(rest[0])
         if card is None:
-            raise CliError(f"no card {rest[0]!r}; see `pwctl devices list`", 2)
+            raise CliError(f"no card {rest[0]!r}; see `pwrench devices list`", 2)
         try:
             cmd = pi.profile_cmd(card, rest[1])
         except ValueError as e:
@@ -477,7 +478,7 @@ def _devices(args, runner, out, err, ask):
             out.write(f"wrote {p}\n")
         restart, what = _restart_for([(p, r) for p, _, r in pending])
         later = (f"labels and clock changes show after {what} restarts: at next login, or now with "
-                 "`pwctl devices apply --restart`\n")
+                 "`pwrench devices apply --restart`\n")
         if "--restart" not in rest:
             out.write(later)
             return 0
@@ -489,12 +490,12 @@ def _devices(args, runner, out, err, ask):
         if problems:
             for p in problems:
                 err.write(f"  {p}\n")
-            err.write("not everything showed up; `pwctl devices list` again, or `pwctl devices rollback` to undo\n")
+            err.write("not everything showed up; `pwrench devices list` again, or `pwrench devices rollback` to undo\n")
             return 1
         out.write("applied\n")
         return 0
     if sub == "rollback" and not rest:
-        paths = [pcfg.dropin_path(), pcfg.labels_path(_wp_version(runner))]
+        paths = [pcfg.live_path(p) for p in (pcfg.dropin_path(), pcfg.labels_path(_wp_version(runner)))]
         try:
             for p in paths:
                 pcfg.check_ours(p)
@@ -506,7 +507,7 @@ def _devices(args, runner, out, err, ask):
             return 0
         for p in touched:
             out.write(pcfg.rollback_generated(p) + "\n")
-        out.write("takes effect at the next restart: next login, or `pwctl devices restart`\n")
+        out.write("takes effect at the next restart: next login, or `pwrench devices restart`\n")
         return 0
     if sub == "restart" and not rest:
         if ask(f"Restart WirePlumber now? {RESTART_WARNING} [y/N] ").strip().lower() != "y":
@@ -517,7 +518,7 @@ def _devices(args, runner, out, err, ask):
     raise CliError(DEVICES_USAGE, 2)
 
 
-PATCH_USAGE = "usage: pwctl patch [list] | connect SRC DST | disconnect SRC DST"
+PATCH_USAGE = "usage: pwrench patch [list] | connect SRC DST | disconnect SRC DST"
 
 
 def _graph(runner):
@@ -530,7 +531,7 @@ def _endpoint(find, key, what):
     except LookupError as e:
         raise CliError(str(e), 2)
     if e is None:
-        raise CliError(f"no {what} {key!r}; see `pwctl patch list`", 2)
+        raise CliError(f"no {what} {key!r}; see `pwrench patch list`", 2)
     return e
 
 
@@ -563,14 +564,17 @@ def main(argv, runner=None, out=None, err=None, execvp=None, ask=None):
     out, err = out or sys.stdout, err or sys.stderr
     ask = ask or input
     if runner is None:
-        fixdir = os.environ.get("PWCTL_FIXTURES")
+        fixdir = os.environ.get("PIPEWRENCH_FIXTURES")
         runner = fixture_runner(fixdir) if fixdir else default_runner
     try:
+        moved = pcfg.migrate_config_dir()  # once: ~/.config/pwctl → ~/.config/pipewrench
+        if moved and argv:
+            err.write(f"pwrench: {moved}\n")
         if not argv:
-            return Tui(runner).run()
+            return Tui(runner, message=moved or "").run()
         return _cli(argv, runner, out, err, execvp, ask)
     except CliError as e:
-        err.write(f"pwctl: {e}\n")
+        err.write(f"pwrench: {e}\n")
         return e.code
 
 
@@ -635,9 +639,9 @@ class Meters:
 
 
 class Tui:
-    def __init__(self, runner):
+    def __init__(self, runner, message=""):
         self.runner = runner
-        self.st = pc.UIState(**pc.load_ui(pc.ui_path()))
+        self.st = pc.UIState(**pc.load_ui(pc.ui_path()), message=message)
         self.current = {}
         self.presets = []
         self.block = None
@@ -737,7 +741,7 @@ class Tui:
         if self.st.tab == "mixer":
             self._refresh_mixer()
         if self.st.tab == "settings":
-            self.realtime = "fixtures" if os.environ.get("PWCTL_FIXTURES") else prt.check(run=self.runner)
+            self.realtime = "fixtures" if os.environ.get("PIPEWRENCH_FIXTURES") else prt.check(run=self.runner)
 
     def _refresh_mixer(self):
         """Devices and app streams from one pw-dump; hidden rows come from devices.json."""
@@ -847,7 +851,7 @@ class Tui:
             theme = "dark"
             self.st.message = self.st.failed = f"{self.st.theme} needs {pc.THEME_MIN_COLOURS[self.st.theme]} colours; showing dark"
         exact = c.can_change_color() and c.COLORS >= 256
-        slots = iter(range(min(c.COLORS, 256) - 1, 15, -1))  # palette slots for exact hex; reset when pwctl exits
+        slots = iter(range(min(c.COLORS, 256) - 1, 15, -1))  # palette slots for exact hex; reset when PipeWrench exits
 
         def colour(name, default):
             if name is None:
@@ -899,7 +903,7 @@ class Tui:
             return None
 
     def _sync_meters(self):
-        metering = self.st.tab == "mixer" and self.st.meters and self.mixer and not os.environ.get("PWCTL_FIXTURES")
+        metering = self.st.tab == "mixer" and self.st.meters and self.mixer and not os.environ.get("PIPEWRENCH_FIXTURES")
         targets = pc.meter_targets(self.mixer, self.st.mix_cursor) if metering else {}
         self.meters.fall, self.meters.hold = self.st.meter_fall, self.st.peak_hold
         self.meters.sync(targets)
@@ -1072,7 +1076,7 @@ class Tui:
             self.st.message = _bus_add(self.runner, c, inv, action[1])
         elif kind == "dev_hide":
             c = pcfg.toggle_hidden(c, action[1])
-            self._save_config(c, f"{'hidden' if action[1] in c['hidden'] else 'shown'}; H shows hidden rows")
+            self._save_config(c, f"{'hidden' if action[1] in c['hidden'] else 'shown'}; h shows hidden rows")
         elif kind == "dev_prompt_bus":
             name = self._prompt(scr, "bus name (letters, digits, - _; empty cancels):")
             if name:
@@ -1088,7 +1092,7 @@ class Tui:
             try:
                 subprocess.run([os.environ.get("PAGER", "less")], input=diff, text=True)
             except FileNotFoundError:
-                self.st.message = "no pager; run `pwctl devices preview`"
+                self.st.message = "no pager; run `pwrench devices preview`"
             scr.refresh()
         elif kind == "dev_test":
             self.st.message = _play_noise(self.runner, inv.find(action[1]))

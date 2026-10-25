@@ -5,7 +5,7 @@ import pytest
 import pwcore as pc
 from pwcore import UIState
 
-ABOUT = {"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pwctl"}
+ABOUT = {"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"}
 
 
 def screen(width=80, height=30, about=ABOUT):
@@ -66,8 +66,8 @@ def test_info_block():
     assert "terminal control for PipeWire" in text
     assert "PipeWire     1.0.5" in text
     assert "WirePlumber  0.4.17" in text
-    assert "~/.config/pwctl" in text
-    assert "github.com/Skrappjaw/pwctl" in text
+    assert "~/.config/pipewrench" in text
+    assert "github.com/Skrappjaw/pipewrench" in text
 
 
 def test_info_unknown_while_loading():

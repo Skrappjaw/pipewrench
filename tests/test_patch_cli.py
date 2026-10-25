@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-import pwctl
+import pipewrench
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -28,7 +28,7 @@ class Runner:
 def run(*argv, runner=None):
     runner = runner or Runner()
     out, err = io.StringIO(), io.StringIO()
-    rc = pwctl.main(["patch", *argv], runner=runner, out=out, err=err)
+    rc = pipewrench.main(["patch", *argv], runner=runner, out=out, err=err)
     return rc, out.getvalue(), err.getvalue(), runner
 
 

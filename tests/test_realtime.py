@@ -6,7 +6,7 @@ import re
 import pytest
 
 import pwcore as pc
-import pwctl
+import pipewrench
 import pwrealtime as prt
 
 LIMITS = "# comment\n@pipewire   - rtprio  95\n@pipewire   - nice    -19\n@pipewire   - memlock 4194304\n"
@@ -164,7 +164,7 @@ def test_cli_realtime(tmp_path, monkeypatch):
     status = check(tmp_path, limit=0)
     monkeypatch.setattr(prt, "check", lambda run: status)
     out = io.StringIO()
-    assert pwctl.main(["realtime"], runner=run_ok(), out=out) == 1
+    assert pipewrench.main(["realtime"], runner=run_ok(), out=out) == 1
     assert "realtime limit" in out.getvalue()
     assert re.search(r"^fix: +reboot", out.getvalue(), re.M)
 
@@ -173,5 +173,5 @@ def test_cli_realtime_ok(tmp_path, monkeypatch):
     status = check(tmp_path, rt=True, limit=95)
     monkeypatch.setattr(prt, "check", lambda run: status)
     out = io.StringIO()
-    assert pwctl.main(["realtime"], runner=run_ok(), out=out) == 0
+    assert pipewrench.main(["realtime"], runner=run_ok(), out=out) == 0
     assert "PipeWire audio runs realtime" in out.getvalue()

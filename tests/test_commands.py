@@ -53,12 +53,12 @@ def test_profile_command_by_index_or_name(inv):
         pi.profile_cmd(gcs, "surround")
 
 
-def test_bus_conflicts_flag_live_buses_pwctl_does_not_own(inv):
+def test_bus_conflicts_flag_live_buses_pipewrench_does_not_own(inv):
     c = {**pc.default_config(), "buses": [{"name": "SYSTEM", "label": "SYSTEM"}, {"name": "GAME", "label": "GAME"}]}
     live = {r.name for r in inv.rows()}
-    # SYSTEM exists live (made by start_audio.sh), and no pwctl drop-in defines it yet
+    # SYSTEM exists live (made by start_audio.sh), and no PipeWrench drop-in defines it yet
     assert pc.bus_conflicts(c, live, applied_text="") == ["SYSTEM"]
-    # once pwctl's own drop-in defines SYSTEM, the live SYSTEM is ours
+    # once PipeWrench's own drop-in defines SYSTEM, the live SYSTEM is ours
     applied = pc.render_dropin({**pc.default_config(), "buses": [{"name": "SYSTEM", "label": "SYSTEM"}]})
     assert pc.bus_conflicts(c, live, applied_text=applied) == []
 

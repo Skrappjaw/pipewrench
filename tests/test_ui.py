@@ -20,7 +20,7 @@ def block():
 
 
 def UIState(**kw):
-    """These tests are about Settings, Top and the chrome; pwctl itself opens on the Mixer."""
+    """These tests are about Settings, Top and the chrome; PipeWrench itself opens on the Mixer."""
     kw.setdefault("tab", "settings")
     return pc.UIState(**kw)
 
@@ -387,7 +387,7 @@ def test_every_theme_defines_every_role():
 
 
 def test_ui_file_round_trips_and_tolerates_junk(tmp_path):
-    p = tmp_path / "pwctl" / "ui.json"
+    p = tmp_path / "pipewrench" / "ui.json"
     assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
     pc.save_ui(p, {"theme": "light", "meter_fps": 20, "meter_fall": 80, "peak_hold": 3, "volume_bar": False})
     assert pc.load_ui(p) == {"theme": "light", "meter_fps": 20, "meter_fall": 80, "peak_hold": 3, "volume_bar": False, "keys": {}}

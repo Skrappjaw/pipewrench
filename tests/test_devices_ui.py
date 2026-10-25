@@ -116,9 +116,9 @@ def test_pending_buses_and_dirty_note():
     assert "not written" not in body(screen(pc.UIState(tab="devices"))[0])
 
 
-def test_clash_tag_on_bus_made_outside_pwctl():
+def test_clash_tag_on_bus_made_outside_pipewrench():
     text = body(screen(pc.UIState(tab="devices"), dv(clash={"SYSTEM"}))[0])
-    assert "outside pwctl" in next(line for line in text.splitlines() if "SYSTEM" in line)
+    assert "outside PipeWrench" in next(line for line in text.splitlines() if "SYSTEM" in line)
 
 
 def test_scrolls_to_keep_cursor_visible():
@@ -166,7 +166,7 @@ def test_h_never_hides():
 
 def test_bus_add_and_live_delete_with_confirm():
     assert key(pc.UIState(tab="devices"), "a")[1] == [("dev_prompt_bus",)]
-    st, actions = key(at("VOIP"), "x")  # any virtual bus, even one pwctl didn't make
+    st, actions = key(at("VOIP"), "x")  # any virtual bus, even one PipeWrench didn't make
     assert actions == [] and st.confirm == ("dev_delete_bus", "VOIP")
     assert "Delete bus 'VOIP'" in body(screen(st)[0])
     assert key(st, "y")[1] == [("dev_delete_bus", "VOIP")]

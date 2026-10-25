@@ -1,4 +1,4 @@
-# pwctl
+# PipeWrench
 
 A terminal replacement for PipeControl, for PipeWire on Linux Mint. It changes the sample rate and
 buffer size live, shows `pw-top`, keeps labelled presets, and lists every audio device with
@@ -12,21 +12,22 @@ the reference (every key, the CLI, files, code map).
 ## Install and launch
 
 ```
-ln -s "$PWD/pwctl.py" ~/.local/bin/pwrench      # from the repo root
-ln -s "$PWD/pwctl.py" ~/.local/bin/pipewrench   # same app, long name
+ln -s "$PWD/pipewrench.py" ~/.local/bin/pwrench      # from the repo root
+ln -s "$PWD/pipewrench.py" ~/.local/bin/pipewrench   # same app, long name
 pwrench                                          # interactive UI
 pwrench status                                   # one-shot commands, see below
 ```
 
-On this machine, `pwrench` and `pipewrench` → `projects/pwctl/pwctl.py` (branch `main`). The old
-`pwctl` link is gone (2026-10-24). The examples below still say `pwctl`; read it as `pwrench`.
+On this machine, `pwrench` and `pipewrench` → `projects/pipewrench/pipewrench.py` (branch `main`). The tool was
+called pwctl until 2026-10-24; on first start it copies `~/.config/pwctl/` to `~/.config/pipewrench/` (the old
+folder is kept), and the next apply moves `50-pwctl-devices.conf` / `51-pwctl-labels.*` to the new names.
 
 Needs PipeWire's command-line tools: `pw-metadata`, `pw-top`, `pw-dump`, `pw-cat`, plus `systemctl --user`.
 
 ## The six views
 
 **Basic** (everyday audio): Mixer, Devices. **Advanced** (engineering): Patch, Settings (clock and
-presets), Top. Then About. pwctl opens on the Mixer.
+presets), Top. Then About. PipeWrench opens on the Mixer.
 
 A **now-playing bar** sits above the keys on every tab. It shows the media player that's playing (MPRIS,
 via `busctl`): `*` play/pause, `-` `+` its volume (numpad keys), `<` `>` previous/next. There's no stop: Brave
@@ -96,8 +97,8 @@ An inventory of every audio card, sink, source and bus on the system, read from 
     - `→ OBS`: what records from it; on an output that's its monitor, marked `(monitor)`
     - qpwgraph patches between devices show the other device's label
 - **Tags:**
-  - `pwctl`: the bus comes from pwctl's drop-in
-  - `made outside pwctl`: a live bus with the same name as one in `devices.json`, e.g. one made by a
+  - `PipeWrench`: the bus comes from PipeWrench's drop-in
+  - `made outside PipeWrench`: a live bus with the same name as one in `devices.json`, e.g. one made by a
     script; applying would make a second
   - `hidden`
   - `label → …`: a label saved but not yet applied
@@ -135,7 +136,7 @@ capture apps such as OBS see them.
 for one) don't reconnect. So:
 - **Buses** are created and removed live, with no restart.
 - **Labels and the clock setting** are written by A and show after the next restart: at login, with
-  R (WirePlumber), or with `pwctl devices apply --restart`.
+  R (WirePlumber), or with `pwrench devices apply --restart`.
 - Relabelling a running bus also waits for a restart, because changing it live would mean
   re-creating it.
 
@@ -164,7 +165,7 @@ How it works:
   Desktop Audio records an output's monitor) always shows; `m` adds the rest.
 - **App streams** carry their own name when it says something: OBS's inputs read `OBS · Desktop Audio`,
   `OBS · Mic/Aux`. Generic names (Brave's "Playback", Discord's "recStream") are left off. This applies
-  on every tab and in `pwctl patch` names.
+  on every tab and in `pwrench patch` names.
 - **JACK apps** (e.g. REAPER via `pw-jack`) appear as apps. Their ports are named `out1`, `in1`…, so
   they pair by position (out1/out2 → FL/FR, FL/FR → in1/in2); `p` reaches the other inputs.
 
@@ -202,15 +203,15 @@ PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata 
   `clock.allowed-rates`, applies with a warning.
 - Below the rows: the allowed rates and the defaults (`clock.rate`, `clock.quantum`).
 - These settings are runtime only. A PipeWire restart clears them.
-- **Meter frame rate** (Display): 5–60 fps for the Mixer's meters; default 10. 60 fps costs pwctl about
+- **Meter frame rate** (Display): 5–60 fps for the Mixer's meters; default 10. 60 fps costs PipeWrench about
   22% CPU with 11 meters, against about 9% at 10 fps.
 - **Meter fall** (Display): 10, 20, 40 or 80 dB a second after a peak; default 20.
 - **Peak hold** (Display): off, 0.5, 1, 1.5, 2 or 3 s; default 1.5. A `▌` marker hangs at the last peak,
   then falls 20 dB a second.
 - **Volume bar** (Display): on or off; default on. Off, each Mixer channel shows just its volume %.
-- All of these are saved with the theme in `~/.config/pwctl/ui.json`.
-- **Theme** (the Display section) is pwctl's own: dark, light, or crowbar (orange, after Mint-Y-Dark-Orange; needs 256 colours). ←→ switches it at once, and it's kept in
-  `~/.config/pwctl/ui.json`. The colour roles are described in `docs/ui-conventions.md`.
+- All of these are saved with the theme in `~/.config/pipewrench/ui.json`.
+- **Theme** (the Display section) is PipeWrench's own: dark, light, or crowbar (orange, after Mint-Y-Dark-Orange; needs 256 colours). ←→ switches it at once, and it's kept in
+  `~/.config/pipewrench/ui.json`. The colour roles are described in `docs/ui-conventions.md`.
 
 | Key | Mouse | Action |
 |---|---|---|
@@ -246,7 +247,7 @@ Settings scrolls to keep the cursor in view.
 #### Presets (the bottom of Settings)
 
 Named, labelled snapshots of the Settings rows (force rate, force buffer, min, max, and optionally
-log level). They're stored in `~/.config/pwctl/presets.json`.
+log level). They're stored in `~/.config/pipewrench/presets.json`.
 
 | Key | Mouse | Action |
 |---|---|---|
@@ -277,36 +278,36 @@ versions are read once, the first time the tab shows. No keys of its own.
 ## Command line
 
 ```
-pwctl status                         current settings, allowed rates, defaults
-pwctl rate N | buf N | min N | max N | log N
+pwrench status                         current settings, allowed rates, defaults
+pwrench rate N | buf N | min N | max N | log N
                                      set one value now (rate/buf 0 = do not force)
-pwctl reset                          stop forcing rate and buffer
-pwctl top                            run pw-top
-pwctl preset list
-pwctl preset save NAME [LABEL]       save the current settings
-pwctl preset apply NAME
-pwctl preset delete NAME
+pwrench reset                          stop forcing rate and buffer
+pwrench top                            run pw-top
+pwrench preset list
+pwrench preset save NAME [LABEL]       save the current settings
+pwrench preset apply NAME
+pwrench preset delete NAME
 
-pwctl devices [list] [--hidden] [--monitors]   every card, device and bus
-pwctl devices default DEV            make DEV the default output or input
-pwctl devices volume DEV STEP        +5%, -5%, 50% or 0.5
-pwctl devices mute DEV               toggle
-pwctl devices profile CARD PROFILE   by index or name, e.g. `profile GCS-8 HiFi` (asks first)
-pwctl devices test DEV               noise burst on an output, to find it by ear
-pwctl devices label DEV TEXT | label DEV --clear
-pwctl devices hide NAME | unhide NAME   a device or a whole card, in pwctl only
-pwctl devices bus add NAME [LABEL]   create a bus live, and keep it for every login
-pwctl devices bus delete NAME       remove a virtual bus live, and forget it
-pwctl devices preview                diff of the generated files against what's on disk
-pwctl devices apply [--restart]      write the generated files; --restart asks, restarts, then checks
-pwctl devices rollback               restore the previous files (or remove them); no restart
-pwctl devices restart                restart WirePlumber, after y/n
+pwrench devices [list] [--hidden] [--monitors]   every card, device and bus
+pwrench devices default DEV            make DEV the default output or input
+pwrench devices volume DEV STEP        +5%, -5%, 50% or 0.5
+pwrench devices mute DEV               toggle
+pwrench devices profile CARD PROFILE   by index or name, e.g. `profile GCS-8 HiFi` (asks first)
+pwrench devices test DEV               noise burst on an output, to find it by ear
+pwrench devices label DEV TEXT | label DEV --clear
+pwrench devices hide NAME | unhide NAME   a device or a whole card, in PipeWrench only
+pwrench devices bus add NAME [LABEL]   create a bus live, and keep it for every login
+pwrench devices bus delete NAME       remove a virtual bus live, and forget it
+pwrench devices preview                diff of the generated files against what's on disk
+pwrench devices apply [--restart]      write the generated files; --restart asks, restarts, then checks
+pwrench devices rollback               restore the previous files (or remove them); no restart
+pwrench devices restart                restart WirePlumber, after y/n
 
-pwctl patch [list]                   every live connection, with its channels
-pwctl patch connect SRC DST          link matching channels (mono feeds both)
-pwctl patch disconnect SRC DST       remove every link between them
+pwrench patch [list]                   every live connection, with its channels
+pwrench patch connect SRC DST          link matching channels (mono feeds both)
+pwrench patch disconnect SRC DST       remove every link between them
 
-pwctl realtime                       realtime status and the fix; exit 0 when PipeWire audio is realtime
+pwrench realtime                       realtime status and the fix; exit 0 when PipeWire audio is realtime
 ```
 
 DEV is a node id, an exact `node.name`, or a label that matches exactly one device. CARD is a card id,
@@ -319,15 +320,15 @@ Exit codes: 0 ok; 1 a PipeWire command failed, a check found problems or you ans
 
 | Path | Written by | What |
 |---|---|---|
-| `~/.config/pwctl/presets.json` | Presets view, `preset save/delete` | presets |
-| `~/.config/pwctl/ui.json` | Settings → Display, Keys | display preferences and key binding overrides (`keys`; `null` = unbound) |
-| `~/.config/pwctl/devices.json` | Devices view, `devices label/hide/bus` | buses, labels, hidden rows, clock: the source of truth |
-| `~/.config/pipewire/pipewire.conf.d/50-pwctl-devices.conf` | `devices apply` | the buses and clock, as a PipeWire drop-in |
-| `~/.config/wireplumber/main.lua.d/51-pwctl-labels.lua` | `devices apply` | labels as WirePlumber 0.4 rules |
-| `~/.config/wireplumber/wireplumber.conf.d/51-pwctl-labels.conf` | `devices apply` | the same on WirePlumber 0.5+ |
+| `~/.config/pipewrench/presets.json` | Presets view, `preset save/delete` | presets |
+| `~/.config/pipewrench/ui.json` | Settings → Display, Keys | display preferences and key binding overrides (`keys`; `null` = unbound) |
+| `~/.config/pipewrench/devices.json` | Devices view, `devices label/hide/bus` | buses, labels, hidden rows, clock: the source of truth |
+| `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf` | `devices apply` | the buses and clock, as a PipeWire drop-in |
+| `~/.config/wireplumber/main.lua.d/51-pipewrench-labels.lua` | `devices apply` | labels as WirePlumber 0.4 rules |
+| `~/.config/wireplumber/wireplumber.conf.d/51-pipewrench-labels.conf` | `devices apply` | the same on WirePlumber 0.5+ |
 | `….bak` next to each generated file | `devices apply` | the previous version, used by rollback |
 
-- Both generated files start with a "Generated by pwctl" header. pwctl refuses to overwrite or roll
+- Both generated files start with a "Generated by PipeWrench" header. PipeWrench refuses to overwrite or roll
   back a file without it.
 - A generated file is only created when there's something to put in it.
 
@@ -354,15 +355,15 @@ Exit codes: 0 ok; 1 a PipeWire command failed, a check found problems or you ans
 
 - **Buses:** each one is a `support.null-audio-sink` with `media.class = Audio/Duplex` and
   `object.linger`. Its node name is the bus name.
-  - pwctl creates it live with `pw-cli create-node`, and removes it with `pw-cli destroy`.
+  - PipeWrench creates it live with `pw-cli create-node`, and removes it with `pw-cli destroy`.
   - The drop-in recreates it at every PipeWire start.
 - **Labels:** WirePlumber rules that set `node.description` for a matching `node.name` when the
   device appears.
   - ALSA devices use `alsa_monitor.rules` (0.4) or `monitor.alsa.rules` (0.5+).
   - Bluetooth devices use the bluez equivalents.
-  - pwctl reads the version from `wireplumber --version`.
+  - PipeWrench reads the version from `wireplumber --version`.
 
-pwctl no longer makes devices of its own for a particular interface. Device-specific splits belong
+PipeWrench no longer makes devices of its own for a particular interface. Device-specific splits belong
 in ALSA UCM profiles, which work for every app and distribution; the GCS-8 one is at
 github.com/Skrappjaw/gcs-8-linux.
 
@@ -370,18 +371,18 @@ github.com/Skrappjaw/gcs-8-linux.
 
 | Variable | Effect |
 |---|---|
-| `PWCTL_PRESETS` | use this presets file instead of the default |
-| `PWCTL_DEVICES` | use this devices file instead of the default |
-| `PWCTL_UI` | use this display-preferences file instead of the default |
+| `PIPEWRENCH_PRESETS` | use this presets file instead of the default |
+| `PIPEWRENCH_DEVICES` | use this devices file instead of the default |
+| `PIPEWRENCH_UI` | use this display-preferences file instead of the default |
 | `XDG_CONFIG_HOME` | base for both config files and the generated files |
-| `PWCTL_FIXTURES` | read from recorded output in that folder and drop all writes (demo and tests) |
+| `PIPEWRENCH_FIXTURES` | read from recorded output in that folder and drop all writes (demo and tests) |
 | `PAGER` | pager for the Devices preview |
 
 ## Code map
 
 | File | Role |
 |---|---|
-| `pwctl.py` | entry point: CLI dispatch, the subprocess runner, the curses `Tui` |
+| `pipewrench.py` | entry point: CLI dispatch, the subprocess runner, the curses `Tui` |
 | `pwcore.py` | pure logic: settings metadata, `pw-top` parsing, presets, the UI state machine and screen rendering |
 | `pwinventory.py` | pure logic: the device inventory from `pw-dump`, lookups, wpctl command builders |
 | `pwpatch.py` | pure logic: patch bay graph (sources, destinations, ports), channel pairing, pw-link commands |
@@ -447,7 +448,7 @@ the tests replace PipeWire.
 
 ### pwrealtime.py
 
-- `check()` → `Status`; `rows(status)` and `fix(status)` feed both Settings and `pwctl realtime`
+- `check()` → `Status`; `rows(status)` and `fix(status)` feed both Settings and `pwrench realtime`
 - `limits_groups`, `pipewire_procs` (reads `/proc`), `portal_refusals` (journalctl via a runner)
 
 ### pwconfig.py
@@ -467,11 +468,11 @@ the tests replace PipeWire.
   - `write_generated(path, text)`: atomic, keeps `.bak`, returns False when unchanged
   - `rollback_generated(path)`
 - **Checks:**
-  - `bus_conflicts(c, live_names, applied_text)`: buses that exist live but aren't pwctl's
+  - `bus_conflicts(c, live_names, applied_text)`: buses that exist live but aren't PipeWrench's
   - `check_applied(c, live)`: missing buses and labels not showing, after an apply
 - **Restart commands:** `RESTART_PIPEWIRE`, `RESTART_WIREPLUMBER`
 
-### pwctl.py
+### pipewrench.py
 
 - `main(argv, runner, out, err, execvp, ask)`: no arguments starts the UI; otherwise runs a command.
   `ask` is the y/n prompt, which tests replace.
@@ -489,7 +490,7 @@ the tests replace PipeWire.
 
 ```
 python3 -m pytest -q                              # everything; no PipeWire calls
-PWCTL_LIVE=1 python3 -m pytest tests/test_live.py # read-only checks against the real PipeWire
+PIPEWRENCH_LIVE=1 python3 -m pytest tests/test_live.py # read-only checks against the real PipeWire
 ```
 
 | File | Covers |
@@ -500,7 +501,7 @@ PWCTL_LIVE=1 python3 -m pytest tests/test_live.py # read-only checks against the
 | `test_inventory.py` | cards, rows, grouping, order, defaults, volume, lookup, monitors, hidden (fixture: a trimmed live `pw-dump`) |
 | `test_config.py` | `devices.json` v2, migration, edits, generated files (golden files in `tests/fixtures/golden/`), backups, rollback, checks |
 | `test_commands.py` | wpctl command builders, bus clash check |
-| `test_devices_cli.py` | `pwctl devices …` with a fake runner; restarts are recorded, never run |
+| `test_devices_cli.py` | `pwrench devices …` with a fake runner; restarts are recorded, never run |
 | `test_patch.py`, `test_patch_cli.py`, `test_patch_ui.py` | patch graph, pairing, commands, CLI, both views, ports, mouse (fixture: a live `pw-dump` with ports and links) |
 | `test_devices_ui.py` | Devices tab keys, mouse, rendering, scrolling, key legend |
 | `test_realtime.py` | realtime check against a fake `/proc` and limits files, fix rules, Settings section, CLI |

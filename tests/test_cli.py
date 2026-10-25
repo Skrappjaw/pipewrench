@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 import pwcore as pc
-import pwctl
+import pipewrench
 
 FIX = Path(__file__).parent / "fixtures"
 READ = ["pw-metadata", "-n", "settings", "0"]
@@ -32,14 +32,14 @@ class FakeRunner:
 @pytest.fixture(autouse=True)
 def presets_file(tmp_path, monkeypatch):
     path = tmp_path / "presets.json"
-    monkeypatch.setenv("PWCTL_PRESETS", str(path))
+    monkeypatch.setenv("PIPEWRENCH_PRESETS", str(path))
     return path
 
 
 def run(*argv, runner=None, execvp=None):
     runner = runner or FakeRunner()
     out, err = io.StringIO(), io.StringIO()
-    rc = pwctl.main(list(argv), runner=runner, out=out, err=err, execvp=execvp)
+    rc = pipewrench.main(list(argv), runner=runner, out=out, err=err, execvp=execvp)
     return rc, out.getvalue(), err.getvalue(), runner
 
 

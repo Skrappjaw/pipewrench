@@ -14,14 +14,14 @@ def make(name="tracking", label="Low-latency tracking", **values):
 
 
 def test_presets_path_env_override(tmp_path, monkeypatch):
-    monkeypatch.setenv("PWCTL_PRESETS", str(tmp_path / "p.json"))
+    monkeypatch.setenv("PIPEWRENCH_PRESETS", str(tmp_path / "p.json"))
     assert pc.presets_path() == tmp_path / "p.json"
 
 
 def test_presets_path_default_xdg(tmp_path, monkeypatch):
-    monkeypatch.delenv("PWCTL_PRESETS", raising=False)
+    monkeypatch.delenv("PIPEWRENCH_PRESETS", raising=False)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    assert pc.presets_path() == tmp_path / "pwctl" / "presets.json"
+    assert pc.presets_path() == tmp_path / "pipewrench" / "presets.json"
 
 
 def test_load_missing_file_is_empty(tmp_path):

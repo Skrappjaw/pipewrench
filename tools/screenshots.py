@@ -286,7 +286,7 @@ def shots():
                                  height=40, media=MEDIA, realtime=realtime_status(True))
     yield "top", frame(pc.UIState(tab="top"), block=block, media=MEDIA)
     yield "about", frame(pc.UIState(tab="about"), media=MEDIA,
-                         about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pwctl"})
+                         about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"})
 
 
 def main(out=OUT):

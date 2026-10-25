@@ -20,14 +20,14 @@ import pwcore as pc  # noqa: E402
 def tab(name):
     """The number key for a tab, so these tests follow the tab order."""
     return str(pc.TABS.index(name) + 1)
-APP = HERE.parent / "pwctl.py"
+APP = HERE.parent / "pipewrench.py"
 
 
 class Pty:
     def __init__(self, tmp_path, term="xterm-256color"):
-        env = {**os.environ, "TERM": term, "PWCTL_FIXTURES": str(HERE / "fixtures"),
-               "PWCTL_PRESETS": str(tmp_path / "presets.json"), "XDG_CONFIG_HOME": str(tmp_path)}
-        env.pop("PWCTL_DEVICES", None)
+        env = {**os.environ, "TERM": term, "PIPEWRENCH_FIXTURES": str(HERE / "fixtures"),
+               "PIPEWRENCH_PRESETS": str(tmp_path / "presets.json"), "XDG_CONFIG_HOME": str(tmp_path)}
+        env.pop("PIPEWRENCH_DEVICES", None)
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             os.execve(sys.executable, [sys.executable, "-I", str(APP)], env)
@@ -82,7 +82,7 @@ def app(tmp_path):
 
 
 def test_tab_key_mouse_click_and_quit(app):
-    app.expect("Playback")  # pwctl opens on the Mixer
+    app.expect("Playback")  # PipeWrench opens on the Mixer
     app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send("\t")
@@ -96,7 +96,7 @@ def test_tab_key_mouse_click_and_quit(app):
 
 
 def test_save_preset_via_prompt(app, tmp_path):
-    app.expect("Playback")  # pwctl opens on the Mixer
+    app.expect("Playback")  # PipeWrench opens on the Mixer
     app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send("s")
@@ -111,7 +111,7 @@ def test_save_preset_via_prompt(app, tmp_path):
 
 
 def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
-    app.expect("Playback")  # pwctl opens on the Mixer
+    app.expect("Playback")  # PipeWrench opens on the Mixer
     app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send(tab("devices"))
@@ -122,14 +122,14 @@ def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
     app.expect("OBS created")  # curses redraws only what changed; "bus " was already on screen
     app.send("q")
     assert app.wait_exit() == 0
-    saved = json.loads((tmp_path / "pwctl" / "devices.json").read_text())
+    saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
     assert saved["buses"] == [{"name": "OBS", "label": "OBS"}]
-    assert 'node.name = "OBS"' in (tmp_path / "pipewire" / "pipewire.conf.d" / "50-pwctl-devices.conf").read_text()
+    assert 'node.name = "OBS"' in (tmp_path / "pipewire" / "pipewire.conf.d" / "50-pipewrench-devices.conf").read_text()
     assert not (tmp_path / "wireplumber").exists()
 
 
 def test_patch_tab_shows_both_views(app):
-    app.expect("Playback")  # pwctl opens on the Mixer
+    app.expect("Playback")  # PipeWrench opens on the Mixer
     app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send(tab("patch"))
@@ -144,7 +144,7 @@ def test_patch_tab_shows_both_views(app):
 
 
 def test_mixer_enter_opens_a_menu_and_card_profile_lands_on_devices(app):
-    app.expect("Playback")      # pwctl opens on the Mixer, cursor on the first output
+    app.expect("Playback")      # PipeWrench opens on the Mixer, cursor on the first output
     app.send("\r")              # Enter: actions, not the default
     app.expect("Card profile")
     app.send("\x1bOB" * 4 + "\r")  # default, Mute, Test sound, Rename…, then Card profile…
@@ -155,7 +155,7 @@ def test_mixer_enter_opens_a_menu_and_card_profile_lands_on_devices(app):
 
 
 def test_mixer_rename_is_enter_down_enter_type_enter(app, tmp_path):
-    app.expect("Playback")      # pwctl opens on the Mixer, cursor on the DualShock output
+    app.expect("Playback")      # PipeWrench opens on the Mixer, cursor on the DualShock output
     app.send("\r")              # Enter: actions
     app.expect("Rename")
     app.send("\x1bOB" * 3 + "\r")  # default, Mute, Test sound, then Rename…
@@ -165,18 +165,18 @@ def test_mixer_rename_is_enter_down_enter_type_enter(app, tmp_path):
     app.send("n")
     app.send("q")
     assert app.wait_exit() == 0
-    saved = json.loads((tmp_path / "pwctl" / "devices.json").read_text())
+    saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
     assert list(saved["labels"].values()) == ["Pad"]
-    lua = (tmp_path / "wireplumber" / "main.lua.d" / "51-pwctl-labels.lua").read_text()
+    lua = (tmp_path / "wireplumber" / "main.lua.d" / "51-pipewrench-labels.lua").read_text()
     assert '"Pad"' in lua
 
 
 def test_mixer_rename_empty_restores_the_default(app, tmp_path):
     ds4 = "alsa_output.usb-Sony_Interactive_Entertainment_Wireless_Controller-00.analog-stereo"
-    (tmp_path / "pwctl").mkdir(exist_ok=True)
-    (tmp_path / "pwctl" / "devices.json").write_text(json.dumps(
+    (tmp_path / "pipewrench").mkdir(exist_ok=True)
+    (tmp_path / "pipewrench" / "devices.json").write_text(json.dumps(
         {"version": 2, "clock_rate": None, "buses": [], "labels": {ds4: "Pad"}, "hidden": []}))
-    app.expect("Playback")  # pwctl opens on the Mixer, cursor on the DualShock output ("Pad")
+    app.expect("Playback")  # PipeWrench opens on the Mixer, cursor on the DualShock output ("Pad")
     app.send("\r")
     app.expect("Rename")
     app.send("\x1bOB" * 3 + "\r")
@@ -186,14 +186,14 @@ def test_mixer_rename_empty_restores_the_default(app, tmp_path):
     app.send("n")
     app.send("q")
     assert app.wait_exit() == 0
-    saved = json.loads((tmp_path / "pwctl" / "devices.json").read_text())
+    saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
     assert saved["labels"] == {}
 
 
 @pytest.mark.parametrize("term", ["xterm-256color", "xterm", "vt100"])  # 16+ colours, 8 colours, none
 def test_theme_switches_live_and_is_saved(tmp_path, term):
-    (tmp_path / "pwctl").mkdir()
-    (tmp_path / "pwctl" / "ui.json").write_text('{"theme": "light"}')
+    (tmp_path / "pipewrench").mkdir()
+    (tmp_path / "pipewrench" / "ui.json").write_text('{"theme": "light"}')
     app = Pty(tmp_path, term)
     try:
         app.expect("Playback")
@@ -201,7 +201,7 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
         app.expect("light")
         app.send("\x1bOB" * pc.THEME_ROW + "\x1bOD")  # down to the theme row, then left: light → dark
         app.expect("theme: dark")
-        assert json.loads((tmp_path / "pwctl" / "ui.json").read_text()) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
+        assert json.loads((tmp_path / "pipewrench" / "ui.json").read_text()) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
         app.send(tab("patch"))
         app.expect("Destinations")
         app.send("q")
@@ -216,8 +216,8 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
 
 @pytest.mark.parametrize("term", ["xterm-256color", "xterm"])  # exact or nearest colours; dark fallback
 def test_crowbar_theme_starts(tmp_path, term):
-    (tmp_path / "pwctl").mkdir()
-    (tmp_path / "pwctl" / "ui.json").write_text('{"theme": "orange"}')  # the old name still loads
+    (tmp_path / "pipewrench").mkdir()
+    (tmp_path / "pipewrench" / "ui.json").write_text('{"theme": "orange"}')  # the old name still loads
     app = Pty(tmp_path, term)
     try:
         app.expect("needs 256 colours" if term == "xterm" else "Playback")
@@ -260,5 +260,5 @@ def test_rebind_a_key_in_settings(app, tmp_path):
     app.expect("meters: no key")
     app.send("q")
     assert app.wait_exit() == 0
-    keys = json.loads((tmp_path / "pwctl" / "ui.json").read_text())["keys"]
+    keys = json.loads((tmp_path / "pipewrench" / "ui.json").read_text())["keys"]
     assert keys == {"devices.show_hidden": "z", "mixer.meters": None}

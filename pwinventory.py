@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field, replace
 
 HW_APIS = ("alsa", "bluez5")
-METER_NAME = "pwctl-meter"  # pwctl's own level-meter streams; never listed anywhere
+METER_NAME = "pipewrench-meter"  # PipeWrench's own level-meter streams; never listed anywhere
 METER_RATE = 3000  # Hz: peaks within ~3% of full rate in the spike (docs/mixer-plan.md); 1 kHz blunts them
 DUMP_CMD = ["pw-dump"]
 
