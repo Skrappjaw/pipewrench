@@ -240,3 +240,25 @@ def test_numpad_keys_reach_the_media_bar(app):
     app.expect("no media player found")  # fixtures have no player, so the key got through
     app.send("q")
     assert app.wait_exit() == 0
+
+
+def test_rebind_a_key_in_settings(app, tmp_path):
+    app.expect("Playback")
+    app.send(tab("settings"))
+    app.expect("Force sample rate")
+    app.send("\x1bOB" * (pc.KEYS_ROW + 1))  # Devices · show hidden, the second Keys row
+    app.expect("Devices · show hidden")
+    app.send("\r")
+    app.expect("press a key")
+    app.send("q")                            # global: refused, and pwrench keeps running
+    app.expect("global: quit")
+    app.send("\r")
+    app.expect("press a key")
+    app.send("z")
+    app.expect("show hidden: z")
+    app.send("\x1bOA\x7f")                   # Mixer · meters, Backspace unbinds
+    app.expect("meters: no key")
+    app.send("q")
+    assert app.wait_exit() == 0
+    keys = json.loads((tmp_path / "pwctl" / "ui.json").read_text())["keys"]
+    assert keys == {"devices.show_hidden": "z", "mixer.meters": None}

@@ -274,13 +274,16 @@ def shots():
     st = patch_at(g, pc.UIState(tab="patch", patch_ports=True, patch_side="dst"), source="GCS-8 CH 2", dest="REAPER")
     yield "patch-ports", frame(st, patch=g, media=MEDIA)
 
-    # Settings doesn't scroll yet, so these are taken on a taller terminal (40 rows).
+    # Settings scrolls to the cursor; these are taken on a taller terminal (40 rows) to show more of it.
     yield "settings", frame(pc.UIState(tab="settings", cursor=1, pending={"clock.min-quantum": 64}), height=40,
                             media=MEDIA, realtime=realtime_status(False))
     yield "settings-realtime-ok", frame(pc.UIState(tab="settings", cursor=pc.BAR_ROW), height=40, media=MEDIA,
                                         realtime=realtime_status(True))
     yield "settings-presets", frame(pc.UIState(tab="settings", cursor=pc.PRESETS_ROW), height=40, media=MEDIA,
                                     realtime=realtime_status(True))
+    yield "settings-keys", frame(pc.UIState(tab="settings", cursor=pc.KEYS_ROW + 1,
+                                            keys={"devices.show_hidden": "z", "mixer.meters": None}),
+                                 height=40, media=MEDIA, realtime=realtime_status(True))
     yield "top", frame(pc.UIState(tab="top"), block=block, media=MEDIA)
     yield "about", frame(pc.UIState(tab="about"), media=MEDIA,
                          about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pwctl"})

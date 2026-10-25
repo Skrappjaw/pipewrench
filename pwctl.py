@@ -987,9 +987,10 @@ class Tui:
                 self._apply_theme(scr)  # may replace the message: a theme the terminal can't show
             elif kind == "save_ui":
                 pc.save_ui(pc.ui_path(), pc.ui_prefs(self.st))
-                hold = f"{self.st.peak_hold:g} s" if self.st.peak_hold else "off"
-                self.st.message = (f"meters: {self.st.meter_fps} fps, fall {self.st.meter_fall} dB/s, peak hold {hold}"
-                                   f" · volume bar {'on' if self.st.volume_bar else 'off'}")
+                if self.st.cursor < pc.KEYS_ROW:  # a Keys row keeps its own message
+                    hold = f"{self.st.peak_hold:g} s" if self.st.peak_hold else "off"
+                    self.st.message = (f"meters: {self.st.meter_fps} fps, fall {self.st.meter_fall} dB/s, "
+                                       f"peak hold {hold} · volume bar {'on' if self.st.volume_bar else 'off'}")
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
             elif kind in ("media", "media_volume"):

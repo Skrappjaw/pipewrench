@@ -217,6 +217,21 @@ green:
 Theme (dark, light, or crowbar orange), the meters' frame rate, fall speed and peak hold, and the
 Mixer's volume bar. These apply at once and are kept in `~/.config/pwctl/ui.json`.
 
+### Keys
+
+Every letter shortcut, one row each, with the key it's on. Enter on a row, then press the new key.
+Backspace (or Delete) takes the key off, so the shortcut does nothing; Esc cancels. **Reset all keys**
+puts every shortcut back after a y/n. Changes apply at once and are kept in `~/.config/pwctl/ui.json`.
+
+- A key that's taken on the same screen, or one that works everywhere (`q`, `1`–`6`, the media keys
+  `* - + < >`, `y` and `n`), is refused and the reason shows on the status line.
+- A clash that's already in the file, from hand editing, shows red with the reason. The first shortcut
+  on that screen keeps the key.
+- Arrows, Enter, Esc, Space and Tab can't be rebound.
+- The key legend at the bottom of each tab shows your keys.
+
+![Settings → Keys](guide/settings-keys.png)
+
 ### Presets
 
 Saved clock settings with a label, such as tracking and mixing. `s` saves the current settings as a

@@ -235,6 +235,14 @@ Settings refresh (`pwrealtime.py`, which reads `/proc` and `/etc/security/limits
 
 Background: the 2026-10-24 Discord stutter, in the vault's `docs/pipewire-realtime.md`.
 
+#### Keys
+
+One row per letter shortcut (`pwkeys.ACTIONS`). Enter then a key rebinds it; Backspace/Delete unbinds; Reset
+all keys asks y/n. Global keys (`q`, `1`–`6`, media keys, `y`/`n`) and keys taken on the same screen are
+refused; clashes from a hand-edited `ui.json` show red, and the first shortcut keeps the key. `handle_key`
+maps the pressed key onto the action's default (`pwkeys.translate`), so the tab handlers only know defaults.
+Settings scrolls to keep the cursor in view.
+
 #### Presets (the bottom of Settings)
 
 Named, labelled snapshots of the Settings rows (force rate, force buffer, min, max, and optionally
@@ -312,7 +320,7 @@ Exit codes: 0 ok; 1 a PipeWire command failed, a check found problems or you ans
 | Path | Written by | What |
 |---|---|---|
 | `~/.config/pwctl/presets.json` | Presets view, `preset save/delete` | presets |
-| `~/.config/pwctl/ui.json` | Settings → Theme | display preferences (theme) |
+| `~/.config/pwctl/ui.json` | Settings → Display, Keys | display preferences and key binding overrides (`keys`; `null` = unbound) |
 | `~/.config/pwctl/devices.json` | Devices view, `devices label/hide/bus` | buses, labels, hidden rows, clock: the source of truth |
 | `~/.config/pipewire/pipewire.conf.d/50-pwctl-devices.conf` | `devices apply` | the buses and clock, as a PipeWire drop-in |
 | `~/.config/wireplumber/main.lua.d/51-pwctl-labels.lua` | `devices apply` | labels as WirePlumber 0.4 rules |
