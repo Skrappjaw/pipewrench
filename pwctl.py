@@ -42,8 +42,16 @@ def SETTLE():
     time.sleep(1)
 
 
+RUN_TIMEOUT = 10  # seconds; pw-dump can hang while WirePlumber restarts
+
+
 def default_runner(argv):
-    p = subprocess.run(argv, capture_output=True, text=True, timeout=10)
+    """(exit code, output). A command that hangs is a failed command (124, like timeout(1)), not a crash:
+    callers already show failures as a message, and the next refresh recovers."""
+    try:
+        p = subprocess.run(argv, capture_output=True, text=True, timeout=RUN_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return 124, f"{argv[0]} timed out after {RUN_TIMEOUT:g} s"
     return p.returncode, p.stdout + p.stderr
 
 
