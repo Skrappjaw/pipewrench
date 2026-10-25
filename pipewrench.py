@@ -551,25 +551,120 @@ def main(argv, runner=None, out=None, err=None, execvp=None, ask=None):
 
 _NUMPAD = {b"kpMUL": "*", b"kpSUB": "-", b"kpADD": "+", b"kpDOT": "."}
 
+def _quiet(argv):
+    try:
+        return subprocess.run(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5).returncode
+    except (OSError, subprocess.TimeoutExpired):
+        return 1
+
+
+def _retry(fn, tries=30, wait=0.1):
+    """fn() until it's truthy, for a node that takes a moment to appear after its process starts."""
+    for _ in range(tries):
+        if result := fn():
+            return result
+        time.sleep(wait)
+    return None
+
+
+def link_meter(name, ports, run=_quiet, tries=30):
+    """Link a JACK client's outputs into an unlinked meter: first → FL, second → FR, one port → both."""
+    pairs = list(zip(ports, ("input_FL", "input_FR"))) if len(ports) > 1 else [(ports[0], "input_FL"), (ports[0], "input_FR")]
+    _retry(lambda: run(["pw-link", str(pairs[0][0]), f"{name}:{pairs[0][1]}"]) == 0, tries)
+    for port, ch in pairs[1:]:
+        run(["pw-link", str(port), f"{name}:{ch}"])
+
+
+def tap_input(dump, pid):
+    """The input port of the pw-mididump our child `pid` runs (its node is always called midi-dump)."""
+    clients = {o["id"] for o in dump if o.get("type") == "PipeWire:Interface:Client"
+               and ((o.get("info") or {}).get("props") or {}).get("application.process.id") in (pid, str(pid))}
+    nodes = {o["id"] for o in dump if o.get("type") == "PipeWire:Interface:Node"
+             and ((o.get("info") or {}).get("props") or {}).get("node.name") == pi.MIDI_TAP_NAME
+             and int(((o.get("info") or {}).get("props") or {}).get("client.id", -1)) in clients}
+    return next((o["id"] for o in dump if o.get("type") == "PipeWire:Interface:Port"
+                 and ((o.get("info") or {}).get("props") or {}).get("node.id") in nodes), None)
+
+
+class MidiActivity:
+    """When each watched app MIDI row last saw an event: one pw-mididump per row, fed by pw-link from the
+    row's ports (fan-out: the app still gets them). Started only while the Mixer meters are on."""
+
+    def __init__(self):
+        self.procs, self.targets, self.seen, self.lock = {}, {}, {}, threading.Lock()
+
+    def sync(self, targets):
+        for key in [k for k in self.procs if targets.get(k) != self.targets.get(k)]:
+            self._stop(key)
+        for key, ports in targets.items():
+            if key in self.procs or not ports:
+                continue
+            try:
+                p = subprocess.Popen(["stdbuf", "-oL", "pw-mididump"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            except OSError:
+                continue
+            self.procs[key], self.targets[key] = p, ports
+            threading.Thread(target=self._run, args=(key, p, ports), daemon=True).start()
+
+    def _run(self, key, p, ports):
+        def find():
+            rc, out = default_runner(pi.DUMP_CMD)
+            return tap_input(pi.merge_dump(out), p.pid) if rc == 0 else None
+        tap = _retry(find, tries=20, wait=0.15)
+        if tap is not None:
+            for port in ports:
+                _quiet(["pw-link", str(port), str(tap)])
+        for line in p.stdout:  # one line per event
+            if line.strip():
+                with self.lock:
+                    self.seen[key] = time.monotonic()
+        p.wait()
+
+    def _stop(self, key):
+        p = self.procs.pop(key)
+        self.targets.pop(key, None)
+        p.terminate()
+        try:
+            p.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            p.kill()
+        with self.lock:
+            self.seen.pop(key, None)
+
+    def stop(self):
+        for key in list(self.procs):
+            self._stop(key)
+
+    def snapshot(self):
+        with self.lock:
+            return dict(self.seen)
+
+
 class Meters:
     """Live peak levels for Mixer rows: one pw-record per target, each read on its own thread.
     Started only while the Mixer is open; stop() ends every one (notes/mixer-plan.md)."""
 
     def __init__(self):
         self.procs, self.levels, self.lock = {}, {}, threading.Lock()  # key -> (level, when, peak, peak_at)
+        self.targets = {}
         self.fall, self.hold = 20, 1.5  # dB a second, seconds; the Tui keeps them in step with Settings
 
     def sync(self, targets):
-        for key in set(self.procs) - set(targets):
+        for key in [k for k in self.procs if targets.get(k) != self.targets.get(k)]:
             self._stop(key)
-        for key, (serial, monitor) in targets.items():
-            if key not in self.procs:
-                try:
-                    p = subprocess.Popen(pi.meter_cmd(serial, monitor), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-                except OSError:
-                    continue
-                self.procs[key] = p
-                threading.Thread(target=self._read, args=(key, p), daemon=True).start()
+        for key, target in targets.items():
+            if key in self.procs:
+                continue
+            serial, monitor, ports = (tuple(target) + ((),))[:3]
+            name = f"{pi.METER_NAME}-{key[0]}-{key[1]}" if ports else None  # a JACK client: link it ourselves
+            try:
+                p = subprocess.Popen(pi.meter_cmd(serial, monitor, name), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            except OSError:
+                continue
+            self.procs[key], self.targets[key] = p, target
+            if ports:
+                threading.Thread(target=link_meter, args=(name, ports), daemon=True).start()
+            threading.Thread(target=self._read, args=(key, p), daemon=True).start()
 
     def _read(self, key, p):
         fd, rest = p.stdout.fileno(), b""
@@ -586,6 +681,7 @@ class Meters:
 
     def _stop(self, key):
         p = self.procs.pop(key)
+        self.targets.pop(key, None)
         p.terminate()
         try:
             p.wait(timeout=1)
@@ -620,6 +716,7 @@ class Tui:
         self.about = None  # versions for the About tab; read when it first shows
         self.realtime = None  # pwrealtime.Status for Settings; read on each Settings refresh
         self.meters = Meters()
+        self.midi = MidiActivity()
         self.media, self.media_at = None, 0.0  # the player the bar shows, and when it was read
         self.lock = threading.Lock()
         self.proc = None
@@ -633,6 +730,7 @@ class Tui:
             curses.wrapper(self._main)
         finally:
             self.meters.stop()
+            self.midi.stop()
             if self.proc:
                 self.proc.terminate()
         return 0
@@ -762,7 +860,7 @@ class Tui:
         last_refresh = time.monotonic()
         while True:
             self._draw(scr)
-            scr.timeout(1000 // self.st.meter_fps if self.meters.procs else 250)  # elsewhere stay idle
+            scr.timeout(1000 // self.st.meter_fps if self.meters.procs or self.midi.procs else 250)  # elsewhere stay idle
             ch = scr.getch()
             if time.monotonic() - last_refresh > 1.0:
                 self._refresh()
@@ -871,8 +969,10 @@ class Tui:
         targets = pc.meter_targets(self.mixer, self.st.mix_cursor) if metering else {}
         self.meters.fall, self.meters.hold = self.st.meter_fall, self.st.peak_hold
         self.meters.sync(targets)
+        self.midi.sync(pc.midi_targets(self.mixer, self.st.mix_cursor) if metering else {})
         if self.mixer:
             self.mixer["metered"], self.mixer["levels"] = targets, self.meters.snapshot()
+            self.mixer["midi_seen"], self.mixer["now"] = self.midi.snapshot(), time.monotonic()
 
     def _draw(self, scr):
         h, w = scr.getmaxyx()
