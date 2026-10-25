@@ -308,7 +308,7 @@ def shots():
 
 
 SHOT_THEMES = {"mixer-pipeboy": "pipeboy", "mixer-vaporware": "vaporware", "about-pipecraft": "pipecraft",
-               "patch-portal": "portal-dark"}  # the rest are drawn in the dark theme
+               "patch-portal": "pipeos-dark"}  # the rest are drawn in the dark theme
 
 
 def main(out=OUT):

@@ -214,8 +214,8 @@ green:
 
 ### Display
 
-Theme (dark, light, crowbar orange, Pipe Boy in green, amber, cyan or white, Vaporware, Pipecraft, or Portal
-Light and Dark), the meters' frame rate, fall speed and peak hold, and the
+Theme (dark, light, crowbar orange, Pipe Boy in green, amber, cyan or white, Vaporware, Pipecraft, or
+pipeOS-lite and pipeOS-dark), the meters' frame rate, fall speed and peak hold, and the
 Mixer's volume bar. These apply at once and are kept in `~/.config/pipewrench/ui.json`.
 
 **Pipe Boy** is one phosphor colour, after Fallout's Pip-Boy: green, amber, cyan or white. With no other
@@ -231,10 +231,10 @@ colours, status shows by style: good is bold, waiting is underlined, and a probl
 
 ![Pipecraft](guide/about-pipecraft.png)
 
-**Portal Light** (a clean test chamber) and **Portal Dark** (Portal 2's moody chambers) colour Patch's dots
+**pipeOS-lite** (a clean test chamber) and **pipeOS-dark** (Portal 2's moody chambers) colour Patch's dots
 like portals: blue on the sources, orange on the destinations.
 
-![Portal Dark](guide/patch-portal.png)
+![pipeOS-dark](guide/patch-portal.png)
 
 Every theme except dark and light needs a 256-colour terminal; on a basic one PipeWrench shows dark instead.
 

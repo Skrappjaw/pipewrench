@@ -67,9 +67,9 @@ THEMES = {
                   "chip": ("#ffffff", "#555555", ""),
                   "bar_ok": ("#ffffff", "#5d9632", ""), "bar_alert": ("#ffffff", "#aa0000", ""),
                   "bar_dim": ("#aaaaaa", "#4a3624", "")},
-    # Portal: Patch's source dots are the blue portal, destination dots the orange one.
+    # pipeOS (Portal): Patch's source dots are the blue portal, destination dots the orange one.
     # Light: a clean test chamber, white panels and grey trim.
-    "portal-light": {"screen": ("#2b2f33", "#f2f4f5", ""),
+    "pipeos-lite": {"screen": ("#2b2f33", "#f2f4f5", ""),
                      "normal": (None, None, ""), "dim": ("#8a9399", None, ""),
                      "selected": ("#ffffff", "#4f5b63", ""), "anchor": ("#2b2f33", "#d5dadd", ""),
                      "title": ("#1b1e21", None, "bold"),
@@ -81,7 +81,7 @@ THEMES = {
                      "src": ("#0a84ff", None, "bold"), "dst": ("#ff7a00", None, "bold"),
                      "dst_partial": ("#ff7a00", None, "")},
     # Dark: Portal 2's moody chambers, dark panels with the portals glowing.
-    "portal-dark": {"screen": ("#c9d1d6", "#14181b", ""),
+    "pipeos-dark": {"screen": ("#c9d1d6", "#14181b", ""),
                     "normal": (None, None, ""), "dim": ("#5f6b73", None, ""),
                     "selected": ("#e8eef2", "#2f4250", ""), "anchor": ("#c9d1d6", "#222a30", ""),
                     "title": ("#e8eef2", None, "bold"),
@@ -112,10 +112,10 @@ _PIPE_BOYS = {"pipeboy": ("#3cff62", "#b6ffc2", "#1f8a35", "#13401c", "#0b1a0d")
               "pipeboy-amber": ("#ffb000", "#ffe0a0", "#9a6a00", "#4a3300", "#1a1000"),
               "pipeboy-cyan": ("#33f0ff", "#b8f9ff", "#1a8a94", "#0d3f45", "#071a1c"),
               "pipeboy-white": ("#e6e6e6", "#ffffff", "#8c8c8c", "#3a3a3a", "#121212")}
-THEMES = {**{k: v for k, v in THEMES.items() if k not in ("vaporware", "pipecraft", "portal-light", "portal-dark")},
+THEMES = {**{k: v for k, v in THEMES.items() if k not in ("vaporware", "pipecraft", "pipeos-lite", "pipeos-dark")},
           **{name: _pipe_boy(*colours) for name, colours in _PIPE_BOYS.items()},
           "vaporware": THEMES["vaporware"], "pipecraft": THEMES["pipecraft"],
-          "portal-light": THEMES["portal-light"], "portal-dark": THEMES["portal-dark"]}
+          "pipeos-lite": THEMES["pipeos-lite"], "pipeos-dark": THEMES["pipeos-dark"]}
 for _t in THEMES.values():  # Patch's dots: the theme's ok and pending, unless it sets its own (Portal)
     _t.setdefault("src", _t["ok"])
     _t.setdefault("dst", _t["ok"])
@@ -123,7 +123,7 @@ for _t in THEMES.values():  # Patch's dots: the theme's ok and pending, unless i
 THEME_NAMES = list(THEMES)
 THEME_LABELS = {"pipeboy": "Pipe Boy", "pipeboy-amber": "Pipe Boy Amber", "pipeboy-cyan": "Pipe Boy Cyan",
                 "pipeboy-white": "Pipe Boy White", "vaporware": "Vaporware", "pipecraft": "Pipecraft",
-                "portal-light": "Portal Light", "portal-dark": "Portal Dark"}
+                "pipeos-lite": "pipeOS-lite", "pipeos-dark": "pipeOS-dark"}
 
 
 def theme_label(name):
@@ -165,7 +165,7 @@ def load_ui(path):
     except (OSError, ValueError):
         ui = {}
     theme = ui.get("theme") if isinstance(ui, dict) else None
-    theme = {"orange": "crowbar"}.get(theme, theme)  # renamed 2026-10-24
+    theme = {"orange": "crowbar", "portal-light": "pipeos-lite", "portal-dark": "pipeos-dark"}.get(theme, theme)  # renamed
     ui = ui if isinstance(ui, dict) else {}
     return {"theme": theme if theme in THEMES else "dark",
             "meter_fps": ui.get("meter_fps") if ui.get("meter_fps") in METER_FPS else 10,

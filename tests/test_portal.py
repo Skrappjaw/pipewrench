@@ -1,4 +1,4 @@
-"""Portal themes (Skrappjaw, 2026-10-24): a light test chamber and a dark Portal 2 theme. On Patch, source dots are
+"""pipeOS themes (Skrappjaw, 2026-10-24; Portal): pipeOS-lite, a clean test chamber, and pipeOS-dark, Portal 2. On Patch, source dots are
 portal blue and destination dots portal orange; every other theme keeps its ok/pending colours for them."""
 import json
 from pathlib import Path
@@ -40,7 +40,7 @@ def test_other_themes_keep_their_dot_colours(name):
     assert t["src"] == t["ok"] and t["dst"] == t["ok"] and t["dst_partial"] == t["pending"]
 
 
-@pytest.mark.parametrize("name", ["portal-light", "portal-dark"])
+@pytest.mark.parametrize("name", ["pipeos-lite", "pipeos-dark"])
 def test_portal_dots_are_blue_and_orange(name):
     t = pc.THEMES[name]
     r, g, b = pc.hex_rgb(t["src"][0])
@@ -52,10 +52,10 @@ def test_portal_dots_are_blue_and_orange(name):
 
 
 def test_portal_light_is_light_and_portal_dark_is_dark():
-    light = sum(pc.hex_rgb(pc.THEMES["portal-light"]["screen"][1]))
-    dark = sum(pc.hex_rgb(pc.THEMES["portal-dark"]["screen"][1]))
+    light = sum(pc.hex_rgb(pc.THEMES["pipeos-lite"]["screen"][1]))
+    dark = sum(pc.hex_rgb(pc.THEMES["pipeos-dark"]["screen"][1]))
     assert light > 600 and dark < 120
-    assert pc.theme_label("portal-light") == "Portal Light" and pc.theme_label("portal-dark") == "Portal Dark"
+    assert pc.theme_label("pipeos-lite") == "pipeOS-lite" and pc.theme_label("pipeos-dark") == "pipeOS-dark"
 
 
 def test_patch_dots_use_source_and_destination_roles():
@@ -81,3 +81,10 @@ def test_cursor_bar_still_wins_over_a_dot():
     text, style = next((t, s) for t, s in lines if t.startswith("> ") and "│" in t)
     if "●" in text.split("│")[0]:
         assert role_at(style, text.index("●")) == "selected"
+
+
+def test_placeholder_names_still_load(tmp_path):
+    p = tmp_path / "ui.json"
+    for old, new in (("portal-light", "pipeos-lite"), ("portal-dark", "pipeos-dark")):
+        p.write_text(f'{{"theme": "{old}"}}')
+        assert pc.load_ui(p)["theme"] == new
