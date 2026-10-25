@@ -34,6 +34,8 @@ can't be restarted from outside once stopped. Notes:
 `docs/media-bar-plan.md`.
 
 Switch views with `Tab`, the number keys `1`–`6`, or a click on the tab bar. `q` quits from any view.
+**The mouse wheel scrolls everywhere:** it's ↑/↓ on the list in focus wherever the mouse is (on Patch,
+the column it's over), and it never changes a value.
 Every view lists its keys the same way: a boxed legend at the bottom, each key a bold inverted chip with
 what it does beside it, starting with Enter wherever Enter acts. The line under the box carries
 messages and y/n questions.
@@ -213,7 +215,7 @@ PipeWire's live clock settings, read from the `settings` metadata (`pw-metadata 
 | Key | Mouse | Action |
 |---|---|---|
 | ↑ ↓ | click a row | select a setting |
-| ← → | click ◀ ▶, or the wheel over a row | step the value (pending) |
+| ← → | click ◀ ▶ | step the value (pending) |
 | Enter | its chip, or double-click a row | write all pending values |
 | Esc | its chip | drop pending values |
 | R | its chip | restart WirePlumber, after y/n |

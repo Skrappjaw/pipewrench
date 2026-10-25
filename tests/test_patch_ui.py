@@ -349,3 +349,16 @@ def test_link_marks_are_tinted():
     lines, _ = screen(at("Discord"))
     row = next(style for text, style in lines if "●1" in text)
     assert any(r == "ok" for *_, r in row[1])
+
+
+def test_wheel_scrolls_the_column_under_the_mouse():
+    # The wheel scrolls everywhere; on Patch it scrolls the column it's over, without moving the other.
+    st = pc.UIState(tab="patch", patch_src=0, patch_dst=0)
+    g = G
+    lines, hits = pc.render_screen(st, CUR, None, [], 120, 40, patch=g)
+    row, c0, _, _ = next(h for h in hits if h[3] == ("patch_dst", 3))
+    st2, actions = pc.handle_mouse(st, hits, row, c0, "wheel_down", CUR, [], patch=g)
+    assert actions == [] and st2.patch_side == "dst" and st2.patch_dst == 1 and st2.patch_src == 0
+    row, c0, _, _ = next(h for h in hits if h[3] == ("patch_src", 2))
+    st3, _ = pc.handle_mouse(st2, hits, row, c0, "wheel_down", CUR, [], patch=g)
+    assert st3.patch_side == "src" and st3.patch_src == 1 and st3.patch_dst == 1

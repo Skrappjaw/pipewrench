@@ -646,6 +646,12 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
     if st.confirm:
         return dataclasses.replace(st, confirm=None, message="cancelled (y confirms)"), []
     target = next((t for row, c0, c1, t in hits if row == y and c0 <= x < c1), None)
+    if event in ("wheel_up", "wheel_down"):
+        # The wheel scrolls everywhere (Skrappjaw, 2026-10-24): ↑/↓ on the list in focus, wherever the mouse is,
+        # and never changes a value. On Patch it scrolls the column it's over.
+        if target and target[0] in ("patch_src", "patch_dst") and not st.patch_menu:
+            st = dataclasses.replace(st, patch_side="src" if target[0] == "patch_src" else "dst")
+        return handle_key(st, "up" if event == "wheel_up" else "down", current, presets, devices, patch, mixer)
     if target is None:
         return st, []
     kind = target[0]
@@ -654,7 +660,7 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
         return dataclasses.replace(st, tab=target[1]), []
     if kind == "setting":
         st = dataclasses.replace(st, cursor=target[1])
-        keys = {"double": ["enter"], "wheel_up": ["right"], "wheel_down": ["left"]}.get(event, [])
+        keys = ["enter"] if event == "double" else []
     elif kind == "arrow":
         st = dataclasses.replace(st, cursor=target[1])
         keys = ["right" if target[2] > 0 else "left"] if event in ("click", "double") else []
@@ -664,34 +670,27 @@ def handle_mouse(st, hits, y, x, event, current, presets, devices=None, patch=No
         st = dataclasses.replace(st, cursor=PRESETS_ROW + target[1])
         keys = ["enter"] if event == "double" else []
     elif kind == "mix_row":
-        # The wheel scrolls the list from the selection; it never changes volume (it clashed with scrolling).
-        if event in ("wheel_up", "wheel_down"):
-            st = dataclasses.replace(st, mix_menu=None)
-            keys = ["up" if event == "wheel_up" else "down"]
-        else:
-            st = dataclasses.replace(st, mix_cursor=target[1], mix_menu=None)
-            keys = ["enter"] if event == "double" else []
+        st = dataclasses.replace(st, mix_cursor=target[1], mix_menu=None)
+        keys = ["enter"] if event == "double" else []
     elif kind == "mix_menu_item":
         st = dataclasses.replace(st, mix_menu_cursor=target[1])
         keys = ["enter"] if event in ("click", "double") else []
-    elif kind == "toplist":
-        keys = {"wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
     elif kind == "dev_menu_item":
         st = dataclasses.replace(st, dev_menu_cursor=target[1])
         keys = ["enter"] if event in ("click", "double") else []
     elif kind == "device":
         st = dataclasses.replace(st, dev_cursor=target[1], dev_menu=None)
-        keys = {"double": ["enter"], "wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
+        keys = ["enter"] if event == "double" else []
     elif kind in ("patch_src", "patch_dst"):
         side = "src" if kind == "patch_src" else "dst"
         st = dataclasses.replace(st, patch_side=side, patch_menu=False, **{f"patch_{side}": target[1]})
-        keys = {"double": ["enter"] if side == "dst" else [], "wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
+        keys = ["enter"] if event == "double" and side == "dst" else []
     elif kind == "patch_cell":
         st = dataclasses.replace(st, patch_src=target[1], patch_dst=target[2], patch_menu=False)
         keys = ["enter"] if event == "double" else []
     elif kind == "patch_slot":
         st = dataclasses.replace(st, patch_menu_cursor=target[1])
-        keys = {"click": ["enter"], "double": ["enter"], "wheel_down": ["down"], "wheel_up": ["up"]}.get(event, [])
+        keys = ["enter"] if event in ("click", "double") else []
     elif kind == "patch_pcell":
         st = dataclasses.replace(st, patch_port_row=target[1], patch_port_col=target[2])
         keys = ["enter"] if event == "double" else []

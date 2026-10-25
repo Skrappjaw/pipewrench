@@ -23,6 +23,8 @@ Start it with `pwrench` (or `pipewrench`). The command line, files and code are 
 - **The now-playing bar** above the keys shows the media player that's playing: `*` play/pause,
   `-` `+` its volume, `<` `>` previous and next. There's no stop on purpose (Brave can't restart a
   stopped tab from outside).
+- **The mouse wheel scrolls** whatever list you're in, wherever the pointer is. It never changes a
+  value, so scrolling a long list is safe.
 - `q` quits from anywhere.
 
 Menus open with Enter and close with Esc (or any other key). Anything that moves audio for every app,

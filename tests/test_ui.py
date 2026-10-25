@@ -273,13 +273,23 @@ def test_click_arrow_equals_keys():
     assert a1 == a2 == []
 
 
-def test_wheel_over_row_steps_value():
-    st = UIState()
+def test_wheel_scrolls_settings_and_never_changes_a_value():
+    # Skrappjaw, 2026-10-24: the mouse wheel scrolls everywhere.
+    st = UIState(cursor=1)
     _, hits = screen(st)
+    st, actions = click(st, hits, ("setting", 3), event="wheel_down")
+    assert st.cursor == 2 and st.pending == {} and actions == []   # from the selection, not the mouse
     st, _ = click(st, hits, ("setting", 3), event="wheel_up")
-    assert st.pending == {"clock.force-quantum": 256}
-    st, _ = click(st, hits, ("setting", 3), event="wheel_down")
-    assert st.pending == {}
+    assert st.cursor == 1 and st.pending == {}
+
+
+def test_wheel_works_anywhere_on_the_screen():
+    st = UIState(cursor=1)
+    lines, hits = screen(st)
+    blank = next(n for n, (t, _) in enumerate(lines) if not t.strip())
+    for y in (0, blank):                                    # the tab bar, an empty line
+        st2, _ = pc.handle_mouse(st, hits, y, 2, "wheel_down", CUR, PRESETS)
+        assert st2.cursor == 2 and st2.tab == "settings"
 
 
 def test_apply_and_revert_chips():
