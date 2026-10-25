@@ -1,5 +1,5 @@
 """Pure logic for the Devices tab: every audio card, sink, source and bus in a pw-dump, with state,
-format, volume and defaults. No curses and no subprocess calls here. Plan: docs/devices-v2-plan.md.
+format, volume and defaults, and the MIDI ports (read-only). No curses and no subprocess calls here. Plan: docs/devices-v2-plan.md.
 """
 import json
 import re
@@ -71,6 +71,7 @@ class Row:
     outputs: tuple = ()       # who reads from it: recorders, or an output's monitor
     serial: int = None        # object.serial, what pw-record --target takes
     pid: int = None           # application.process.id (app streams), to find a media player's stream
+    alsa_card: int = None     # MIDI rows: the ALSA card number (hw:N)
 
 
 @dataclass
@@ -88,6 +89,7 @@ class Inventory:
     cards: list
     virtual: list
     defaults: dict
+    midi: list = field(default_factory=list)  # read-only; not in rows(), so nothing acts on them
 
     def rows(self):
         return [r for c in self.cards for r in c.rows] + list(self.virtual)
@@ -270,6 +272,68 @@ def _peers(dump):
     return {n: (order(ins.get(n, ())), order(outs.get(n, ()))) for n in set(ins) | set(outs)}
 
 
+MIDI_THROUGH = "Midi Through:"  # the kernel's loopback port; never something to list or patch
+
+
+def is_midi_port(props):
+    dsp = str(props.get("format.dsp", "")).lower()
+    return "midi" in dsp or "ump" in dsp
+
+
+def is_midi_bridge(props):
+    return props.get("media.class") == "Midi/Bridge"
+
+
+def midi_label(alias):
+    """A MIDI port's name from its alias: GCS-8:GCS-8 MIDI 1 → GCS-8 MIDI 1."""
+    return alias.split(":", 1)[-1].strip()
+
+
+def alsa_midi_ports(dump):
+    """(port object, alias) for each ALSA MIDI port. PipeWire hangs them all off one Midi-Bridge node, so
+    a port's alias, not its node, says which device it is. Midi Through is left out."""
+    bridges = {o["id"] for o in dump if o.get("type") == "PipeWire:Interface:Node" and "id" in o
+               and is_midi_bridge(_info(o).get("props") or {})}
+    out = []
+    for o in dump:
+        p = _info(o).get("props") or {}
+        if o.get("type") != "PipeWire:Interface:Port" or p.get("node.id") not in bridges or not is_midi_port(p):
+            continue
+        alias = p.get("port.alias") or p.get("port.name", str(o["id"]))
+        if not alias.startswith(MIDI_THROUGH):
+            out.append((o, alias))
+    return out
+
+
+def midi_devices(dump):
+    """MIDI rows for the Devices tab: one per ALSA MIDI port, in from the device, out to it, or duplex,
+    with what it's linked to (← plays into it, → reads from it)."""
+    ports = alsa_midi_ports(dump)
+    nodes = {o["id"]: _info(o).get("props") or {} for o in dump if o.get("type") == "PipeWire:Interface:Node" and "id" in o}
+    names = {o["id"]: midi_label(alias) for o, alias in ports}
+    for o in dump:  # a linked port that isn't an ALSA MIDI port goes by its node (REAPER)
+        p = _info(o).get("props") or {}
+        if o.get("type") == "PipeWire:Interface:Port" and o.get("id") not in names and p.get("node.id") in nodes:
+            names[o["id"]] = display_name(nodes[p["node.id"]])
+    links = [(_info(o).get("output-port-id"), _info(o).get("input-port-id")) for o in dump
+             if o.get("type") == "PipeWire:Interface:Link" and _info(o).get("state") != "error"]
+    devs = {}
+    for o, alias in ports:
+        devs.setdefault(alias, []).append(o)
+    order = lambda s: tuple(sorted(s, key=str.lower))
+    rows = []
+    for alias, objs in devs.items():
+        outs = {o["id"] for o in objs if _info(o).get("direction") == "output"}  # from the device
+        ins = {o["id"] for o in objs if _info(o).get("direction") == "input"}
+        direction = "duplex" if outs and ins else "in" if outs else "out"
+        props = _info(objs[0]).get("props") or {}
+        rows.append(Row(id=min(o["id"] for o in objs), name=alias, label=midi_label(alias), direction=direction,
+                        kind="midi", alsa_card=props.get("api.alsa.card"),
+                        inputs=order({names[a] for a, b in links if b in ins and a in names}),
+                        outputs=order({names[b] for a, b in links if a in outs and b in names})))
+    return sorted(rows, key=lambda r: natural_key(r.label))
+
+
 def inventory(dump):
     defaults = _defaults(dump)
     peers = _peers(dump)
@@ -291,7 +355,8 @@ def inventory(dump):
     for c in cards.values():
         c.rows = _sort(c.rows)
     return Inventory(cards=sorted(cards.values(), key=lambda c: c.label.lower()),
-                     virtual=sorted(virtual, key=lambda r: natural_key(r.name)), defaults=defaults)
+                     virtual=sorted(virtual, key=lambda r: natural_key(r.name)), defaults=defaults,
+                     midi=midi_devices(dump))
 
 
 def monitor_rows(rows):
@@ -330,6 +395,8 @@ def view(inv, hidden=(), show_hidden=False, monitors=False):
             continue
         out.append((f"{c.label} · profile {c.active or '?'}", None))
         out += rows_of(c.rows)
+    if inv.midi:
+        out += [("MIDI", None)] + [("", r) for r in inv.midi]
     out.append(("Virtual", None))
     out += rows_of(inv.virtual)
     return out + ([("Off", None)] + off if off else [])

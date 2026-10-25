@@ -256,6 +256,8 @@ def _fit(text, width):
 
 
 def device_line(row, c, hidden=False, owned=(), clash=()):
+    if row.kind == "midi":
+        return f"    {row.direction:<6} {_fit(row.label, 30):<30} {f'hw:{row.alsa_card}':<9} {_fit(pi.connections(row), 32)}".rstrip()
     fmt = " ".join(x for x in (row.format, f"{row.channels}ch" if row.channels else None,
                                str(row.rate) if row.rate else None) if x)
     vol = "muted" if row.mute else "" if row.volume is None else f"vol {round(row.volume * 100)}%"

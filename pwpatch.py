@@ -129,14 +129,6 @@ def _kind(props):
     return "device" if props.get("device.api") in pi.HW_APIS else "bus"
 
 
-def _is_midi(port_props):
-    dsp = str(port_props.get("format.dsp", "")).lower()
-    return "midi" in dsp or "ump" in dsp
-
-
-_MIDI_THROUGH = "Midi Through:"  # the kernel's loopback port; never something to patch
-
-
 def _midi(dump, links):
     """(sources, destinations): one endpoint per MIDI port. ALSA MIDI ports all hang off one Midi-Bridge
     node, so each is named by its alias (GCS-8:GCS-8 MIDI 1 → GCS-8 MIDI 1). A JACK client's port
@@ -148,10 +140,10 @@ def _midi(dump, links):
         info = o.get("info") or {}
         p = info.get("props") or {}
         node = nodes.get(p.get("node.id"))
-        if o.get("type") != "PipeWire:Interface:Port" or node is None or pi.is_meter(node) or not _is_midi(p):
+        if o.get("type") != "PipeWire:Interface:Port" or node is None or pi.is_meter(node) or not pi.is_midi_port(p):
             continue
         alias = p.get("port.alias") or p.get("port.name", str(o["id"]))
-        if alias.startswith(_MIDI_THROUGH) or info.get("direction") not in ("output", "input"):
+        if alias.startswith(pi.MIDI_THROUGH) or info.get("direction") not in ("output", "input"):
             continue
         found.append((Port(o["id"], p["node.id"], p.get("port.name", ""), "MIDI", info["direction"]), alias, node))
     per_client = {}
@@ -159,8 +151,8 @@ def _midi(dump, links):
         per_client[(port.node, port.direction)] = per_client.get((port.node, port.direction), 0) + 1
     sources, dests = [], []
     for port, alias, node in found:
-        if node.get("media.class") == "Midi/Bridge":
-            label, kind = alias.split(":", 1)[-1].strip(), "device"
+        if pi.is_midi_bridge(node):
+            label, kind = pi.midi_label(alias), "device"
         else:
             label, kind = pi.display_name(node), "app"
             if per_client[(port.node, port.direction)] > 1:

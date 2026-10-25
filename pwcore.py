@@ -697,6 +697,8 @@ def _dev_lines(devices, st):
             continue
         lines.append(("card", card))
         lines += rows(card.rows)
+    if inv.midi:  # read-only, like channels; nothing hides them
+        lines += [("midi", None)] + [("chan", r) for r in inv.midi]
     lines.append(("virtual", None))
     lines += rows(inv.virtual)
     lines += [("pending", b) for b in devices["pending"]]
@@ -705,7 +707,7 @@ def _dev_lines(devices, st):
 
 
 def dev_selectable(devices, st):
-    return [line for line in _dev_lines(devices, st) if line[0] not in ("virtual", "off", "chan")]
+    return [line for line in _dev_lines(devices, st) if line[0] not in ("virtual", "off", "midi", "chan")]
 
 
 def _key_devices(st, key, devices):
@@ -1334,12 +1336,16 @@ def _device_line_text(kind, obj, devices, selected):
         return f"{prefix}{obj.label} · off", "dim"
     if kind == "card":
         return f"{prefix}{obj.label} · profile {obj.active or '?'}", "title"
-    if kind in ("virtual", "off"):
-        return f"  {kind.title()}", "title"
+    if kind in ("virtual", "off", "midi"):
+        return f"  {'MIDI' if kind == 'midi' else kind.title()}", "title"
     if kind == "addbus":
         return f"{prefix}+ Add bus…", "dim"
     if kind == "pending":
         return f"{prefix}+ duplex {_fit(obj['label'], 30):<30} pending: A creates it  {obj['name']}", "pending"
+    if obj.kind == "midi":  # no state, volume or node of its own: every ALSA MIDI port shares the bridge
+        text = f"{prefix}  {obj.direction:<6} {_fit(obj.label, 30):<30} {f'hw:{obj.alsa_card}':<9}" \
+               + (f"  {pi.connections(obj)}" if obj.inputs or obj.outputs else "")
+        return text, "normal"
     c = devices["config"]
     vol = "muted" if obj.mute else "" if obj.volume is None else f"{round(obj.volume * 100)}%"
     pending = c["labels"].get(obj.name)
@@ -1372,7 +1378,7 @@ def _render_devices(cv, st, devices, body_h):
     cursor = max(0, min(len(selectable) - 1, st.dev_cursor)) if selectable else -1
     menu_at = None
     for kind, obj in _dev_lines(devices, st):
-        idx = None if kind in ("virtual", "off", "chan") else n_sel
+        idx = None if kind in ("virtual", "off", "midi", "chan") else n_sel
         text, style = _device_line_text("row" if kind == "chan" else kind, obj, devices, idx == cursor)
         if kind == "chan":  # read-only; in pipeOS its direction word is the portal colour
             role = {"out": "dir_out", "in": "dir_in"}.get(obj.direction)
