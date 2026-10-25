@@ -58,6 +58,15 @@ THEMES = {
                   "chip": ("#1b0d33", "#b967ff", ""),
                   "bar_ok": ("#1b0d33", "#05ffa1", ""), "bar_alert": ("#1b0d33", "#ff4f81", ""),
                   "bar_dim": ("#8a6fb3", "#3a1d5c", "")},
+    # Pipecraft: Minecraft's text-colour codes (yellow, green, gold, red, grey) on dark dirt, grey buttons.
+    "pipecraft": {"screen": ("#ffffff", "#2b1d12", ""),
+                  "normal": (None, None, ""), "dim": ("#aaaaaa", None, ""),
+                  "selected": ("#ffffa0", "#6f6f6f", "bold"), "anchor": ("#ffffff", "#4a4a4a", ""),
+                  "title": ("#ffff55", None, "bold"),
+                  "ok": ("#55ff55", None, "bold"), "pending": ("#ffaa00", None, "bold"), "alert": ("#ff5555", None, "bold"),
+                  "chip": ("#ffffff", "#555555", ""),
+                  "bar_ok": ("#ffffff", "#5d9632", ""), "bar_alert": ("#ffffff", "#aa0000", ""),
+                  "bar_dim": ("#aaaaaa", "#4a3624", "")},
 }
 
 
@@ -78,12 +87,12 @@ _PIPE_BOYS = {"pipeboy": ("#3cff62", "#b6ffc2", "#1f8a35", "#13401c", "#0b1a0d")
               "pipeboy-amber": ("#ffb000", "#ffe0a0", "#9a6a00", "#4a3300", "#1a1000"),
               "pipeboy-cyan": ("#33f0ff", "#b8f9ff", "#1a8a94", "#0d3f45", "#071a1c"),
               "pipeboy-white": ("#e6e6e6", "#ffffff", "#8c8c8c", "#3a3a3a", "#121212")}
-THEMES = {**{k: v for k, v in THEMES.items() if k != "vaporware"},
+THEMES = {**{k: v for k, v in THEMES.items() if k not in ("vaporware", "pipecraft")},
           **{name: _pipe_boy(*colours) for name, colours in _PIPE_BOYS.items()},
-          "vaporware": THEMES["vaporware"]}
+          "vaporware": THEMES["vaporware"], "pipecraft": THEMES["pipecraft"]}
 THEME_NAMES = list(THEMES)
 THEME_LABELS = {"pipeboy": "Pipe Boy", "pipeboy-amber": "Pipe Boy Amber", "pipeboy-cyan": "Pipe Boy Cyan",
-                "pipeboy-white": "Pipe Boy White", "vaporware": "Vaporware"}
+                "pipeboy-white": "Pipe Boy White", "vaporware": "Vaporware", "pipecraft": "Pipecraft"}
 
 
 def theme_label(name):
@@ -1141,13 +1150,34 @@ LOGO_SLANT = [
     '/_/   /_/ .___/\\___/|__/|__/_/   \\___/_/ /_/\\___/_/ /_/ ',
     '       /_/                                              ',
 ]
+# Pipecraft says PIPECRAFT at every width: ANSI Shadow (blocky, like Minecraft's logo), then Pagga.
+LOGO_PIPECRAFT = [
+    "██████╗ ██╗██████╗ ███████╗ ██████╗██████╗  █████╗ ███████╗████████╗",
+    "██╔══██╗██║██╔══██╗██╔════╝██╔════╝██╔══██╗██╔══██╗██╔════╝╚══██╔══╝",
+    "██████╔╝██║██████╔╝█████╗  ██║     ██████╔╝███████║█████╗     ██║   ",
+    "██╔═══╝ ██║██╔═══╝ ██╔══╝  ██║     ██╔══██╗██╔══██║██╔══╝     ██║   ",
+    "██║     ██║██║     ███████╗╚██████╗██║  ██║██║  ██║██║        ██║   ",
+    "╚═╝     ╚═╝╚═╝     ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝        ╚═╝   ",
+]
+LOGO_PIPECRAFT_SMALL = [
+    "░█▀█░▀█▀░█▀█░█▀▀░█▀▀░█▀▄░█▀█░█▀▀░▀█▀",
+    "░█▀▀░░█░░█▀▀░█▀▀░█░░░█▀▄░█▀█░█▀▀░░█░",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀▀▀░▀░▀░▀░▀░▀░░░░▀░",
+]
 
 
 def theme_logo(theme):
     """The wordmark for a theme when it fits; dark and light keep ANSI Compact."""
     if theme.startswith("pipeboy"):
         return LOGO_COMPUTER
-    return {"crowbar": LOGO_DOOM, "vaporware": LOGO_SLANT}.get(theme, LOGO_ANSI)
+    return {"crowbar": LOGO_DOOM, "vaporware": LOGO_SLANT, "pipecraft": LOGO_PIPECRAFT}.get(theme, LOGO_ANSI)
+
+
+def logo_chain(theme):
+    """Wordmarks to try, widest first; the last always fits."""
+    if theme == "pipecraft":
+        return [LOGO_PIPECRAFT, LOGO_PIPECRAFT_SMALL, ["P I P E C R A F T"]]
+    return [theme_logo(theme), LOGO_PAGGA, LOGO_PLAIN]
 ABOUT_LINK = "github.com/Skrappjaw/pipewrench"
 ABOUT_CMDS = {"pipewire": ["pipewire", "--version"], "wireplumber": ["wireplumber", "--version"]}
 
@@ -1170,7 +1200,8 @@ def about_info(run):
 
 def _render_about(cv, about, theme="dark"):
     about = about or {}
-    logo = next((lg for lg in (theme_logo(theme), LOGO_PAGGA) if len(lg[0]) + 4 <= cv.width), LOGO_PLAIN)
+    chain = logo_chain(theme)
+    logo = next((lg for lg in chain[:-1] if len(lg[0]) + 4 <= cv.width), chain[-1])
     pad = max(0, (cv.width - len(logo[0])) // 2)
     cv.add("")
     for row in logo:

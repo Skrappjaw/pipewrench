@@ -3,7 +3,7 @@
 
 Each picture is the frame pwrench paints: pwcore.render_screen gives the same lines and colour roles the
 curses UI draws, and this script paints them as PNG in the dark theme, one character per cell in DejaVu
-Sans Mono (two shots show the Pipe Boy and Vaporware themes). Fixtures only, so nothing from a live machine ends up in the docs, and the pictures can be
+Sans Mono (a few shots show the other themes). Fixtures only, so nothing from a live machine ends up in the docs, and the pictures can be
 redrawn whenever the UI changes:
 
     python3 tools/screenshots.py            # writes docs/guide/*.png
@@ -299,12 +299,14 @@ def shots():
     yield "settings-keys", frame(pc.UIState(tab="settings", cursor=pc.KEYS_ROW + 1,
                                             keys={"devices.show_hidden": "z", "mixer.meters": None}),
                                  height=40, media=MEDIA, realtime=realtime_status(True))
+    yield "about-pipecraft", frame(pc.UIState(tab="about", theme="pipecraft"), media=MEDIA,
+                                   about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"})
     yield "top", frame(pc.UIState(tab="top"), block=block, media=MEDIA)
     yield "about", frame(pc.UIState(tab="about"), media=MEDIA,
                          about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"})
 
 
-SHOT_THEMES = {"mixer-pipeboy": "pipeboy", "mixer-vaporware": "vaporware"}  # the rest are drawn in the dark theme
+SHOT_THEMES = {"mixer-pipeboy": "pipeboy", "mixer-vaporware": "vaporware", "about-pipecraft": "pipecraft"}  # the rest are drawn in the dark theme
 
 
 def main(out=OUT):

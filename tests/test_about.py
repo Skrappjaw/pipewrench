@@ -139,5 +139,12 @@ def test_themed_logos_fall_back_when_narrow(theme):
 
 
 def test_themed_logos_fit_80_columns_and_stay_aligned():
-    for logo in (pc.LOGO_DOOM, pc.LOGO_COMPUTER, pc.LOGO_SLANT):
+    for logo in (pc.LOGO_DOOM, pc.LOGO_COMPUTER, pc.LOGO_SLANT, pc.LOGO_PIPECRAFT):
         assert len({len(row) for row in logo}) == 1 and len(logo[0]) + 4 <= 80
+
+
+def test_pipecraft_says_pipecraft_at_every_width():
+    assert all(row.rstrip() in themed("pipecraft") for row in pc.LOGO_PIPECRAFT)
+    assert pc.LOGO_PIPECRAFT_SMALL[0] in themed("pipecraft", width=50)
+    assert "P I P E C R A F T" in themed("pipecraft", width=34)
+    assert "PIPEWRENCH" not in themed("pipecraft", width=50) and pc.LOGO_PAGGA[0] not in themed("pipecraft", width=50)
