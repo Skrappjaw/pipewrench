@@ -1071,7 +1071,7 @@ class Tui:
                     if stream is None or stream.volume is None:
                         self.st.message = self.st.failed = f"{player.label} has no PipeWire stream to set yet"
                     else:
-                        _run(self.runner, pi.volume_cmd(stream, action[1]))
+                        _run(self.runner, pi.volume_cmd(stream, action[1], limit=pi.UNITY))  # no unlock here
                         self.st.message = f"{player.label} volume {action[1]}"
             elif kind == "mix_test":
                 rows = [r for _, _, r in pc.mixer_selectable(self.mixer)] if self.mixer else []

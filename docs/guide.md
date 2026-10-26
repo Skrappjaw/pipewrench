@@ -38,13 +38,15 @@ Every output and input, then the apps playing or recording under each. ★ marks
 | Key | Does |
 |---|---|
 | ↑ ↓ | select a channel |
-| ← → | volume −5% / +5%, up to 150% |
+| ← → | volume −5% / +5%. → stops at 100%; press it again there to unlock that channel up to 150% |
 | mouse wheel | scroll the list (it never changes volume) |
 | Space | mute or unmute |
 | Enter (double-click) | the channel's menu |
 | v | live meters on or off |
 
-The volume % sits inside the bar. Green is up to 100%, red past it, grey when muted. The meter to the
+The volume % sits inside the bar. Green is up to 100%, red past it, grey when muted. Past 100% can clip, so
+at 100% the first → only warns; the second unlocks that channel. It locks again once it's back under 100%.
+The media bar's `+` stops at 100%. On the command line, `pwrench devices volume DEV +5%` goes up to 150%. The meter to the
 right shows the live level of running channels (yellow past −18 dB, red past −6 dB) with a short peak
 hold.
 

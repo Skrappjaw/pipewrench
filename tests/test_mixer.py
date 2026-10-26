@@ -122,11 +122,10 @@ def test_rows_fit_the_width():
 # --- keys and mouse -------------------------------------------------------------------------
 
 def test_arrows_step_volume_and_space_mutes():
-    st = at("Discord")
-    play = next(r for r in pi.streams(DUMP) if r.direction == "out")
-    assert key(st, "right")[1] == [("mix_cmd", ["wpctl", "set-volume", str(play.id), "5%+"])]
-    assert key(st, "left")[1] == [("mix_cmd", ["wpctl", "set-volume", str(play.id), "5%-"])]
-    assert key(st, " ")[1] == [("mix_cmd", ["wpctl", "set-mute", str(play.id), "toggle"])]
+    st, m, nid = discord_at(0.5)
+    assert key(st, "right", m=m)[1] == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1", str(nid), "5%+"])]
+    assert key(st, "left", m=m)[1] == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1.5", str(nid), "5%-"])]
+    assert key(st, " ", m=m)[1] == [("mix_cmd", ["wpctl", "set-mute", str(nid), "toggle"])]
 
 
 def labels(st, m=MX):
@@ -235,6 +234,56 @@ def test_legend_leads_with_enter_actions_and_the_menu_has_its_own():
     assert chips(screen(pc.UIState())[0])[0] == ("Enter", "actions")
     st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
     assert chips(screen(st)[0])[0] == ("Enter", "pick")
+
+
+def with_volume(dump, node_id, level):
+    """The dump with one node's volume set (level on wpctl's scale, 1.0 = 100%)."""
+    dump = json.loads(json.dumps(dump))
+    node = next(o for o in dump if o["id"] == node_id)
+    for props in node["info"]["params"]["Props"]:
+        if "channelVolumes" in props:
+            props["channelVolumes"] = [level ** 3] * len(props["channelVolumes"])
+    return dump
+
+
+def discord_at(level):
+    play = next(r for r in pi.streams(DUMP) if r.direction == "out" and r.label == "Discord")
+    m = mx(with_volume(DUMP, play.id, level))
+    return at("Discord", m=m), m, play.id
+
+
+def test_volume_stops_at_100_percent_then_warns():
+    # Skrappjaw, 2026-10-26: "vol past 100 is ok btw. just needs a warning/unlock."
+    st, m, nid = discord_at(1.0)
+    st, actions = key(st, "right", m=m)
+    assert actions == [] and "100%" in st.message and "again" in st.message
+    st, actions = key(st, "right", m=m)  # the second → unlocks this row, up to 150%
+    assert actions == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1.5", str(nid), "5%+"])]
+    st, actions = key(st, "right", m=m)  # stays unlocked
+    assert actions == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1.5", str(nid), "5%+"])]
+
+
+def test_moving_away_disarms_the_warning():
+    st, m, nid = discord_at(1.0)
+    st, _ = key(st, "right", "down", "up", m=m)
+    st, actions = key(st, "right", m=m)
+    assert actions == [] and "again" in st.message
+
+
+def test_back_to_100_locks_the_row_again():
+    st, m, nid = discord_at(1.0)
+    st, _ = key(st, "right", "right", m=m)
+    _, m_low, _ = discord_at(0.9)                     # the refresh after stepping down
+    st, actions = key(st, "right", m=m_low)
+    assert actions == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1", str(nid), "5%+"])]
+    st, actions = key(st, "right", m=m)               # at 100% again: warn again
+    assert actions == []
+
+
+def test_a_row_already_past_100_is_not_trapped():
+    st, m, nid = discord_at(1.2)
+    assert key(st, "right", m=m)[1] == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1.5", str(nid), "5%+"])]
+    assert key(st, "left", m=m)[1] == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1.5", str(nid), "5%-"])]
 
 
 def test_no_volume_control_is_refused():

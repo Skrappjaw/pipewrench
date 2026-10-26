@@ -444,6 +444,8 @@ class UIState:
     mix_cursor: int = 0
     mix_menu: tuple = None       # (section, node id) of the row whose menu is open
     mix_menu_cursor: int = 0
+    vol_armed: int = None        # node id warned at 100%: → again unlocks it (Skrappjaw, 2026-10-26)
+    vol_unlocked: frozenset = frozenset()  # node ids allowed past 100%, up to 150%
     meters: bool = True          # live levels on the Mixer (v toggles)
     cursor: int = 0              # Settings: the row in the open category
     pending: dict = field(default_factory=dict)
@@ -1610,6 +1612,23 @@ def _is_default(mx, section, row):
     return row.name == mx["defaults"]["sink" if section == "playback" else "source"]
 
 
+VOLUME_WARNING = "Past 100% can clip. → again to go louder (up to 150%)"
+
+
+def _volume_up(st, row):
+    """→ stops at 100%. There, the first → only warns and the second unlocks the row up to 150%. A row seen
+    below 100% locks again; one already past 100% (set elsewhere) is never trapped."""
+    if row.volume < pi.UNITY - 0.005:
+        st.vol_unlocked, st.vol_armed = st.vol_unlocked - {row.id}, None
+        return st, [("mix_cmd", pi.volume_cmd(row, "+5%", limit=pi.UNITY))]
+    if row.id not in st.vol_unlocked and row.volume <= pi.UNITY + 0.005 and st.vol_armed != row.id:
+        st.vol_armed = row.id
+        st.message = st.failed = VOLUME_WARNING
+        return st, []
+    st.vol_unlocked, st.vol_armed = st.vol_unlocked | {row.id}, None
+    return st, [("mix_cmd", pi.volume_cmd(row, "+5%"))]
+
+
 def _key_mixer(st, key, mx):
     if mx is None:
         return st, []
@@ -1623,11 +1642,14 @@ def _key_mixer(st, key, mx):
     try:
         if key in ("up", "down"):
             st.mix_cursor = max(0, min(len(items) - 1, st.mix_cursor + (1 if key == "down" else -1)))
+            st.vol_armed = None
         elif key in ("left", "right"):
             if row.volume is None:
                 st.message = st.failed = f"{row.label} has no volume control here"
                 return st, []
-            return st, [("mix_cmd", pi.volume_cmd(row, "+5%" if key == "right" else "-5%"))]
+            if key == "left":
+                return st, [("mix_cmd", pi.volume_cmd(row, "-5%"))]
+            return _volume_up(st, row)
         elif key == " ":
             if row.mute is None:
                 st.message = st.failed = f"{row.label} can't be muted here"

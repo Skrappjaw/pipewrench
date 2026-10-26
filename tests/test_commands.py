@@ -18,8 +18,9 @@ def inv():
 def test_default_volume_mute_commands(inv):
     ch2 = inv.find(CH2_IN)
     assert pi.default_cmd(ch2) == ["wpctl", "set-default", "96"]
-    assert pi.volume_cmd(ch2, "+5%") == ["wpctl", "set-volume", "96", "5%+"]
-    assert pi.volume_cmd(ch2, "-5%") == ["wpctl", "set-volume", "96", "5%-"]
+    assert pi.volume_cmd(ch2, "+5%") == ["wpctl", "set-volume", "--limit", "1.5", "96", "5%+"]
+    assert pi.volume_cmd(ch2, "-5%") == ["wpctl", "set-volume", "--limit", "1.5", "96", "5%-"]
+    assert pi.volume_cmd(ch2, "+5%", limit=1.0) == ["wpctl", "set-volume", "--limit", "1", "96", "5%+"]
     assert pi.volume_cmd(ch2, "50%") == ["wpctl", "set-volume", "96", "50%"]
     assert pi.volume_cmd(ch2, "0.4") == ["wpctl", "set-volume", "96", "0.4"]
     assert pi.mute_cmd(ch2) == ["wpctl", "set-mute", "96", "toggle"]

@@ -147,7 +147,7 @@ def test_list_without_pipewire_fails_clearly():
 
 def test_default_volume_mute_run_wpctl():
     for args, cmd in ((("default", CH2_IN), ["wpctl", "set-default", "96"]),
-                      (("volume", "96", "+5%"), ["wpctl", "set-volume", "96", "5%+"]),
+                      (("volume", "96", "+5%"), ["wpctl", "set-volume", "--limit", "1.5", "96", "5%+"]),
                       (("mute", "GCS-8 CH 2"), ["wpctl", "set-mute", "96", "toggle"])):
         rc, _, err, r, _ = run(*args)
         assert rc == 0, err

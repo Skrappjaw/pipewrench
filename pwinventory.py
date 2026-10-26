@@ -489,6 +489,7 @@ _REL = re.compile(r"([+-])(\d{1,3})%")
 _ABS_PCT = re.compile(r"(\d{1,3})%")
 _ABS_FRAC = re.compile(r"\d(\.\d+)?")
 MAX_VOLUME = 1.5  # wpctl's own ceiling for set-volume
+UNITY = 1.0       # 100%: the Mixer stops here until the row is unlocked
 
 
 def _actionable(row):
@@ -506,12 +507,13 @@ def mute_cmd(row):
     return ["wpctl", "set-mute", str(row.id), "toggle"]
 
 
-def volume_cmd(row, step):
-    """step: +5% / -5% (relative), 50% or 0.5 (absolute, up to 150%)."""
+def volume_cmd(row, step, limit=MAX_VOLUME):
+    """step: +5% / -5% (relative, stopping at `limit`), 50% or 0.5 (absolute, up to 150%). Without --limit
+    wpctl's relative steps have no ceiling at all."""
     _actionable(row)
     step = str(step).strip()
     if m := _REL.fullmatch(step):
-        return ["wpctl", "set-volume", str(row.id), f"{m.group(2)}%{m.group(1)}"]
+        return ["wpctl", "set-volume", "--limit", f"{limit:g}", str(row.id), f"{m.group(2)}%{m.group(1)}"]
     if (m := _ABS_PCT.fullmatch(step)) and int(m.group(1)) <= MAX_VOLUME * 100:
         return ["wpctl", "set-volume", str(row.id), step]
     if _ABS_FRAC.fullmatch(step) and float(step) <= MAX_VOLUME:
