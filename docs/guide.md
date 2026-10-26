@@ -51,6 +51,8 @@ The volume % sits inside the bar. Green is up to 100%, red past it, grey when mu
 at 100% → opens a box: **Go louder** unlocks that channel until it's back under 100%, **Don't ask again**
 unlocks it for good, and **Cancel** (where the cursor starts) leaves it. The channel menu's **Volume boost**
 row locks or unlocks it any time.
+
+![The box at 100%](guide/mixer-boost.png)
 The media bar's `+` stops at 100%. On the command line, `pwrench devices volume DEV +5%` goes up to 150%. The meter to the
 right shows the live level of running channels (yellow past −18 dB, red past −6 dB) with a short peak
 hold.

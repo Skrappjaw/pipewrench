@@ -262,6 +262,8 @@ def shots():
                                  mixer=m, media=MEDIA)
     st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH 2", "recording")), "enter", CUR, mixer=m)
     yield "mixer-menu", frame(st, mixer=m, media=MEDIA)
+    st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH 2", "recording")), "right", CUR, mixer=m)
+    yield "mixer-boost", frame(st, mixer=m, media=MEDIA)  # → at 100%: the volume popover
     st.mix_menu = None
     yield "mixer-rename", prompt(frame(st, mixer=m, media=MEDIA), "new name for GCS-8 CH 2 (empty restores the default): Mic")
 
