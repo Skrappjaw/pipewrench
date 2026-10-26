@@ -347,6 +347,7 @@ have their own lettering.
 | OBS isn't getting desktop audio | Patch → Monitors: is the output's monitor connected to OBS? |
 | A device is missing from the Mixer | Devices: is its card hidden (H) or on profile `off`? |
 | A new name doesn't show | It shows after a WirePlumber restart (Devices → R) or the next login |
+| A red "PipeWire not answering" line under the tabs | PipeWire is up but hung. The screen keeps the last thing it saw and the keys still work; PipeWrench checks every 5 s and says "PipeWire is back" when it answers. It never restarts anything itself: `systemctl --user status pipewire wireplumber`, then restart them if you choose |
 
 ## Redrawing the pictures
 

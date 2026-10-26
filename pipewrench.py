@@ -45,14 +45,78 @@ def SETTLE():
 RUN_TIMEOUT = 10  # seconds; pw-dump can hang while WirePlumber restarts
 
 
-def default_runner(argv):
+def default_runner(argv, timeout=None):
     """(exit code, output). A command that hangs is a failed command (124, like timeout(1)), not a crash:
     callers already show failures as a message, and the next refresh recovers."""
+    timeout = RUN_TIMEOUT if timeout is None else timeout
     try:
-        p = subprocess.run(argv, capture_output=True, text=True, timeout=RUN_TIMEOUT)
+        p = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
-        return 124, f"{argv[0]} timed out after {RUN_TIMEOUT:g} s"
+        return 124, f"{argv[0]} timed out after {timeout:g} s"
     return p.returncode, p.stdout + p.stderr
+
+
+PW_TOOLS = frozenset({"pw-dump", "pw-metadata", "pw-cli", "pw-link", "wpctl"})
+PW_TIMEOUT = 3      # seconds; a healthy PipeWire answers in milliseconds
+PROBE_EVERY = 5     # seconds between background probes while PipeWire is down
+PROBE_CMD = ["pw-cli", "info", "0"]
+PW_HINT = "check `systemctl --user status pipewire wireplumber`"
+
+
+class Watchdog:
+    """A runner that notices PipeWire has stopped answering (the 2026-10-24 wedge: the daemon up, every
+    client hanging). The first PipeWire call to time out marks it down; after that PipeWire calls return
+    at once instead of each freezing the UI, and a background loop probes until it answers. Other commands
+    pass straight through. It never restarts anything."""
+
+    def __init__(self, run, spawn=None, clock=time.monotonic, sleep=time.sleep):
+        self.run, self.clock, self.sleep = run, clock, sleep
+        self.spawn = spawn or (lambda fn: threading.Thread(target=fn, daemon=True).start())
+        self.lock = threading.Lock()
+        self.down_since = None        # time.strftime of the first timeout
+        self.recovered = False
+
+    @property
+    def down(self):
+        return self.down_since is not None
+
+    def __call__(self, argv):
+        if not argv or argv[0] not in PW_TOOLS:
+            return self.run(argv)
+        if self.down:
+            return 124, f"PipeWire not answering; retrying every {PROBE_EVERY} s ({PW_HINT})"
+        rc, text = self.run(argv, timeout=PW_TIMEOUT)
+        if rc == 124:
+            with self.lock:
+                start = not self.down
+                if start:
+                    self.down_since, self.recovered = time.strftime("%H:%M:%S"), False
+            if start:
+                self.spawn(self._probe_loop)
+            return 124, f"PipeWire not answering ({text.strip()}); {PW_HINT}"
+        return rc, text
+
+    def probe(self):
+        """One try. True once PipeWire answers again."""
+        rc, _ = self.run(PROBE_CMD, timeout=PW_TIMEOUT)
+        if rc == 0:
+            with self.lock:
+                self.down_since, self.recovered = None, True
+        return rc == 0
+
+    def _probe_loop(self):
+        while self.down:
+            self.sleep(PROBE_EVERY)
+            self.probe()
+
+    def take_recovered(self):
+        with self.lock:
+            was, self.recovered = self.recovered, False
+        return was
+
+    def banner(self):
+        since = self.down_since
+        return f"PipeWire not answering since {since} · retrying every {PROBE_EVERY} s" if since else ""
 
 
 def fixture_runner(fixdir):
@@ -550,7 +614,7 @@ def main(argv, runner=None, out=None, err=None, execvp=None, ask=None):
     ask = ask or input
     if runner is None:
         fixdir = os.environ.get("PIPEWRENCH_FIXTURES")
-        runner = fixture_runner(fixdir) if fixdir else default_runner
+        runner = fixture_runner(fixdir) if fixdir else Watchdog(default_runner)
     try:
         moved = pcfg.migrate_config_dir()  # once: ~/.config/pwctl → ~/.config/pipewrench
         if moved and argv:
@@ -808,6 +872,16 @@ class Tui:
                 return None
         return pm.stream_for(pm.parse_pid(text) if rc == 0 else None, streams, parent_of)
 
+    def _watch(self):
+        """The Watchdog's banner onto the state; True the moment PipeWire answers again."""
+        if not isinstance(self.runner, Watchdog):
+            return False
+        self.st.pw_down = self.runner.banner()
+        if self.runner.take_recovered():
+            self.st.message, self.st.failed = "PipeWire is back", ""
+            return True
+        return False
+
     def _refresh(self):
         try:
             self.current = pc.read_settings(self.runner)
@@ -877,11 +951,12 @@ class Tui:
         self._refresh()
         last_refresh = time.monotonic()
         while True:
+            back = self._watch()
             self._draw(scr)
             scr.timeout(1000 // self.st.meter_fps if self.meters.procs or self.midi.procs else 250)  # elsewhere stay idle
             ch = scr.getch()
-            if time.monotonic() - last_refresh > 1.0:
-                self._refresh()
+            if back or (time.monotonic() - last_refresh > 1.0 and not self.st.pw_down):
+                self._refresh()  # while PipeWire isn't answering the screen keeps its last data
                 last_refresh = time.monotonic()
             if ch == -1:
                 continue

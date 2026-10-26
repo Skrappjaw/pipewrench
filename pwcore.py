@@ -472,6 +472,7 @@ class UIState:
     confirm: tuple = None
     message: str = ""
     failed: str = ""             # the message is drawn red while it still equals this
+    pw_down: str = ""            # the Watchdog's banner while PipeWire isn't answering; it replaces the rule
     theme: str = "dark"
     meter_fps: int = 10
     meter_fall: int = 20         # dB a second
@@ -1113,7 +1114,8 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
     row = cv.add(text, ("title", [active]))
     for c0, c1, tab in spans:
         cv.hit(row, c0, c1, ("tab", tab))
-    cv.add("─" * width, "dim")
+    cv.add(f" {st.pw_down} ".center(width, "─")[:width] if st.pw_down else "─" * width,
+           "alert" if st.pw_down else "dim")
     footer, chips = _key_box(legend(st), width)
     body_h = height - len(cv.lines) - 2 - len(footer)  # the now-playing bar and the status line
     if st.tab == "mixer":
