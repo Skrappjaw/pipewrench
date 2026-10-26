@@ -530,6 +530,11 @@ def profile_cmd(card, profile):
     return ["wpctl", "set-profile", str(card.id), str(p.index)]
 
 
+def profile_name(card, profile):
+    """The profile's name, given its index or name (profile_cmd has checked it exists)."""
+    return next(p.name for p in card.profiles if str(p.index) == str(profile) or p.name == profile)
+
+
 def bus_create_cmd(name, label):
     """A stereo bus made live: it lingers after pw-cli exits and lasts until destroyed or PipeWire restarts."""
     props = (f'factory.name=support.null-audio-sink node.name="{name}" node.description="{label}" '

@@ -24,7 +24,7 @@ guide is about using the screen.
 - **Questions and warnings** open in a box over the screen and stay until you answer: ←→ pick a
   button, Enter chooses it, Esc cancels. Other keys do nothing while it's open. A click or tap on a
   button works too. The cursor starts on Cancel, so a stray Enter never does the risky thing.
-- **The now-playing bar** above the keys shows the media player that's playing: `*` play/pause,
+- **The now-playing box** above the keys shows the media player that's playing: `*` play/pause,
   `-` `+` its volume, `<` `>` previous and next. There's no stop on purpose (Brave can't restart a
   stopped tab from outside).
 - **The mouse wheel scrolls** whatever list you're in, wherever the pointer is. It never changes a
@@ -105,14 +105,18 @@ levels) is on the Mixer.
 | Shortcut | Does | Without it |
 |---|---|---|
 | p | the card's profile menu | Enter on the card |
-| h | show hidden cards and buses (dimmed) | **View…** (the end of the list) → Show hidden |
-| m | list each output's monitor | **View…** → Monitors |
+| h | show hidden cards and buses (dimmed) | Settings → Preferences → Show hidden devices |
+| m | list each output's monitor | Settings → Preferences → Monitors on Devices |
 | a | add a bus | Enter on **+ Add bus…** |
 | x | delete a bus (asks first) | Enter on the bus → Delete bus |
 | t | test sound on a bus | Enter on the bus → Test noise |
-| v | preview the generated files | **Actions…** (the end of the list) → Preview files |
-| A | write the generated files (names, buses, clock) | **Actions…** → Apply files |
-| R | restart WirePlumber (asks first) | **Actions…** → Restart WirePlumber |
+| R | restart WirePlumber (asks first) | Settings → Audio → Restart |
+
+**Everything here is saved as you go**, and survives closing PipeWrench, restarting WirePlumber and
+rebooting: hidden devices, each card's profile (on or off), names, buses, and whether Show hidden and
+Monitors are on. There's no Apply step. A name or a bus shows once WirePlumber restarts (PipeWrench asks
+where that matters). If WirePlumber comes back with a card on the wrong profile, PipeWrench puts it back
+when it starts; `pwrench devices restore` does the same from a login script.
 
 Cards on profile `off` (unused HDMI, a webcam you don't use for sound) wait at the bottom under
 **Off**.
@@ -127,7 +131,7 @@ cards. They're read-only: each shows its ALSA card (`hw:3`) and what it's connec
 
 ● marks the active profile. Picking another asks first, because audio on that card drops for a
 moment. For the GCS-8, **HiFi** is the split profile (one channel pair per device). Picking `off`
-turns the card off completely.
+turns the card off completely. The choice is saved and comes back after a restart.
 
 ### Hide a device you never use
 
@@ -297,7 +301,8 @@ keeps it and Esc puts it back. They're kept in `~/.config/pipewrench/ui.json`.
 
 Theme (dark, light, crowbar orange, Pipe Boy in green, amber, cyan or white, Vaporware, Pipecraft, or
 pipeOS-lite and pipeOS-dark), the meters' frame rate, fall speed and peak hold, the
-Mixer's volume bar, **Meters** (the Mixer's live levels, what `v` toggles) and **Keys box**. With the
+Mixer's volume bar, **Meters** (the Mixer's live levels, what `v` toggles), **Show hidden devices** and
+**Monitors on Devices** (what `h` and `m` toggle on Devices) and **Keys box**. With the
 Keys box off, the key list at the bottom of the screen is gone and the view gets those lines. Every key,
 letter shortcuts included, still works.
 
@@ -372,7 +377,7 @@ have their own lettering.
 | Friends can't hear you | Mixer: is the right input ★ default, unmuted, with a moving meter? |
 | OBS isn't getting desktop audio | Patch → Monitors: is the output's monitor connected to OBS? |
 | A device is missing from the Mixer | Devices: is its card hidden (H) or on profile `off`? |
-| A new name doesn't show | It shows after a WirePlumber restart (Devices → Actions… → Restart WirePlumber) or the next login |
+| A new name doesn't show | It shows after a WirePlumber restart (Devices `R`, or Settings → Audio → Restart) or the next login |
 | A red "PipeWire not answering" line under the tabs | PipeWire is up but hung. The screen keeps the last thing it saw and the keys still work; PipeWrench checks every 5 s and says "PipeWire is back" when it answers. It never restarts anything itself: `systemctl --user status pipewire wireplumber`, then restart them if you choose |
 
 ## Redrawing the pictures

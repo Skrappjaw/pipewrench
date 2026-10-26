@@ -7,7 +7,7 @@ watch pw-top, and save the clock for the next PipeWire start.
     pwrench rate N | buf N | min N | max N | log N
     pwrench reset                stop forcing rate and buffer
     pwrench top                  run pw-top
-    pwrench devices [list] | default | volume | mute | profile | label | hide | bus | apply …
+    pwrench devices [list] | default | volume | mute | profile | restore | label | hide | bus | apply …
     pwrench patch [list] | connect SRC DST | disconnect SRC DST
     pwrench realtime             is PipeWire's audio realtime? and the fix if not
     pwrench theme list | export ID [FILE] | check [FILE]   themes as TOML files (docs/themes.md)
@@ -314,7 +314,7 @@ def write_noise(path, seconds=1.0, rate=48000, peak=4000):
 
 DEVICES_USAGE = """usage: pwrench devices [list] [--hidden] [--monitors]
        pwrench devices default DEV | volume DEV STEP | mute DEV | test DEV
-       pwrench devices profile CARD PROFILE
+       pwrench devices profile CARD PROFILE | restore
        pwrench devices label DEV TEXT | label DEV --clear | hide NAME | unhide NAME
        pwrench devices bus add NAME [LABEL] | bus delete NAME
        pwrench devices preview | apply [--restart] | rollback | restart"""
@@ -470,6 +470,19 @@ def _bus_add(runner, c, inv, name, label=None):
     return f"bus {name} created; it comes back at every login"
 
 
+def _restore_profiles(runner, c, inv):
+    """Put every present card back on its saved profile; WirePlumber's own memory can lose it (Skrappjaw,
+    2026-10-26). Cards not plugged in and profiles a card no longer has are skipped. Returns [(label, profile)]."""
+    done = []
+    for name, prof in c.get("profiles", {}).items():
+        card = next((k for k in inv.cards if k.name == name), None)
+        if card is None or card.active == prof or not any(p.name == prof for p in card.profiles):
+            continue
+        _run(runner, pi.profile_cmd(card, prof))
+        done.append((card.label, prof))
+    return done
+
+
 def _bus_delete(runner, c, inv, name):
     """Destroy a virtual bus live and forget it, whether or not PipeWrench made it."""
     live = next((r for r in inv.rows() if r.name == name), None)
@@ -524,6 +537,11 @@ def _devices(args, runner, out, err, ask):
             out.write("nothing changed\n")
             return 1
         _run(runner, cmd)
+        pcfg.save_config(pcfg.config_path(), pcfg.set_profile(c, card.name, pi.profile_name(card, rest[1])))
+        return 0
+    if sub == "restore" and not rest:
+        done = _restore_profiles(runner, c, _inventory(runner))
+        out.write("".join(f"{label} → {prof}\n" for label, prof in done) or "nothing to restore\n")
         return 0
     if sub == "label" and len(rest) == 2:
         inv = _inventory(runner)
@@ -967,8 +985,18 @@ class Tui:
         except CliError as e:
             self.st.message = self.st.failed = str(e)
 
+    def _restore_profiles(self):
+        """Once at start: cards back on their saved profiles (on/off survives restarts, Skrappjaw 2026-10-26)."""
+        try:
+            done = _restore_profiles(self.runner, pcfg.load_config(pcfg.config_path()), _inventory(self.runner))
+        except (CliError, ValueError, OSError):
+            return  # Devices reports the problem when it loads
+        if done:
+            self.st.message = "restored " + ", ".join(f"{label} to {prof}" for label, prof in done)
+
     def _refresh_devices(self):
-        """Inventory, devices.json, bus status and whether the generated files are behind."""
+        """Inventory, devices.json and bus status. Generated files that fell behind devices.json (a CLI edit)
+        are written here: there's no Apply step (Skrappjaw, 2026-10-26). Nothing restarts."""
         try:
             c = pcfg.load_config(pcfg.config_path())
         except (ValueError, OSError) as e:
@@ -978,12 +1006,16 @@ class Tui:
             inv = _inventory(self.runner)
             if self.wp_version is None:
                 self.wp_version = _wp_version(self.runner)
-            dirty = bool(_generated(self.runner, c, self.wp_version))
+            behind = _generated(self.runner, c, self.wp_version)
+            for path, text, _ in behind:
+                pcfg.write_generated(path, text)
         except CliError as e:
             self.st.message = self.st.failed = str(e)
             return
         owned, clash, pending = _bus_status(c, inv)
-        self.devices = pc.devices_view(inv, c, dirty=dirty, owned=owned, clash=clash, pending=pending)
+        if behind:
+            self.st.message = "devices.json changed; its files are written (they show after a restart)"
+        self.devices = pc.devices_view(inv, c, owned=owned, clash=clash, pending=pending)
         self.st = pc.focus_device(self.st, self.devices)  # Mixer → Card profile… lands on its card
 
     def _main(self, scr):
@@ -999,6 +1031,7 @@ class Tui:
         self._apply_theme(scr)
         threading.Thread(target=self._pwtop, daemon=True).start()
         threading.Thread(target=self._media_poll, daemon=True).start()
+        self._restore_profiles()
         self._refresh()
         last_refresh = time.monotonic()
         while True:
@@ -1276,6 +1309,9 @@ class Tui:
         elif kind == "dev_profile":
             _, card_id, index, profile = action
             _run(self.runner, ["wpctl", "set-profile", str(card_id), str(index)])
+            card = next((k for k in inv.cards if k.id == card_id), None)
+            if card is not None:  # saved, so it comes back after a restart (Skrappjaw, 2026-10-26)
+                pcfg.save_config(pcfg.config_path(), pcfg.set_profile(c, card.name, profile))
             self.st.message = f"switched to {profile}"
         elif kind == "dev_bus_create":
             self.st.message = _bus_add(self.runner, c, inv, action[1])
@@ -1288,21 +1324,8 @@ class Tui:
                 self.st.message = _bus_add(self.runner, c, inv, name)
         elif kind == "dev_delete_bus":
             self.st.message = _bus_delete(self.runner, c, inv, action[1])
-        elif kind == "dev_preview":
-            diff = "".join(pcfg.diff_generated(p, t) for p, t, _ in _generated(self.runner, c, self.wp_version))
-            if not diff:
-                self.st.message = "generated files are up to date"
-                return
-            self.curses.endwin()
-            try:
-                subprocess.run([os.environ.get("PAGER", "less")], input=diff, text=True)
-            except FileNotFoundError:
-                self.st.message = "no pager; run `pwrench devices preview`"
-            scr.refresh()
         elif kind == "dev_test":
             self.st.message = _play_noise(self.runner, inv.find(action[1]))
-        elif kind == "dev_apply":
-            self._apply_devices(scr, c)
 
     def _save_clock(self):
         """Settings → Save: the live clock into devices.json and PipeWrench's PipeWire drop-in. Never restarts;
@@ -1316,16 +1339,6 @@ class Tui:
         saved = ", ".join(f"{k.split('_', 1)[1].replace('_', '-')} {c[k]}" for k, *_ in pcfg.CLOCK if c.get(k))
         self.st.message = f"saved {saved or 'PipeWire defaults'}; takes effect the next time PipeWire starts"
 
-    def _apply_devices(self, scr, c):
-        """Write the generated files; never restart here. R restarts WirePlumber, after a y/n."""
-        pending = _generated(self.runner, c, self.wp_version)
-        if not pending:
-            self.st.message = "generated files are up to date"
-            return
-        for p, t, _ in pending:
-            pcfg.write_generated(p, t)
-        _, what = _restart_for([(p, r) for p, _, r in pending])
-        self.st.message = f"written; shows after {what} restarts: R now, or next login"
 
 
 if __name__ == "__main__":

@@ -150,7 +150,7 @@ def test_h_does_not_hide_a_card():
     st = pc.focus_device(pc.UIState(tab="devices", dev_focus=("card", 193)), dv())
     st.dev_menu = None
     _, actions = dkey(st, "h")
-    assert actions == []
+    assert actions == [("save_ui",)]  # shows hidden, and saves that; never hides
 
 
 def test_d_points_to_the_mixer():

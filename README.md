@@ -32,7 +32,7 @@ quits, and every tab lists its keys at the bottom. The mouse works too.
 
 ```
 pwrench status | rate N | buf N | min N | max N | reset
-pwrench devices [list] | default DEV | volume DEV STEP | mute DEV | profile CARD PROFILE | test DEV
+pwrench devices [list] | default DEV | volume DEV STEP | mute DEV | profile CARD PROFILE | restore | test DEV
 pwrench devices label DEV TEXT | hide NAME | bus add NAME | bus delete NAME
 pwrench devices preview | apply [--restart] | rollback | restart
 pwrench patch [list] | connect SRC DST | disconnect SRC DST

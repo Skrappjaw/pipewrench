@@ -105,6 +105,8 @@ def load_ui(path):
             "volume_bar": ui.get("volume_bar") if isinstance(ui.get("volume_bar"), bool) else True,
             "meters": ui.get("meters") if isinstance(ui.get("meters"), bool) else True,
             "key_box": ui.get("key_box") if isinstance(ui.get("key_box"), bool) else True,
+            "dev_show_hidden": ui.get("dev_show_hidden") if isinstance(ui.get("dev_show_hidden"), bool) else False,
+            "dev_monitors": ui.get("dev_monitors") if isinstance(ui.get("dev_monitors"), bool) else False,
             "keys": pk.clean(ui.get("keys"))}
 
 
@@ -112,6 +114,7 @@ def ui_prefs(st):
     """What ui.json keeps, from the live state."""
     return {"theme": st.theme, "meter_fps": st.meter_fps, "meter_fall": st.meter_fall, "peak_hold": st.peak_hold,
             "volume_bar": st.volume_bar, "meters": st.meters, "key_box": st.key_box,
+            "dev_show_hidden": st.dev_show_hidden, "dev_monitors": st.dev_monitors,
             "keys": pk.overrides(pk.bindings(st.keys))}
 
 
@@ -399,7 +402,7 @@ MEDIA_KEYS = {"*": ("media", "play/pause"), "<": ("media", "previous"),
 def handle_key(st, key, current, devices=None, patch=None, mixer=None):
     """Return (new_state, actions). Nothing touches PipeWire until an action is executed.
 
-    devices is the Devices tab's view: {"model", "status", "buses", "dirty"}, or None until loaded.
+    devices is the Devices tab's view (devices_view), or None until loaded.
     """
     st = dataclasses.replace(st, pending=dict(st.pending))
     if st.key_capture:
@@ -447,13 +450,16 @@ FALL_ROW = FPS_ROW + 1
 HOLD_ROW = FALL_ROW + 1
 BAR_ROW = HOLD_ROW + 1
 METERS_ROW = BAR_ROW + 1
-KEY_BOX_ROW = METERS_ROW + 1
+SHOW_HIDDEN_ROW = METERS_ROW + 1
+MONITORS_ROW = SHOW_HIDDEN_ROW + 1
+KEY_BOX_ROW = MONITORS_ROW + 1
 KEYS_ROW = KEY_BOX_ROW + 1     # one row per pwkeys action
 RESET_KEYS_ROW = KEYS_ROW + len(pk.ACTIONS)
 
 
 PREF_ROWS = {THEME_ROW: "theme", FPS_ROW: "meter_fps", FALL_ROW: "meter_fall", HOLD_ROW: "peak_hold",
-             BAR_ROW: "volume_bar", METERS_ROW: "meters", KEY_BOX_ROW: "key_box"}
+             BAR_ROW: "volume_bar", METERS_ROW: "meters",
+             SHOW_HIDDEN_ROW: "dev_show_hidden", MONITORS_ROW: "dev_monitors", KEY_BOX_ROW: "key_box"}
 
 
 def _leave(st):
@@ -666,7 +672,7 @@ def _edit_pref(st, key):
 
 
 def _step_pref(st, key):
-    if st.cursor in (BAR_ROW, METERS_ROW, KEY_BOX_ROW):  # on/off rows
+    if st.cursor in (BAR_ROW, METERS_ROW, SHOW_HIDDEN_ROW, MONITORS_ROW, KEY_BOX_ROW):  # on/off rows
         attr = PREF_ROWS[st.cursor]
         setattr(st, attr, not getattr(st, attr))
         return st, [("save_ui",)]
@@ -687,10 +693,10 @@ def _key_top(st, key, current):
     return st, []
 
 
-def devices_view(inv, config, dirty=False, owned=(), clash=(), pending=()):
-    """Everything the Devices tab draws: the live inventory, devices.json, whether the generated
-    files are behind it, and bus status (PipeWrench-owned, clashing with a bus made elsewhere, pending)."""
-    return {"inv": inv, "config": config, "dirty": dirty, "owned": set(owned), "clash": set(clash),
+def devices_view(inv, config, owned=(), clash=(), pending=()):
+    """Everything the Devices tab draws: the live inventory, devices.json, and bus status (PipeWrench-owned,
+    clashing with a bus made elsewhere, pending)."""
+    return {"inv": inv, "config": config, "owned": set(owned), "clash": set(clash),
             "pending": list(pending)}
 
 
@@ -719,8 +725,7 @@ def _dev_lines(devices, st):
     lines += rows(inv.virtual)
     lines += [("pending", b) for b in devices["pending"]]
     lines.append(("addbus", None))
-    # View and Actions: every Devices shortcut by arrows and Enter (Skrappjaw, 2026-10-26)
-    return lines + ([("off", None)] + off if off else []) + [("view", None), ("actions", None)]
+    return lines + ([("off", None)] + off if off else [])
 
 
 def dev_selectable(devices, st):
@@ -734,19 +739,15 @@ def _key_devices(st, key, devices):
         return _key_menu(st, key, devices)
     if key == "a":
         return st, [("dev_prompt_bus",)]
-    if key == "v":
-        return st, [("dev_preview",)]
-    if key == "A":
-        return st, [("dev_apply",)]
     if key == "R":
         st.popup = ("restart",)
         return st, []
     if key == "h":  # show hidden; nothing hides on a key (a stray h hid the GCS-8, Skrappjaw 2026-10-24)
         st.dev_show_hidden = not st.dev_show_hidden
-        return st, []
+        return st, [("save_ui",)]  # both survive a restart (Skrappjaw, 2026-10-26)
     if key == "m":
         st.dev_monitors = not st.dev_monitors
-        return st, []
+        return st, [("save_ui",)]
     items = dev_selectable(devices, st)
     if not items:
         return st, []
@@ -882,7 +883,7 @@ LEGENDS = {
     "preferences": [("Enter", "edit"), ("↑↓", "select"), ("← Esc", "menu")] + TAB_KEYS,
     "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
     "about": TAB_KEYS,
-    "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("h", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
+    "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("h", "show hidden"), ("R", "restart WirePlumber")] + TAB_KEYS,
     "keys": [("Enter", "rebind"), ("↑↓", "select"), ("Bksp", "unbind"), ("← Esc", "menu")] + TAB_KEYS,
     "keys capture": [("Esc", "cancel"), ("Bksp", "unbind")],
     "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
@@ -1128,7 +1129,7 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
     cv.add(f" {st.pw_down} ".center(width, "─")[:width] if st.pw_down else "─" * width,
            "alert" if st.pw_down else "dim")
     footer, chips = _key_box(legend(st), width) if st.key_box else ([], [])  # hidden: the body gets its lines
-    body_h = height - len(cv.lines) - 2 - len(footer)  # the now-playing bar and the status line
+    body_h = height - len(cv.lines) - MEDIA_BOX_H - 1 - len(footer)  # the now-playing box and the status line
     if st.tab == "mixer":
         _render_mixer(cv, st, mixer, body_h)
     elif st.tab == "devices":
@@ -1141,12 +1142,12 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
         _render_settings(cv, st, current, body_h, realtime, rates)
     else:
         _render_top(cv, st, block, body_h)
-    body_end = height - 2 - len(footer)
+    body_end = height - MEDIA_BOX_H - 1 - len(footer)
     cv.lines = cv.lines[:body_end]
     cv.hits = [h for h in cv.hits if h[0] < body_end]
     while len(cv.lines) < body_end:
         cv.add("")
-    _media_bar(cv, media)
+    _media_box(cv, media)
     top = len(cv.lines)
     for text, style in footer:
         cv.add(text, style)
@@ -1166,8 +1167,25 @@ _MEDIA_CHIPS = [("*", "play"), ("-", None), ("+", "vol"), ("<", "prev"), (">", "
 _STATUS = {"Playing": ("▶", "ok"), "Paused": ("❚❚", "pending"), "Stopped": ("■", "dim")}
 
 
+def _media_box(cv, media):
+    """The now-playing line in its own box, framed like the Keys box (Skrappjaw, 2026-10-26: "media player needs
+    its own box to separate from the rest of the ui")."""
+    inner = _Canvas(max(10, cv.width - 4))
+    _media_bar(inner, media)
+    text, style = inner.lines[0]
+    base, spans = style if isinstance(style, tuple) else (style, [])
+    cv.add("┌─ Now playing " + "─" * max(0, cv.width - 16) + "┐", "dim")
+    row = cv.add("│ " + text.ljust(inner.width) + " │", (base, [(a + 2, b + 2, r) for a, b, r in spans]))
+    for _, c0, c1, target in inner.hits:
+        cv.hit(row, c0 + 2, c1 + 2, target)
+    cv.add("└" + "─" * max(0, cv.width - 2) + "┘", "dim")
+
+
+MEDIA_BOX_H = 3
+
+
 def _media_bar(cv, media):
-    """One line above the keys on every tab: what's playing, and its keys as clickable chips.
+    """What's playing, and its keys as clickable chips, on one line of cv.
     media: {"player": pwmedia.Player or None, "position": microseconds now}. When space runs short the
     song is cut first, then the time; the keys always fit."""
     right, chips, joined = "", [], False
@@ -1315,6 +1333,10 @@ def _render_prefs(cv, st):
                  f"a peak marker hangs, then falls {PEAK_FALL} dB/s")
     _display_row(cv, st, BAR_ROW, "Volume bar", "on" if st.volume_bar else "off", "the bar under each Mixer channel")
     _display_row(cv, st, METERS_ROW, "Meters", "on" if st.meters else "off", "live levels on the Mixer")
+    _display_row(cv, st, SHOW_HIDDEN_ROW, "Show hidden devices", "on" if st.dev_show_hidden else "off",
+                 "hidden cards and buses, greyed")
+    _display_row(cv, st, MONITORS_ROW, "Monitors on Devices", "on" if st.dev_monitors else "off",
+                 "each output's monitor, under it")
     _display_row(cv, st, KEY_BOX_ROW, "Keys box", "on" if st.key_box else "off",
                  "the key list at the bottom of the screen")
     cv.add("")
@@ -1535,12 +1557,8 @@ def _device_line_text(kind, obj, devices, selected):
         return f"  {'MIDI' if kind == 'midi' else kind.title()}", "title"
     if kind == "addbus":
         return f"{prefix}+ Add bus…", "dim"
-    if kind == "view":
-        return f"{prefix}View…", "dim"
-    if kind == "actions":
-        return f"{prefix}Actions…", "dim"
     if kind == "pending":
-        return f"{prefix}+ duplex {_fit(obj['label'], 30):<30} pending: A creates it  {obj['name']}", "pending"
+        return f"{prefix}+ duplex {_fit(obj['label'], 30):<30} pending: Enter → Create now  {obj['name']}", "pending"
     if obj.kind == "midi":  # no state, volume or node of its own: every ALSA MIDI port shares the bridge
         text = f"{prefix}  {obj.direction:<6} {_fit(obj.label, 30):<30} {f'hw:{obj.alsa_card}':<9}" \
                + (f"  {pi.connections(obj)}" if obj.inputs or obj.outputs else "")
@@ -1590,7 +1608,7 @@ def _render_devices(cv, st, devices, body_h):
             title = obj.label if kind in ("row", "card") else kind.title() if obj is None else obj["name"]
             lines += _menu_lines(devices, st, title)
             menu_at = len(lines) - 1
-    room = max(1, body_h - 2)  # blank line and note sit below
+    room = max(1, body_h)
     at = menu_at if menu_at is not None else next((n for n, line in enumerate(lines) if line[1] == "selected"), 0)
     start = 0 if at < room else at - room + 1
     for text, style, idx in lines[start:start + room]:
@@ -1599,11 +1617,6 @@ def _render_devices(cv, st, devices, body_h):
             cv.hit(row, 4, cv.width, ("dev_menu_item", idx[1]))
         elif idx is not None:
             cv.hit(row, 0, cv.width, ("device", idx))
-    cv.add("")
-    if devices["dirty"]:
-        cv.add("  * label or clock changes not written yet; A writes them (no restart)", "pending")
-    else:
-        cv.add("  generated files match devices.json", "dim")
 
 
 # --- Mixer tab: everyday volume, mute and defaults (notes/mixer-plan.md) --------------------------
@@ -2310,8 +2323,6 @@ def _menu_target(devices, st):
             return k, obj
         if k == kind == "pending" and obj["name"] == ref:
             return k, obj
-        if k == kind and kind in ("view", "actions"):
-            return k, obj
     return None
 
 
@@ -2331,12 +2342,6 @@ def dev_menu_items(devices, st):
             n = len(hidden_chans)
             items.append((f"Unhide {n} channel{'s' if n > 1 else ''}", ("unhide", hidden_chans)))
         return items + [("Back", ("back",))]
-    if kind == "view":
-        return [(f"Show hidden: {'on' if st.dev_show_hidden else 'off'}", ("toggle", "dev_show_hidden")),
-                (f"Monitors: {'on' if st.dev_monitors else 'off'}", ("toggle", "dev_monitors")), ("Back", ("back",))]
-    if kind == "actions":
-        return [("Preview files", ("preview",)), ("Apply files", ("apply",)),
-                ("Restart WirePlumber…", ("restart",)), ("Back", ("back",))]
     if kind == "pending":
         return [("Create now", ("create", obj["name"])), ("Rename…", ("rename", obj["name"], obj["label"])),
                 ("Delete bus", ("delete", obj["name"])), ("Back", ("back",))]
@@ -2351,8 +2356,6 @@ def _open_menu(st, kind, obj):
         st.dev_menu = ("card", obj.id)
         names = [p.name for p in obj.profiles]
         st.dev_menu_cursor = names.index(obj.active) if obj.active in names else 0
-    elif kind in ("view", "actions"):
-        st.dev_menu, st.dev_menu_cursor = (kind, None), 0
     else:
         st.dev_menu = (kind, obj.name if kind == "row" else obj["name"])
         st.dev_menu_cursor = 0
@@ -2396,14 +2399,6 @@ def _key_menu(st, key, devices):
             return st, []
     if op[0] == "test":
         return st, [("dev_test", op[1])]
-    if op[0] == "toggle":
-        setattr(st, op[1], not getattr(st, op[1]))
-        return st, []
-    if op[0] in ("preview", "apply"):
-        return st, [(f"dev_{op[0]}",)]
-    if op[0] == "restart":
-        st.popup, st.popup_button = ("restart",), None
-        return st, []
     if op[0] == "hide":
         return st, [("dev_hide", op[1])]
     if op[0] == "unhide":

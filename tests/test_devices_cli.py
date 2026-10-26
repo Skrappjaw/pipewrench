@@ -381,3 +381,52 @@ def test_first_run_copies_the_old_settings_folder(xdg):
     assert pcfg.load_config(pcfg.config_path())["labels"] == {CH2_IN: "Mic"}
     assert (old / "devices.json").exists()
     assert "copied" not in run("list")[2]
+
+
+# --- card profiles survive restarts (Skrappjaw, 2026-10-26) ---------------------------------------------
+
+def test_profile_switch_is_saved():
+    run("profile", "GCS-8", "pro-audio", answer="n")
+    assert config()["profiles"] == {}
+    run("profile", "GCS-8", "pro-audio", answer="y")
+    assert config()["profiles"] == {"alsa_card.usb-BOSS_GCS-8-01": "pro-audio"}
+
+
+def test_restore_sets_only_the_cards_that_drifted():
+    c = pcfg.default_config()
+    for card, prof in (("alsa_card.usb-BOSS_GCS-8-01", "pro-audio"), (WEBCAM, "off"),
+                       ("alsa_card.unplugged", "HiFi"), ("alsa_card.pci-0000_00_1b.0", "gone-profile")):
+        c = pcfg.set_profile(c, card, prof)
+    pcfg.save_config(pcfg.config_path(), c)
+    rc, out, *_, r, _ = run("restore")
+    assert rc == 0 and r.ran(["wpctl"]) == [["wpctl", "set-profile", "95", "3"]]   # webcam is off already
+    assert "GCS-8" in out and "pro-audio" in out
+
+
+def test_restore_with_nothing_saved_does_nothing():
+    rc, out, *_, r, _ = run("restore")
+    assert rc == 0 and r.ran(["wpctl"]) == [] and "nothing to restore" in out
+
+
+def test_tui_writes_files_that_fell_behind_without_apply():
+    # No Apply step (Skrappjaw, 2026-10-26): a label set from the CLI is written when Devices loads.
+    pcfg.save_config(pcfg.config_path(), pcfg.set_label(pcfg.default_config(), CH2_IN, "Guitar"))
+    t = pipewrench.Tui(Runner())
+    t._refresh_devices()
+    assert "Guitar" in pcfg.labels_path((0, 4, 17)).read_text() and "files are written" in t.st.message
+    t.st.message = ""
+    t._refresh_devices()
+    assert t.st.message == ""                                              # caught up: nothing more to say
+
+
+def test_tui_switching_a_profile_saves_it_and_start_restores_it():
+    r = Runner()
+    t = pipewrench.Tui(r)
+    t.st.tab = "devices"
+    t._refresh_devices()
+    t._do_devices(None, ("dev_profile", 95, 3, "pro-audio"))
+    assert config()["profiles"] == {"alsa_card.usb-BOSS_GCS-8-01": "pro-audio"}
+    r2 = Runner()                                                         # the fixture still says HiFi: WirePlumber lost it
+    t2 = pipewrench.Tui(r2)
+    t2._restore_profiles()
+    assert r2.ran(["wpctl"]) == [["wpctl", "set-profile", "95", "3"]] and "GCS-8" in t2.st.message

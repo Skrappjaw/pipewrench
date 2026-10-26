@@ -37,7 +37,7 @@ def test_display_has_meters_and_keys_box_rows():
     text = body(prefs())
     assert "Meters" in text and "Keys box" in text and "Shortcut keys" not in text
     assert "the key list at the bottom of the screen" in text
-    assert pc.METERS_ROW == pc.BAR_ROW + 1 and pc.KEY_BOX_ROW == pc.METERS_ROW + 1
+    assert pc.METERS_ROW == pc.BAR_ROW + 1 and pc.KEY_BOX_ROW == pc.MONITORS_ROW + 1
     assert pc.KEYS_ROW == pc.KEY_BOX_ROW + 1
 
 
@@ -94,5 +94,5 @@ def test_the_keys_page_is_not_greyed():
 
 
 def test_every_letter_key_is_a_listed_action():
-    assert pk.BY_ID["devices.preview"].default == "v"
+    assert "devices.preview" not in pk.BY_ID and "devices.apply" not in pk.BY_ID  # no Preview/Apply (2026-10-26)
     assert "y" not in pk.GLOBAL and "n" not in pk.GLOBAL

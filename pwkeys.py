@@ -19,8 +19,6 @@ ACTIONS = [
     Action("devices", "devices.delete_bus", "x", "delete bus"),
     Action("devices", "devices.test", "t", "test noise"),
     Action("devices", "devices.profile", "p", "card profile"),
-    Action("devices", "devices.preview", "v", "preview files"),
-    Action("devices", "devices.apply", "A", "apply files"),
     Action("devices", "devices.restart", "R", "restart WirePlumber"),
     Action("patch", "patch.grid", "g", "grid/column view"),
     Action("patch", "patch.monitors", "m", "monitors"),

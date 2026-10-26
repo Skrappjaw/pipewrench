@@ -232,7 +232,7 @@ def test_legend_fits_80(view):
 
 def test_scrolls_to_keep_cursor_visible():
     st = pc.UIState(tab="patch", patch_src=len(SRCS) - 1)
-    lines, _ = screen(st, height=14)
+    lines, _ = screen(st, height=16)
     assert any(SRCS[-1].label in t and t.startswith(">") for t, _ in lines)
 
 

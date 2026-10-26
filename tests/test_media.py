@@ -32,9 +32,11 @@ def screen(st, media, width=100, height=30):
 
 
 def bar(lines):
-    """The bar is the line just above the key box."""
-    top = next(i for i, (t, _) in enumerate(lines) if t.startswith("┌─ Keys"))
-    return lines[top - 1]
+    """The now-playing line: inside its own box, framed like the Keys box (Skrappjaw, 2026-10-26)."""
+    top = next(i for i, (t, _) in enumerate(lines) if t.startswith("┌─ Now playing"))
+    text, style = lines[top + 1]
+    assert text.startswith("│ ") and text.endswith(" │") and lines[top + 2][0].startswith("└")
+    return text, style
 
 
 # --- model --------------------------------------------------------------------------------
@@ -131,3 +133,15 @@ def test_dot_and_slash_are_not_media_keys():
     """No stop: Brave ends its session on Stop, and only the browser can start it again."""
     for k in (".", "/"):
         assert pc.handle_key(pc.UIState(tab="settings"), k, CUR)[1] == []
+
+
+@pytest.mark.parametrize("key_box", [True, False])
+def test_the_player_has_its_own_box(key_box):
+    lines, hits = screen(pc.UIState(key_box=key_box), {"player": player(), "position": 0})
+    top = next(i for i, (t, _) in enumerate(lines) if t.startswith("┌─ Now playing"))
+    assert len(lines) == 30 and all(len(t) <= 100 for t, _ in lines[top:top + 3])
+    assert lines[top][1] == lines[top + 2][1] == "dim"
+    rows = {h[0] for h in hits if h[3][0] == "key" and h[3][1] in "*-+<>"}
+    assert rows == {top + 1}                                       # the chips sit on the boxed line
+    if key_box:
+        assert lines[top + 3][0].startswith("┌─ Keys")

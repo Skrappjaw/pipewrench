@@ -79,8 +79,7 @@ def test_off_cards_group_at_the_bottom_and_turn_on_from_their_menu():
     assert next(s for t, s in lines if t == "  Off") == "title"
     assert next(s for t, s in lines if "HDA ATI HDMI · off" in t) == "dim"
     entries = pc.dev_selectable(dv(), pc.UIState(tab="devices"))
-    assert [o.label for k, o in entries[-5:-2]] == ["Built-in Audio", "HD Pro Webcam C920", "HDA ATI HDMI"]
-    assert [k for k, _ in entries[-2:]] == ["view", "actions"]  # View… and Actions… end the list
+    assert [o.label for k, o in entries[-3:]] == ["Built-in Audio", "HD Pro Webcam C920", "HDA ATI HDMI"]
     st, actions = key(at("HDA ATI HDMI"), "enter")
     assert actions == [] and st.dev_menu[0] == "card"
 
@@ -99,7 +98,7 @@ def test_hidden_rows_vanish_until_h():
     st, _ = key(pc.UIState(tab="devices"), "H", devices=d)
     assert not st.dev_show_hidden  # H is gone (Skrappjaw, 2026-10-24)
     st, actions = key(pc.UIState(tab="devices"), "h", devices=d)
-    assert st.dev_show_hidden and actions == []
+    assert st.dev_show_hidden and actions == [("save_ui",)]
     assert not key(st, "h", devices=d)[0].dev_show_hidden
     lines, _ = screen(st, d)
     assert any("GCS-8 CH 2 " in t and (s[0] if isinstance(s, tuple) else s) == "dim" for t, s in lines)
@@ -110,11 +109,10 @@ def test_m_shows_monitors():
     assert st.dev_monitors and "GCS-8 CH 3-AUX (monitor)" in body(screen(st)[0])
 
 
-def test_pending_buses_and_dirty_note():
+def test_pending_buses():
     c = pcfg.add_bus(pcfg.default_config(), "OBS")
-    text = body(screen(pc.UIState(tab="devices"), dv(c, dirty=True, pending=c["buses"]), height=60)[0])
-    assert "OBS" in text and "pending" in text and "not written" in text
-    assert "not written" not in body(screen(pc.UIState(tab="devices"))[0])
+    text = body(screen(pc.UIState(tab="devices"), dv(c, pending=c["buses"]), height=60)[0])
+    assert "OBS" in text and "pending" in text
 
 
 def test_clash_tag_on_bus_made_outside_pipewrench():
@@ -163,7 +161,7 @@ def test_test_noise_on_bus_outputs_only():
 def test_h_never_hides():
     # Skrappjaw hid the GCS-8 with a stray h (2026-10-24); hiding goes through Enter → Hide only. h shows hidden.
     for name in ("SYSTEM", "GCS-8"):
-        assert key(at(name), "h")[1] == []
+        assert key(at(name), "h")[1] == [("save_ui",)]
 
 def test_bus_add_and_live_delete_with_confirm():
     assert key(pc.UIState(tab="devices"), "a")[1] == [("dev_prompt_bus",)]
@@ -174,10 +172,7 @@ def test_bus_add_and_live_delete_with_confirm():
     st, actions = key(at("GCS-8"), "x")
     assert actions == [] and "bus" in st.message
 
-def test_apply_writes_without_confirm_and_R_restarts_with_warning():
-    assert key(pc.UIState(tab="devices"), "v")[1] == [("dev_preview",)]
-    st, actions = key(pc.UIState(tab="devices"), "A")
-    assert actions == [("dev_apply",)] and st.popup is None
+def test_R_restarts_with_warning():
     st, actions = key(pc.UIState(tab="devices"), "R")
     assert actions == [] and st.popup == ("restart",)
     assert key(st, "left", "enter")[1] == [("restart_wireplumber",)]
@@ -197,18 +192,12 @@ def click(st, target, event="click"):
     return pc.handle_mouse(st, hits, row, c0, event, CUR, devices=dv())
 
 
-def test_apply_is_a_chip():
+def test_restart_is_a_chip():
     lines, hits = screen(pc.UIState(tab="devices"))
-    r, c0, c1 = hit_for(hits, ("key", "A"))
-    assert lines[r][0][c0:c1] == " A "
-    _, actions = click(pc.UIState(tab="devices"), ("key", "A"))
-    assert actions == [("dev_apply",)]
-
-
-def test_note_follows_the_list_after_one_blank_line():
-    text = [t for t, _ in screen(pc.UIState(tab="devices"))[0]]
-    note = next(i for i, t in enumerate(text) if "generated files" in t or "not written yet" in t)
-    assert text[note - 1].strip() == "" and text[note - 2].strip()
+    r, c0, c1 = hit_for(hits, ("key", "R"))
+    assert lines[r][0][c0:c1] == " R "
+    st, _ = click(pc.UIState(tab="devices"), ("key", "R"))
+    assert st.popup == ("restart",)
 
 
 def test_rows_show_connections():
@@ -307,8 +296,7 @@ def test_picking_the_active_profile_just_closes():
 def test_add_bus_row_ends_the_virtual_group():
     entries = pc.dev_selectable(dv(), pc.UIState(tab="devices"))
     i = entries.index(("addbus", None))
-    assert all(k == "card" and o.active == "off" for k, o in entries[i + 1:-2])  # only the Off group follows,
-    assert [k for k, _ in entries[-2:]] == ["view", "actions"]                 # then View… and Actions…
+    assert all(k == "card" and o.active == "off" for k, o in entries[i + 1:])  # only the Off group follows
     st = pc.UIState(tab="devices", dev_cursor=i)
     assert "+ Add bus…" in body(screen(st, height=60)[0])
     assert key(st, "enter")[1] == [("dev_prompt_bus",)]

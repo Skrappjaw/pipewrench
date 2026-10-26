@@ -45,30 +45,6 @@ def pick(st, label, menu=dev_menu, **kw):
 
 # --- Devices --------------------------------------------------------------------------------------
 
-def test_devices_list_ends_with_view_and_actions_lines():
-    kinds = [k for k, _ in pc.dev_selectable(DV, pc.UIState(tab="devices"))]
-    assert kinds[-2:] == ["view", "actions"]
-    text = "\n".join(t for t, _ in pc.render_screen(devices(), CUR, "", 100, 80, devices=DV)[0])
-    assert "View…" in text and "Actions…" in text
-
-
-def test_view_menu_shows_hidden_and_monitors():
-    st, _ = key(devices(dev_cursor=dev_line("view")), "enter", devices=DV)
-    assert dev_menu(st) == ["Show hidden: off", "Monitors: off", "Back"]
-    st2, _ = pick(st, "Show hidden", devices=DV)
-    assert st2.dev_show_hidden and st2.dev_menu is None
-    st3, _ = pick(st, "Monitors", devices=DV)
-    assert st3.dev_monitors
-
-
-def test_actions_menu_previews_applies_and_restarts():
-    st, _ = key(devices(dev_cursor=dev_line("actions")), "enter", devices=DV)
-    assert dev_menu(st) == ["Preview files", "Apply files", "Restart WirePlumber…", "Back"]
-    assert pick(st, "Preview", devices=DV)[1] == [("dev_preview",)]
-    assert pick(st, "Apply", devices=DV)[1] == [("dev_apply",)]
-    assert pick(st, "Restart", devices=DV)[0].popup == ("restart",)
-
-
 def test_a_bus_menu_offers_test_noise():
     st, _ = key(devices(dev_cursor=dev_line("row", "VOIP Audio/Duplex sink")), "enter", devices=DV)
     assert "Test noise" in dev_menu(st)

@@ -25,7 +25,7 @@ def cfg(**changes):
 # --- 2. model v2 ---------------------------------------------------------------
 
 def test_default_config_is_empty_and_generic():
-    assert pc.default_config() == {"version": 2, "clock_rate": None, "buses": [], "labels": {}, "hidden": [], "boost": []}
+    assert pc.default_config() == {"version": 2, "clock_rate": None, "buses": [], "labels": {}, "hidden": [], "boost": [], "profiles": {}}
     pc.validate_config(pc.default_config())
 
 
@@ -38,7 +38,7 @@ def test_v1_file_migrates_keeping_buses_and_clock(xdg):
     path.write_text(json.dumps(v1))
     c = pc.load_config(path)
     assert c == {"version": 2, "clock_rate": 48000, "buses": [{"name": "SYSTEM", "label": "SYSTEM"}],
-                 "labels": {}, "hidden": [], "boost": []}
+                 "labels": {}, "hidden": [], "boost": [], "profiles": {}}
 
 
 def test_missing_file_gives_default(xdg):
@@ -231,3 +231,17 @@ def test_boost_is_a_saved_list_of_node_names():
     assert pc.migrate({"version": 2, "boost": ["a"]})["boost"] == ["a"]
     with pytest.raises(ValueError, match="boost"):
         pc.validate_config({**pc.default_config(), "boost": "a"})
+
+
+def test_card_profiles_are_saved_by_card_name():
+    # Skrappjaw, 2026-10-26: on/off has to survive restarts, so PipeWrench keeps each card's profile itself.
+    c = pc.set_profile(pc.default_config(), "alsa_card.usb-BOSS_GCS-8-01", "off")
+    assert c["profiles"] == {"alsa_card.usb-BOSS_GCS-8-01": "off"}
+    assert pc.set_profile(c, "alsa_card.usb-BOSS_GCS-8-01", "HiFi")["profiles"] == {"alsa_card.usb-BOSS_GCS-8-01": "HiFi"}
+    assert pc.migrate({"version": 2})["profiles"] == {}                    # older files gain an empty map
+    assert pc.migrate({"version": 2, "profiles": {"a": "off"}})["profiles"] == {"a": "off"}
+    pc.validate_config(c)
+    with pytest.raises(ValueError):
+        pc.validate_config({**pc.default_config(), "profiles": ["off"]})
+    with pytest.raises(ValueError):
+        pc.validate_config({**pc.default_config(), "profiles": {"a": 3}})
