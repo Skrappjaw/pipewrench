@@ -470,7 +470,8 @@ class UIState:
     patch_port_col: int = 0      # destination port
     patch_menu: bool = False     # the slot menu under the destination
     patch_menu_cursor: int = 0
-    confirm: tuple = None
+    popup: tuple = None          # the open popover: a kind tuple (POPUPS), answered with ←→ and Enter
+    popup_button: int = None     # its selected button; None is the kind's default (Cancel, or the only one)
     message: str = ""
     failed: str = ""             # the message is drawn red while it still equals this
     pw_down: str = ""            # the Watchdog's banner while PipeWire isn't answering; it replaces the rule
@@ -500,19 +501,8 @@ def handle_key(st, key, current, devices=None, patch=None, mixer=None):
     st = dataclasses.replace(st, pending=dict(st.pending))
     if st.key_capture:
         return _capture_key(st, key)
-    if st.confirm:
-        if key == "y":
-            kind = st.confirm
-            st.confirm = None
-            if kind == ("reset_keys",):
-                st.keys, st.message = {}, "keys reset to the defaults"
-                return st, [("save_ui",)]
-            # confirm tuples name their action, except the two v1 ones
-            return st, [{"restart": ("restart_wireplumber",), "restart_labels": ("restart_wireplumber",)
-                         }.get(kind[0], kind)]
-        # Any other key cancels: a missed prompt that swallowed keys looked like a frozen screen.
-        st.confirm, st.message = None, "cancelled" if key in ("n", "esc") else "cancelled (y confirms)"
-        return st, []
+    if st.popup:
+        return _key_popup(st, key)
     if key == "q":
         return st, [("quit",)]
     if key in ("tab", "btab"):
@@ -624,7 +614,7 @@ def _key_settings(st, key, current):
     if key == "s":
         return _save_clock(st)
     if key == "R":
-        st.confirm = ("restart",)
+        st.popup = ("restart",)
         return st, []
     if st.settings_focus == "menu":
         return _key_settings_menu(st, key)
@@ -747,7 +737,7 @@ def _key_prefs(st, key, current):
             return st, []
         return _bind(st, a.id, None)
     elif st.cursor == RESET_KEYS_ROW and key == "enter":
-        st.confirm = ("reset_keys",)
+        st.popup = ("reset_keys",)
     return st, []
 
 
@@ -838,7 +828,7 @@ def _key_devices(st, key, devices):
     if key == "A":
         return st, [("dev_apply",)]
     if key == "R":
-        st.confirm = ("restart",)
+        st.popup = ("restart",)
         return st, []
     if key == "h":  # show hidden; nothing hides on a key (a stray h hid the GCS-8, Skrappjaw 2026-10-24)
         st.dev_show_hidden = not st.dev_show_hidden
@@ -870,7 +860,7 @@ def _key_devices(st, key, devices):
         _open_menu(st, "card", card)
     elif key == "x":
         if kind == "pending" or (kind == "row" and obj.kind == "virtual"):
-            st.confirm = ("dev_delete_bus", obj["name"] if kind == "pending" else obj.name)
+            st.popup = ("dev_delete_bus", obj["name"] if kind == "pending" else obj.name)
         else:
             st.message = st.failed = "x deletes a virtual bus"
     elif key == "t":
@@ -882,8 +872,11 @@ def _key_devices(st, key, devices):
 
 def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer=None):
     """Map a mouse event onto the same keys the keyboard uses."""
-    if st.confirm:
-        return dataclasses.replace(st, confirm=None, message="cancelled (y confirms)"), []
+    if st.popup:  # only its buttons take clicks; a click elsewhere leaves it up
+        target = next((t for row, c0, c1, t in hits if row == y and c0 <= x < c1), None)
+        if target and target[0] == "popup_btn" and event in ("click", "double"):
+            return _key_popup(dataclasses.replace(st, popup_button=target[1]), "enter")
+        return st, []
     target = next((t for row, c0, c1, t in hits if row == y and c0 <= x < c1), None)
     if event in ("wheel_up", "wheel_down"):
         # The wheel scrolls everywhere (Skrappjaw, 2026-10-24): ↑/↓ on the list in focus, wherever the mouse is,
@@ -1040,6 +1033,8 @@ def legend(st):
 
 
 def _legend(st):
+    if st.popup:
+        return [("←→", "choose"), ("Enter", "pick"), ("Esc", "cancel")]
     if st.tab == "devices" and st.dev_menu:
         return LEGENDS["devices menu"]
     if st.tab == "mixer" and st.mix_menu:
@@ -1092,6 +1087,86 @@ class _Canvas:
             self.hits.append((row, c0, min(c1, self.width), target))
 
 
+# Popovers (Skrappjaw, 2026-10-26): warnings and questions in a box that stays until answered, with no
+# shortcut keys. {kind: (title, [(button, op)], default button)}; text comes from popup_view.
+POPUPS = {
+    "restart": ("Restart WirePlumber", [("Restart", "ok"), ("Cancel", "cancel")], 1),
+    "restart_labels": ("Restart WirePlumber", [("Restart now", "ok"), ("Cancel", "cancel")], 1),
+    "dev_delete_bus": ("Delete bus", [("Delete", "ok"), ("Cancel", "cancel")], 1),
+    "dev_profile": ("Switch profile", [("Switch", "ok"), ("Cancel", "cancel")], 1),
+    "reset_keys": ("Reset keys", [("Reset", "ok"), ("Cancel", "cancel")], 1),
+    "pw_down": ("PipeWire not answering", [("OK", "close")], 0),
+}
+PW_DOWN_TEXT = "PipeWire stopped answering. PipeWrench keeps the last screen and checks again every 5 s."
+
+
+def popup_view(st, devices=None):
+    """(title, text, [(button, op)]) for the open popover."""
+    title, buttons, _ = POPUPS[st.popup[0]]
+    text = PW_DOWN_TEXT if st.popup[0] == "pw_down" else _confirm_question(st.popup, devices)
+    return title, text, buttons
+
+
+def popup_cursor(st):
+    return POPUPS[st.popup[0]][2] if st.popup_button is None else st.popup_button
+
+
+def _key_popup(st, key):
+    """←→ choose, Enter picks, Esc cancels; any other key leaves the box up (it can't be missed)."""
+    kind = st.popup
+    buttons = POPUPS[kind[0]][1]
+    if key in ("left", "right"):
+        st.popup_button = max(0, min(len(buttons) - 1, popup_cursor(st) + (1 if key == "right" else -1)))
+        return st, []
+    if key not in ("enter", "esc"):
+        return st, []
+    op = buttons[popup_cursor(st)][1] if key == "enter" else "cancel"
+    st.popup = st.popup_button = None
+    if op == "cancel":
+        st.message = "cancelled"
+        return st, []
+    if op == "close":
+        return st, []
+    if kind == ("reset_keys",):
+        st.keys, st.message = {}, "keys reset to the defaults"
+        return st, [("save_ui",)]
+    # confirm tuples name their action, except the two v1 ones
+    return st, [{"restart": ("restart_wireplumber",), "restart_labels": ("restart_wireplumber",)}.get(kind[0], kind)]
+
+
+def _overlay_popup(cv, st, devices, width, height):
+    """Draw the open popover centred over the finished screen; only its buttons take clicks."""
+    title, text, buttons = popup_view(st, devices)
+    labels = [f"[ {b} ]" for b, _ in buttons]
+    row_btn = "  ".join(labels)
+    bw = min(width - 4, max(48, len(title) + 8, len(row_btn) + 6))
+    inner = bw - 4
+    body = textwrap.wrap(text, inner) or [""]
+    pad = (inner - len(row_btn)) // 2
+    rows = ([f"┌─ {title} ".ljust(bw - 1, "─") + "┐", "│" + " " * (bw - 2) + "│"]
+            + [f"│ {line.ljust(inner)} │" for line in body]
+            + ["│" + " " * (bw - 2) + "│", f"│ {(' ' * pad + row_btn).ljust(inner)} │",
+               "│" + " " * (bw - 2) + "│", "└" + "─" * (bw - 2) + "┘"])
+    y0, x0 = max(0, (height - len(rows)) // 2), (width - bw) // 2
+    btn_y, chosen = y0 + len(rows) - 3, popup_cursor(st)
+    cv.hits = []
+    for n, row in enumerate(rows):
+        y = y0 + n
+        if y >= len(cv.lines):
+            break
+        text0, style = cv.lines[y]
+        base, spans = style if isinstance(style, tuple) else (style, [])
+        line = text0.ljust(width)[:width]
+        spans = list(spans) + [(x0, x0 + bw, "chip")]
+        if y == btn_y:
+            c = x0 + 2 + pad
+            for i, label in enumerate(labels):
+                spans.append((c, c + len(label), "selected" if i == chosen else "chip"))
+                cv.hit(y, c, c + len(label), ("popup_btn", i))
+                c += len(label) + 2
+        cv.lines[y] = (line[:x0] + row + line[x0 + bw:], (base, spans))
+
+
 def _confirm_question(confirm, devices=None):
     kind, arg = confirm[0], (confirm[1] if len(confirm) > 1 else None)
     if kind == "dev_profile":
@@ -1142,14 +1217,13 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
         cv.add(text, style)
     for n, c0, c1, k in chips:
         cv.hit(top + n, c0, c1, ("key", k))
-    if st.confirm:
-        cv.add(f" {_confirm_question(st.confirm, devices)} y/n", "alert")
+    if st.message:  # a full-width band; the symbol carries it on one-colour themes (Skrappjaw, 2026-10-26)
+        bad = st.message == st.failed
+        cv.add(f" {'✖' if bad else '✓'} {st.message}".ljust(width), "band_alert" if bad else "band_ok")
     else:
-        if st.message:  # a full-width band; the symbol carries it on one-colour themes (Skrappjaw, 2026-10-26)
-            bad = st.message == st.failed
-            cv.add(f" {'✖' if bad else '✓'} {st.message}".ljust(width), "band_alert" if bad else "band_ok")
-        else:
-            cv.add(f" {HINTS.get(st.tab, '')}", "dim")
+        cv.add(f" {HINTS.get(st.tab, '')}", "dim")
+    if st.popup:
+        _overlay_popup(cv, st, devices, width, height)
     return cv.lines, cv.hits
 
 
@@ -2317,11 +2391,11 @@ def _key_menu(st, key, devices):
     if op[0] == "unhide":
         return st, [("dev_hide", name) for name in op[1]]  # each is hidden, so the toggle shows it
     if op[0] == "delete":
-        st.confirm = ("dev_delete_bus", op[1])
+        st.popup = ("dev_delete_bus", op[1])
     elif op[0] == "create":
         return st, [("dev_bus_create", op[1])]
     elif op[0] == "profile" and op[2] != obj.active:
-        st.confirm = ("dev_profile", obj.id, op[1], op[2])
+        st.popup = ("dev_profile", obj.id, op[1], op[2])
     return st, []
 
 

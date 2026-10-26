@@ -20,7 +20,10 @@ guide is about using the screen.
 - **The keys box** at the bottom lists every key the current view takes. Each key is a chip, and
   clicking a single-key chip presses it.
 - **The status band** under it shows what just happened: `✓` on green when it worked, `✖` on red when it
-  didn't. It stays until the next message. A y/n question shows there too; any key other than `y` cancels it.
+  didn't. It stays until the next message.
+- **Questions and warnings** open in a box over the screen and stay until you answer: ←→ pick a
+  button, Enter chooses it, Esc cancels. Other keys do nothing while it's open. A click or tap on a
+  button works too. The cursor starts on Cancel, so a stray Enter never does the risky thing.
 - **The now-playing bar** above the keys shows the media player that's playing: `*` play/pause,
   `-` `+` its volume, `<` `>` previous and next. There's no stop on purpose (Brave can't restart a
   stopped tab from outside).
@@ -94,11 +97,11 @@ levels) is on the Mixer.
 | p | the card's profile menu |
 | h | show hidden cards and buses (dimmed) |
 | a | add a bus |
-| x | delete a bus (after y/n) |
+| x | delete a bus (asks first) |
 | t | test sound on a bus |
 | m | list each output's monitor |
 | A | write the generated files (names, buses, clock) |
-| R | restart WirePlumber (after y/n) |
+| R | restart WirePlumber (asks first) |
 
 Cards on profile `off` (unused HDMI, a webcam you don't use for sound) wait at the bottom under
 **Off**.
@@ -111,7 +114,7 @@ cards. They're read-only: each shows its ALSA card (`hw:3`) and what it's connec
 
 ![A card's profile menu](guide/devices-profile.png)
 
-● marks the active profile. Picking another asks y/n first, because audio on that card drops for a
+● marks the active profile. Picking another asks first, because audio on that card drops for a
 moment. For the GCS-8, **HiFi** is the split profile (one channel pair per device). Picking `off`
 turns the card off completely.
 
@@ -312,7 +315,7 @@ Every theme except dark and light needs a 256-colour terminal; on a basic one Pi
 
 Every letter shortcut, one row each, with the key it's on. Enter on a row, then press the new key.
 Backspace (or Delete) takes the key off, so the shortcut does nothing; Esc cancels. **Reset all keys**
-puts every shortcut back after a y/n.
+puts every shortcut back after asking.
 
 - A key that's taken on the same screen, or one that works everywhere (`q`, `1`–`6`, the media keys
   `* - + < >`, `y` and `n`), is refused and the reason shows on the status line.

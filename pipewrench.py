@@ -876,8 +876,13 @@ class Tui:
         """The Watchdog's banner onto the state; True the moment PipeWire answers again."""
         if not isinstance(self.runner, Watchdog):
             return False
-        self.st.pw_down = self.runner.banner()
+        banner = self.runner.banner()
+        if banner and not self.st.pw_down and self.st.popup is None:
+            self.st.popup = ("pw_down",)  # once per outage; the banner under the tabs stays
+        self.st.pw_down = banner
         if self.runner.take_recovered():
+            if self.st.popup == ("pw_down",):
+                self.st.popup = None  # stale once it answers
             self.st.message, self.st.failed = "PipeWire is back", ""
             return True
         return False
@@ -1204,7 +1209,7 @@ class Tui:
                 self.st.message = f"{what}; a bus shows its new name after the next login"
             else:
                 self.st.message = what
-                self.st.confirm = ("restart_labels",)  # labels only show once WirePlumber reloads its rules
+                self.st.popup = ("restart_labels",)  # labels only show once WirePlumber reloads its rules
         elif kind == "dev_profile":
             _, card_id, index, profile = action
             _run(self.runner, ["wpctl", "set-profile", str(card_id), str(index)])

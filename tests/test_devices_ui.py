@@ -167,19 +167,19 @@ def test_h_never_hides():
 def test_bus_add_and_live_delete_with_confirm():
     assert key(pc.UIState(tab="devices"), "a")[1] == [("dev_prompt_bus",)]
     st, actions = key(at("VOIP"), "x")  # any virtual bus, even one PipeWrench didn't make
-    assert actions == [] and st.confirm == ("dev_delete_bus", "VOIP")
+    assert actions == [] and st.popup == ("dev_delete_bus", "VOIP")
     assert "Delete bus 'VOIP'" in body(screen(st)[0])
-    assert key(st, "y")[1] == [("dev_delete_bus", "VOIP")]
+    assert key(st, "left", "enter")[1] == [("dev_delete_bus", "VOIP")]
     st, actions = key(at("GCS-8"), "x")
     assert actions == [] and "bus" in st.message
 
 def test_apply_writes_without_confirm_and_R_restarts_with_warning():
     assert key(pc.UIState(tab="devices"), "v")[1] == [("dev_preview",)]
     st, actions = key(pc.UIState(tab="devices"), "A")
-    assert actions == [("dev_apply",)] and st.confirm is None
+    assert actions == [("dev_apply",)] and st.popup is None
     st, actions = key(pc.UIState(tab="devices"), "R")
-    assert actions == [] and st.confirm == ("restart",)
-    assert key(st, "y")[1] == [("restart_wireplumber",)]
+    assert actions == [] and st.popup == ("restart",)
+    assert key(st, "left", "enter")[1] == [("restart_wireplumber",)]
 
 
 def test_nothing_happens_until_devices_load():
@@ -263,7 +263,7 @@ def test_menu_actions_map_to_the_same_commands():
     _, actions = pick(st, d, "Hide")
     assert actions == [("dev_hide", "SYSTEM")]
     st2, actions = pick(open_menu("SYSTEM")[0], d, "Delete bus")
-    assert actions == [] and st2.confirm == ("dev_delete_bus", "SYSTEM")
+    assert actions == [] and st2.popup == ("dev_delete_bus", "SYSTEM")
 
 def test_pending_bus_keeps_its_rename():
     d = dv(pending=[{"name": "OBS", "label": "OBS"}])
@@ -275,7 +275,7 @@ def test_bus_menu_adds_delete_with_confirm():
     st, d = open_menu("VOIP")
     assert menu_labels(st, d)[-2:] == ["Delete bus", "Back"]
     st2, actions = pick(st, d, "Delete bus")
-    assert actions == [] and st2.confirm == ("dev_delete_bus", "VOIP")
+    assert actions == [] and st2.popup == ("dev_delete_bus", "VOIP")
 
 
 def test_pending_bus_menu():
@@ -292,15 +292,15 @@ def test_card_heading_lists_profiles_and_switches_after_confirm():
     items = menu_labels(st, d)
     assert items[:4] == ["○ off", "● HiFi", "○ Direct", "○ pro-audio"] and items[-2:] == ["Hide card", "Back"]
     st2, actions = pick(st, d, "○ pro-audio")
-    assert actions == [] and st2.confirm == ("dev_profile", 95, 3, "pro-audio")
+    assert actions == [] and st2.popup == ("dev_profile", 95, 3, "pro-audio")
     assert "Switch GCS-8 to pro-audio?" in body(screen(st2, d)[0])
-    assert key(st2, "y", devices=d)[1] == [("dev_profile", 95, 3, "pro-audio")]
+    assert key(st2, "left", "enter", devices=d)[1] == [("dev_profile", 95, 3, "pro-audio")]
 
 
 def test_picking_the_active_profile_just_closes():
     st, d = open_menu("GCS-8")
     st2, actions = pick(st, d, "● HiFi")
-    assert actions == [] and st2.confirm is None and st2.dev_menu is None
+    assert actions == [] and st2.popup is None and st2.dev_menu is None
 
 
 def test_add_bus_row_ends_the_virtual_group():
@@ -346,10 +346,10 @@ def test_click_selects_double_click_opens_actions_wheel_moves():
     assert st.dev_cursor == 1
 
 def test_rename_restart_question_warns_about_apps():
-    st = pc.UIState(tab="devices", confirm=("restart_labels",))
+    st = pc.UIState(tab="devices", popup=("restart_labels",))
     text = body(screen(st)[0])
     assert "Restart WirePlumber now" in text and "Discord" in text
-    assert key(st, "y")[1] == [("restart_wireplumber",)]
+    assert key(st, "left", "enter")[1] == [("restart_wireplumber",)]
 
 
 @pytest.mark.parametrize("target", ["SYSTEM", "GCS-8", "VOIP"])

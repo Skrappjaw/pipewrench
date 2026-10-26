@@ -63,10 +63,13 @@ def step_checks(before, k, after, width, via=None, raw=None):
         check(0 <= after.dev_menu_cursor < max(1, len(pc.dev_menu_items(DEV, after))), "Devices menu cursor")
     check(0 <= after.mix_cursor < max(1, len(pc.mixer_selectable(MX))), "Mixer cursor")
     check(0 <= after.dev_cursor < max(1, len(pc.dev_selectable(DEV, after))), "Devices cursor")
-    if before.confirm and k is not None:
-        check(after.confirm is None or after.confirm != before.confirm, "a prompt outlived a key press")
+    if before.popup and k is not None:  # a popover stays until Enter or Esc (Skrappjaw, 2026-10-26)
+        if k in ("enter", "esc"):
+            check(after.popup != before.popup, "Enter or Esc left a popover up")
+        elif k not in ("left", "right"):
+            check(after.popup == before.popup and after.tab == before.tab, "a stray key closed a popover")
     left_view = after.tab != before.tab or after.settings_cat != before.settings_cat
-    if left_view and not before.confirm and not before.key_capture:
+    if left_view and not before.popup and not before.key_capture:
         check(is_reset(raw or after, opened=via == ("double", "settings_cat")),
               f"left {before.tab}/{before.settings_cat} without a reset")
     stayed = after.tab == "settings" and after.settings_focus == "pane"  # ← may leave, and leaving drops edits
@@ -79,7 +82,7 @@ def step_checks(before, k, after, width, via=None, raw=None):
 
 def editing_guard(st):
     """A Settings value row with its value closed: ←→ must not change it."""
-    if st.tab != "settings" or st.settings_focus != "pane" or st.editing or st.confirm or st.key_capture:
+    if st.tab != "settings" or st.settings_focus != "pane" or st.editing or st.popup or st.key_capture:
         return False
     return st.cursor < pc.CLOCK_BUTTONS_ROW if st.settings_cat == "audio" else st.cursor in pc.PREF_ROWS
 

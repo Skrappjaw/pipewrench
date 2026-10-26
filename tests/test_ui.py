@@ -175,19 +175,20 @@ def test_basic_tabs_come_first():
 
 def test_restart_needs_confirmation():
     st, actions = key(UIState(), "R")
-    assert actions == [] and st.confirm == ("restart",)
-    st2, actions = key(st, "n")
-    assert actions == [] and st2.confirm is None
-    st3, actions = key(st, "y")
-    assert actions == [("restart_wireplumber",)] and st3.confirm is None
+    assert actions == [] and st.popup == ("restart",)
+    st2, actions = key(st, "esc")
+    assert actions == [] and st2.popup is None
+    st3, actions = key(st, "left", "enter")
+    assert actions == [("restart_wireplumber",)] and st3.popup is None
 
 
-def test_confirm_any_other_key_cancels_and_says_so():
-    # A missed y/n prompt used to swallow every key, which looked like a frozen screen.
-    for k in ("q", "down", "A", "x"):
+def test_a_question_stays_up_until_answered():
+    # It used to sit on the status line, where a missed prompt looked like a frozen screen, so any key
+    # cancelled it. Now it's a box over the screen (Skrappjaw, 2026-10-26): other keys leave it up.
+    for k in ("q", "down", "A", "x", "y"):
         st, _ = key(UIState(), "R")
         st, actions = key(st, k)
-        assert actions == [] and st.confirm is None and "cancelled" in st.message and "y" in st.message
+        assert actions == [] and st.popup == ("restart",)
 
 
 def test_q_quits():
@@ -401,7 +402,7 @@ def test_restart_chip_needs_confirmation():
     st = UIState()
     _, hits = screen(st)
     st, actions = click(st, hits, ("key", "R"))
-    assert actions == [] and st.confirm == ("restart",)
+    assert actions == [] and st.popup == ("restart",)
 
 
 def test_click_outside_targets_does_nothing():
@@ -422,11 +423,12 @@ def test_wheel_scrolls_top():
     assert st.top_scroll == 0
 
 
-def test_click_while_confirming_cancels_without_acting():
+def test_a_click_off_the_box_does_nothing():
     st, _ = key(UIState(), "R")
     _, hits = screen(st)
-    st2, actions = click(st, hits, ("tab", "top"))
-    assert st2.tab == "settings" and actions == [] and st2.confirm is None and "y confirms" in st2.message
+    assert not any(t == ("tab", "top") for *_, t in hits)  # only the box's buttons take clicks
+    st2, actions = pc.handle_mouse(st, hits, 0, 0, "click", CUR)
+    assert st2.tab == "settings" and actions == [] and st2.popup == ("restart",)
 
 
 # --- theme ------------------------------------------------------------------------------

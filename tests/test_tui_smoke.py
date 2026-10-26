@@ -162,7 +162,8 @@ def test_mixer_rename_is_enter_down_enter_type_enter(app, tmp_path):
     app.expect("new name")
     app.send("Pad\r")           # type, Enter
     app.expect("Restart WirePlumber now")
-    app.send("n")
+    app.send("\x1b")           # Esc closes the popover
+    app.expect("cancelled")
     app.send("q")
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
@@ -183,7 +184,8 @@ def test_mixer_rename_empty_restores_the_default(app, tmp_path):
     app.expect("empty restores the default")
     app.send("\r")              # empty
     app.expect("Restart WirePlumber now")
-    app.send("n")
+    app.send("\x1b")           # Esc closes the popover
+    app.expect("cancelled")
     app.send("q")
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())

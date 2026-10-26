@@ -140,9 +140,9 @@ def test_rebinding_back_to_the_default_clears_the_override():
 def test_reset_all_asks_first():
     st = prefs(cursor=pc.RESET_KEYS_ROW, keys={"mixer.meters": "b"})
     st, actions = skey(st, "enter")
-    assert st.confirm == ("reset_keys",) and actions == []
+    assert st.popup == ("reset_keys",) and actions == []
     assert "Reset every key" in "\n".join(t for t, _ in text(st))
-    st, actions = skey(st, "y")
+    st, actions = skey(st, "left", "enter")
     assert st.keys == {} and actions == [("save_ui",)]
 
 
