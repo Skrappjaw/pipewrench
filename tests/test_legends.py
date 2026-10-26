@@ -18,7 +18,7 @@ DEV = pc.devices_view(pi.inventory(DUMP), pcfg.default_config())
 PATCH = pp.graph(DUMP)
 
 STATES = {
-    "settings": pc.UIState(tab="settings", settings_focus="pane"),
+    "settings": pc.UIState(tab="settings", settings_focus="pane", cursor=pc.audio_index(("setting", 0))),
     "settings menu": pc.UIState(tab="settings"),
     "preferences": pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane"),
     "top": pc.UIState(tab="top"),
@@ -103,7 +103,8 @@ def test_one_box_and_a_status_line_for_messages(name):
 
 
 def test_legend_survives_a_message():
-    assert ("Enter", "edit") in chips(render(pc.UIState(tab="settings", settings_focus="pane", message="applied")))
+    assert ("Enter", "edit") in chips(render(pc.UIState(tab="settings", settings_focus="pane", message="applied",
+                                                         cursor=pc.audio_index(("setting", 0)))))
 
 
 def flat(lines):

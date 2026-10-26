@@ -235,12 +235,15 @@ A value never changes on a stray arrow: **Enter opens a row**, then ←→ chang
 it, Esc puts the row back, and ↑↓ close it, keeping the change. A tap on a row's ◀ ▶ opens it and steps it
 in one go.
 
-![Settings → Audio: PipeWire, Devices, Realtime and Advanced](guide/settings.png)
+![Settings → Audio: PipeWire, Devices, Clock and Advanced](guide/settings.png)
 
 ### Audio
 
-The page is in four boxes: **PipeWire**, **Devices**, **Realtime** and **Advanced**. The status line at
-the bottom says what the selected row does.
+PipeWire is a server: every app and every sound card goes through it. The page follows that order in
+four boxes: **PipeWire** (the server), **Devices** (the cards it manages), **Clock** (what you can change)
+and **Advanced**. Each line names a thing, then gives its status. ↑↓ visits every line, and the status
+line at the bottom says what the selected one means. Lines that only show something don't open; Enter
+does nothing there.
 
 **How it fits together.** PipeWire is the mix: every app and every device meets in one clock, with one
 sample rate and one buffer size. Each device then runs at its own hardware rate. When a device's rate
@@ -249,32 +252,69 @@ costs a little CPU and is usually inaudible.
 
 #### PipeWire
 
-**Running now** is what PipeWire is doing this moment, read live: for example `48 kHz · 256 samples ·
-5.33 ms`. Under it, where each value comes from:
+- **Server:** `● running`, or `✖ not answering` when PipeWire has stopped responding.
+- **Realtime:** whether PipeWire's audio runs with realtime priority (`● realtime` or `◐ not realtime`).
+  Without it, anything else on the computer can interrupt the audio, and you hear stutters and dropouts,
+  for example on a Discord call. Its checks sit under it:
+  - **pipewire group:** realtime is granted to members of the `pipewire` group.
+  - **realtime limit:** what PipeWire actually got. 0 means it started without the permission.
+  - **audio threads:** each of PipeWire's audio threads, realtime or not.
+  - **portal refusals:** for information. Apps ask the desktop portal for realtime too, and it refuses
+    them; that's harmless once PipeWire itself is realtime.
+  - **fix** and **for now:** when realtime isn't working, what to run in a terminal. PipeWrench never
+    runs `sudo` itself. "For now" restarts PipeWire, which drops calls.
 
-- **buffer:** *forced*, or *the smallest an app asks for* (Discord, the browser and REAPER each ask),
-  kept between Minimum and Max buffer;
-- **rate:** *forced*, *PipeWire's default*, or *an app asked for it* (only rates in **allowed rates**).
+  The usual fix is `sudo usermod -aG pipewire $USER` and then a **reboot**. Logging out isn't always
+  enough, because the session that starts PipeWire can stay running.
+- **Running now:** what PipeWire is doing this moment, read live, for example `48 kHz · 256 samples ·
+  5.33 ms`. With nothing playing it says **idle**, and what applies when something starts. If two devices
+  run on separate clocks at different settings, each gets its own line, named. Under it, where each value
+  comes from:
+  - **buffer set by:** *forced*, or *the smallest an app asks for* (Discord, the browser and REAPER each
+    ask), kept between Minimum and Max buffer;
+  - **rate set by:** *forced*, *PipeWire's default*, or *an app asked for it* (only rates in **Allowed
+    rates**).
 
-With nothing playing it says **idle**, and what applies when something starts. If two devices run on
-separate clocks at different settings, each gets its own line, named.
+When realtime is right, the Realtime line and its checks are green and there's no fix:
 
-**Overrides.** Force sample rate and Force buffer size. **off** lets PipeWire and the apps decide, and
-the row shows what's running instead (`off → 256 now (5.33 ms)`). Set one to make it win over every app:
-128 or lower for tracking, 1024 for mixing.
+![Settings, realtime working](guide/settings-realtime-ok.png)
 
-**Limits.** Minimum and Max buffer: the range apps may ask for. Each row shows its latency at the rate in
-use: one buffer's period, buffer ÷ rate (128 at 48k is 2.67 ms; at 192k, 0.67 ms). It's not the round
-trip, which adds each device's own buffers.
+`pwrench realtime` prints the same check in a terminal and exits 0 when all is well.
+
+#### Devices
+
+Every sound card, on or off, one line each:
+
+- **Status:** running, idle, suspended (asleep until something uses it), or off (its profile is off).
+- **Rate:** the rate it's running at.
+- **vs PipeWire:** `✓ same as PipeWire`, or `⇄ resampled` when its rate differs from PipeWire's.
+
+Select a card and the status line says what that means for it and which rates it can run, as the kernel
+lists them. Only USB interfaces report rates; others say `not reported`. A device that plays and records
+at different rates shows each (`out 32k · in 16k`).
+
+#### Clock
+
+**Force sample rate** and **Force buffer size** override PipeWire. **off** lets PipeWire and the apps
+decide, and the row shows what's running instead (`off → 256 now (5.33 ms)`; `→ waiting for pw-top`
+until the live reading arrives). Set one to make it win over every app: 128 or lower for tracking, 1024
+for mixing.
+
+**Minimum buffer** and **Max buffer** are the range apps may ask for. Each row shows its latency at the
+rate in use: one buffer's period, buffer ÷ rate (128 at 48k is 2.67 ms; at 192k, 0.67 ms). It's not the
+round trip, which adds each device's own buffers.
+
+**Allowed rates** are the rates an app may switch PipeWire to, and **Defaults** are PipeWire's own rate and
+buffer when nothing forces them. Both come from PipeWire's config and only show here.
 
 An open row's change is marked `*` until applied. When you change the rate:
 
 - a card that can't run it is named (`GCS-8 can't run at 192k (it supports 48k)`);
-- a rate outside **allowed rates** runs PipeWire at that rate while your devices stay at the default
+- a rate outside **Allowed rates** runs PipeWire at that rate while your devices stay at the default
   rate and PipeWire resamples, and the warning says so;
 - if any card that's on doesn't report its rates: "Make sure your device(s) support the rate selected."
 
-Four buttons sit under the rows. ↓ to their row, ←→ picks one, and Enter or a click presses it:
+Four buttons end the box. ↓ to their row, ←→ picks one, and Enter or a click presses it:
 
 - **Apply** sets the changes live, now. Enter on an open row does the same, and Esc reverts.
 - **Save** keeps the live clock for the next time PipeWire starts. It writes to PipeWrench's PipeWire file, `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf`,
@@ -286,36 +326,6 @@ Four buttons sit under the rows. ↓ to their row, ←→ picks one, and Enter o
 - **Restart** restarts WirePlumber, after asking. It's the one place to do it: no shortcut, so a stray key
   can't drop your audio. Apps like Discord may
   lose their audio, so pick Cancel if you're on a call.
-
-#### Devices
-
-Every sound card, on or off, one line each:
-
-- **Status:** running, idle, suspended (asleep until something uses it), or off (its profile is off).
-- **Rate:** the rate it's running at.
-- **vs PipeWire:** `✓ same as PipeWire`, or `⇄ resampled` when its rate differs from PipeWire's.
-- **Can run:** the rates the kernel lists for it. Only USB interfaces report one; others say `not
-  reported`. A device that plays and records at different rates shows each (`out 32k · in 16k`).
-
-#### Realtime
-
-Whether PipeWire's audio thread runs with realtime priority. Without it, anything else on the computer
-can interrupt the audio, and you hear stutters and dropouts, for example on a Discord call.
-
-- **pipewire group:** realtime is granted to members of the `pipewire` group.
-- **realtime limit:** what PipeWire actually got. 0 means it started without the permission.
-- **audio threads:** each of PipeWire's audio threads, realtime or not.
-- **portal refusals:** for information. Apps ask the desktop portal for realtime too, and it refuses
-  them; that's harmless once PipeWire itself is realtime.
-- **fix:** the command to run in a terminal. PipeWrench never runs `sudo` itself.
-
-The usual fix is `sudo usermod -aG pipewire $USER` and then a **reboot**. Logging out isn't always
-enough, because the session that starts PipeWire can stay running. When it's right, every row is
-green:
-
-![Settings, realtime working](guide/settings-realtime-ok.png)
-
-`pwrench realtime` prints the same check in a terminal and exits 0 when all is well.
 
 #### Advanced
 
@@ -414,7 +424,7 @@ have their own lettering.
 
 | Symptom | Look at |
 |---|---|
-| Stutter, dropouts, "robot voice" on calls | Settings → Realtime; Top's ERR column |
+| Stutter, dropouts, "robot voice" on calls | Settings → Audio → Realtime; Top's ERR column |
 | Friends can't hear you | Mixer: is the right input ★ default, unmuted, with a moving meter? |
 | OBS isn't getting desktop audio | Patch → Monitors: is the output's monitor connected to OBS? |
 | A device is missing from the Mixer | Devices: is its card hidden (H) or on profile `off`? |

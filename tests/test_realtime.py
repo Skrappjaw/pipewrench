@@ -137,13 +137,15 @@ def settings(width=100, height=50, realtime=None):
 def test_section_follows_the_clock_in_audio(tmp_path):
     lines = [t[pc.MENU_W:].strip() for t, _ in settings(realtime=check(tmp_path))]
     tops = [t for t in lines if t.startswith("┌─ ")]
-    assert [t.split()[1] for t in tops] == ["PipeWire", "Devices", "Realtime", "Advanced"] and "Display" not in lines
+    assert [t.split()[1] for t in tops] == ["PipeWire", "Devices", "Clock", "Advanced"] and "Display" not in lines
+    server = lines[lines.index(tops[0]) + 1:lines.index(tops[1])]
+    assert any("Realtime" in t for t in server)          # part of the server's status (rework 2)
 
 
 def test_section_shows_rows_and_fix(tmp_path):
     body = "\n".join(t for t, _ in settings(realtime=check(tmp_path, limit=0)))
     assert "realtime limit" in body and "◐" in body
-    assert "fix: reboot" in body
+    assert re.search(r"fix +reboot", body)
 
 
 def test_section_checking_when_none():
@@ -155,8 +157,9 @@ def test_section_fits_width(tmp_path, width):
     assert all(len(t) <= width for t, _ in settings(width=width, realtime=check(tmp_path)))
 
 
-def test_realtime_has_no_cursor_rows():
-    assert pc.LOG_ROW == pc.CLOCK_BUTTONS_ROW + 1 == len(pc.SETTINGS)  # the last Audio row: Realtime is read-only
+def test_realtime_checks_are_rows(tmp_path):
+    ids = pc.audio_rows(check(tmp_path, limit=0))   # every line selectable (Skrappjaw, 2026-10-26)
+    assert ("rt", "realtime limit") in ids and ("fix", 0) in ids
 
 
 # --- CLI ------------------------------------------------------------------------

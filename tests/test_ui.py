@@ -7,6 +7,7 @@ import pwcore as pc
 
 FIX = Path(__file__).parent / "fixtures"
 CUR = pc.parse_settings((FIX / "settings.txt").read_text())
+ROW = lambda i: pc.audio_index(("setting", i))  # Audio's clock rows sit under PipeWire and Devices (rework 2)
 
 
 def block():
@@ -21,6 +22,8 @@ def UIState(**kw):
     opens with its menu in focus; most tests here start in the open category."""
     kw.setdefault("tab", "settings")
     kw.setdefault("settings_focus", "pane")
+    if kw.get("settings_cat", "audio") == "audio":
+        kw.setdefault("cursor", ROW(0))  # these tests start on the first clock row, Force sample rate
     return pc.UIState(**kw)
 
 
@@ -66,7 +69,7 @@ def test_settings_render_shows_allowed_rates_and_warning():
     st, _ = key(UIState(), "enter", "right")  # force-rate 48000 -> 88200 pending
     lines, _ = screen(st)
     body = "\n".join(t for t, _ in lines)
-    assert "allowed rates: 48 kHz" in body
+    assert re.search(r"Allowed rates +48 kHz", body)
     assert "isn't in allowed" in body
 
 
@@ -106,10 +109,10 @@ def test_top_render_waiting_for_data():
 # --- 7. keys -----------------------------------------------------------------
 
 def test_up_down_moves_cursor_and_clamps():
-    st, _ = key(UIState(), "up")
+    st, _ = key(UIState(cursor=0), "up")
     assert st.cursor == 0
     st, _ = key(st, *["down"] * 60)
-    assert st.cursor == pc.LOG_ROW  # Audio: the clock rows, the buttons, then Log level (Advanced)
+    assert st.cursor == pc.audio_index(("log",))  # Audio: the clock rows, the buttons, then Log level (Advanced)
     st, _ = key(UIState(settings_cat="prefs"), *["down"] * 60)
     assert st.cursor == pc.RESET_KEYS_ROW  # Preferences: Display, then Keys
 
@@ -169,7 +172,7 @@ def test_basic_tabs_come_first():
 
 def open_restart(st):
     """The Restart clock button: the only way to restart WirePlumber now (Skrappjaw, 2026-10-26)."""
-    st = pc.dataclasses.replace(st, settings_cat="audio", cursor=pc.CLOCK_BUTTONS_ROW)
+    st = pc.dataclasses.replace(st, settings_cat="audio", cursor=pc.audio_index(("buttons",)))
     return key(st, *["right"] * pc.CLOCK_BUTTONS.index("Restart"), "enter")
 
 
@@ -256,23 +259,23 @@ def test_clicking_a_category_opens_it_and_a_row_focuses_the_pane():
 
 
 def test_clock_buttons_apply_save_reset():
-    st = UIState(cursor=pc.CLOCK_BUTTONS_ROW, pending={"clock.force-quantum": 256})
+    st = UIState(cursor=pc.audio_index(("buttons",)), pending={"clock.force-quantum": 256})
     _, actions = key(st, "enter")  # Apply is first
     assert actions == [("set_many", [("clock.force-quantum", 256)])]
     st2, actions = key(st, "right", "enter")  # Save, with an edit not yet applied
     assert actions == [] and "apply first" in st2.message and st2.failed == st2.message
-    _, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW), "right", "enter")
+    _, actions = key(UIState(cursor=pc.audio_index(("buttons",))), "right", "enter")
     assert actions == [("save_clock",)]
-    st, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW), "right", "right", "enter")  # Reset
+    st, actions = key(UIState(cursor=pc.audio_index(("buttons",))), "right", "right", "enter")  # Reset
     assert actions == [] and st.clock_button == 2
-    st, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW), *["right"] * 5, "enter")  # Restart, clamped: asks
+    st, actions = key(UIState(cursor=pc.audio_index(("buttons",))), *["right"] * 5, "enter")  # Restart, clamped: asks
     assert actions == [] and st.clock_button == 3 and st.popup == ("restart",)
 
 
 def test_reset_loads_pipewire_defaults_as_pending():
     cur = {**CUR, "clock.force-rate": 96000, "clock.force-quantum": 128, "clock.min-quantum": 64,
            "clock.max-quantum": 2048}
-    st, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW, clock_button=2), "enter", cur=cur)
+    st, actions = key(UIState(cursor=pc.audio_index(("buttons",)), clock_button=2), "enter", cur=cur)
     assert actions == []
     assert st.pending == {"clock.force-rate": 0, "clock.force-quantum": 0, "clock.min-quantum": 32}
     assert "Apply" in st.message
@@ -282,7 +285,7 @@ def test_reset_loads_pipewire_defaults_as_pending():
 
 def test_reset_at_the_defaults_says_so():
     cur = {**CUR, **pc.CLOCK_DEFAULTS}
-    st, _ = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW, clock_button=2), "enter", cur=cur)
+    st, _ = key(UIState(cursor=pc.audio_index(("buttons",)), clock_button=2), "enter", cur=cur)
     assert st.pending == {} and "already" in st.message
 
 
@@ -306,7 +309,7 @@ def test_clock_buttons_light_only_under_the_cursor():
         return [on_top(text.index(f"[ {name} ]")) for name in pc.CLOCK_BUTTONS]
 
     assert roles(UIState(cursor=0)) == ["normal"] * 4
-    assert roles(UIState(cursor=pc.CLOCK_BUTTONS_ROW, clock_button=1)) == ["normal", "selected", "normal", "normal"]
+    assert roles(UIState(cursor=pc.audio_index(("buttons",)), clock_button=1)) == ["normal", "selected", "normal", "normal"]
 
 
 def test_top_scroll_keys():
@@ -326,7 +329,7 @@ def click(st, hits, target, event="click", offset=0):
 @pytest.mark.parametrize("width", [80, 120])
 def test_hitmap_lands_on_drawn_glyphs(width):
     lines, hits = screen(UIState(), width=width)
-    for i in range(pc.CLOCK_BUTTONS_ROW):                   # the clock rows (Log level is below the fold)
+    for i in map(ROW, range(4)):                                    # the clock rows (Log level is below the fold)
         r, c0, _ = hit_for(hits, ("arrow", i, -1))
         assert text_at(lines, r, c0) == "◀"
         r, c0, _ = hit_for(hits, ("arrow", i, +1))
@@ -347,14 +350,14 @@ def test_click_tab_switches():
 def test_click_row_selects():
     st = UIState()
     _, hits = screen(st)
-    st, _ = click(st, hits, ("setting", 3))
-    assert st.cursor == 3 and st.pending == {}
+    st, _ = click(st, hits, ("setting", ROW(3)))
+    assert st.cursor == ROW(3) and st.pending == {}
 
 
 def test_click_arrow_equals_keys():
     st = UIState()
     _, hits = screen(st)
-    via_mouse, a1 = click(st, hits, ("arrow", 3, +1))
+    via_mouse, a1 = click(st, hits, ("arrow", ROW(3), +1))
     via_keys, a2 = key(st, "down", "down", "down", "enter", "right")
     assert via_mouse.pending == via_keys.pending and via_mouse.cursor == via_keys.cursor
     assert a1 == a2 == []
@@ -362,20 +365,20 @@ def test_click_arrow_equals_keys():
 
 def test_wheel_scrolls_settings_and_never_changes_a_value():
     # Skrappjaw, 2026-10-24: the mouse wheel scrolls everywhere.
-    st = UIState(cursor=1)
+    st = UIState(cursor=ROW(1))
     _, hits = screen(st)
-    st, actions = click(st, hits, ("setting", 3), event="wheel_down")
-    assert st.cursor == 2 and st.pending == {} and actions == []   # from the selection, not the mouse
-    st, _ = click(st, hits, ("setting", 3), event="wheel_up")
-    assert st.cursor == 1 and st.pending == {}
+    st, actions = click(st, hits, ("setting", ROW(3)), event="wheel_down")
+    assert st.cursor == ROW(2) and st.pending == {} and actions == []   # from the selection, not the mouse
+    st, _ = click(st, hits, ("setting", ROW(3)), event="wheel_up")
+    assert st.cursor == ROW(1) and st.pending == {}
 
 
 def test_wheel_works_anywhere_on_the_screen():
-    st = UIState(cursor=1)
+    st = UIState(cursor=ROW(1))
     lines, hits = screen(st)
     for y in (0, 1):                                        # the tab bar, the rule under it
         st2, _ = pc.handle_mouse(st, hits, y, 2, "wheel_down", CUR)
-        assert st2.cursor == 2 and st2.tab == "settings"
+        assert st2.cursor == ROW(2) and st2.tab == "settings"
 
 
 def test_apply_and_revert_chips():
@@ -390,7 +393,7 @@ def test_apply_and_revert_chips():
 def test_double_click_row_applies():
     st, _ = key(UIState(), "down", "enter", "right")
     _, hits = screen(st)
-    _, actions = click(st, hits, ("setting", 1), event="double")
+    _, actions = click(st, hits, ("setting", ROW(1)), event="double")
     assert actions == [("set_many", [("clock.force-quantum", 256)])]
 
 

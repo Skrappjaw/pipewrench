@@ -106,7 +106,7 @@ def test_save_keeps_the_clock_for_the_next_pipewire_start(app, tmp_path):
     app.send(tab("settings"))
     app.expect("Force sample rate")
     # No s key any more (Skrappjaw, 2026-10-26): into the pane, down to the buttons, → to Save, Enter.
-    app.send("\x1bOC" + "\x1bOB" * pc.CLOCK_BUTTONS_ROW + "\x1bOC" * pc.CLOCK_BUTTONS.index("Save") + "\r")
+    app.send("\x1bOC" + "\x1bOB" * pc.audio_index(("buttons",)) + "\x1bOC" * pc.CLOCK_BUTTONS.index("Save") + "\r")
     app.expect("next time PipeWire starts")
     app.quit()
     assert app.wait_exit() == 0

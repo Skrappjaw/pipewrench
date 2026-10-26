@@ -307,9 +307,12 @@ def shots():
              pr.CardRates("HD Pro Webcam C920", pr.Stream(frozenset({16000, 32000}), (), 32000), "running", 32000),
              pr.CardRates("Built-in Audio", None, "idle"),
              pr.CardRates("HDA ATI HDMI", None, "off")]
-    yield "settings", frame(pc.UIState(tab="settings", settings_focus="pane", cursor=1), height=50, current=free,
+    bad, good = pc.audio_rows(realtime_status(False), cards), pc.audio_rows(realtime_status(True), cards)
+    yield "settings", frame(pc.UIState(tab="settings", settings_focus="pane", cursor=bad.index(("setting", 1))),
+                            height=50, current=free,
                             block=driving, rates=cards, media=MEDIA, realtime=realtime_status(False))
-    yield "settings-realtime-ok", frame(pc.UIState(tab="settings", settings_focus="pane", cursor=pc.LOG_ROW),
+    yield "settings-realtime-ok", frame(pc.UIState(tab="settings", settings_focus="pane",
+                                                   cursor=good.index(("realtime",))),
                                         height=50, current=free, block=driving, rates=cards, media=MEDIA,
                                         realtime=realtime_status(True))
     yield "settings-preferences", frame(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane",

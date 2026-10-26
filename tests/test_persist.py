@@ -101,7 +101,7 @@ def test_preferences_rows_toggle_them():
 # --- Reset never touches it ------------------------------------------------------------------------
 
 def test_settings_reset_only_loads_clock_values():
-    st = pc.UIState(tab="settings", settings_cat="audio", settings_focus="pane", cursor=pc.CLOCK_BUTTONS_ROW,
+    st = pc.UIState(tab="settings", settings_cat="audio", settings_focus="pane", cursor=pc.audio_index(("buttons",)),
                     dev_show_hidden=True, dev_monitors=True)
     st, actions = key(st, *["right"] * pc.CLOCK_BUTTONS.index("Reset"), "enter")
     assert actions == [] and set(st.pending) <= set(pc.CLOCK_DEFAULTS)

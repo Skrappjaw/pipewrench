@@ -9,7 +9,8 @@ import pipewrench
 
 FIX = Path(__file__).parent / "fixtures"
 CUR = pc.parse_settings((FIX / "settings.txt").read_text())  # force rate 48000, force buffer 128
-RATE, FORCE_Q = 0, [s.key for s in pc.SETTINGS].index("clock.force-quantum")   # SETTINGS rows
+RATE, FORCE_Q = (pc.audio_index(("setting", [s.key for s in pc.SETTINGS].index(k)))
+                 for k in ("clock.force-rate", "clock.force-quantum"))   # Audio rows (rework 2: row ids)
 
 
 def S(**kw):
@@ -77,7 +78,7 @@ def test_meter_rows_edit_after_enter():
 
 def test_a_click_on_an_arrow_edits_at_once():
     """Taps on ◀ ▶ are deliberate (the touch desk needs them): they start the edit themselves."""
-    st = S(cursor=0)
+    st = S(cursor=RATE)
     lines, hits = pc.render_screen(st, CUR, None, 100, 50)
     row, c0, _ = next((r, a, b) for r, a, b, t in hits if t == ("arrow", FORCE_Q, +1))
     st, _ = pc.handle_mouse(st, hits, row, c0, "click", CUR)
@@ -98,7 +99,7 @@ def test_left_in_the_pane_goes_back_to_the_menu():
 
 
 def test_left_on_the_buttons_row_picks_buttons_then_goes_back_from_apply():
-    st, _ = key(S(cursor=pc.CLOCK_BUTTONS_ROW, clock_button=2), "left")
+    st, _ = key(S(cursor=pc.audio_index(("buttons",)), clock_button=2), "left")
     assert st.settings_focus == "pane" and st.clock_button == 1
     st, _ = key(st, "left", "left")
     assert st.settings_focus == "menu"
@@ -147,7 +148,8 @@ def test_latency_follows_pending_values():
 
 def test_latency_without_forcing_uses_the_default_rate_and_buffer():
     cur = {**CUR, "clock.force-rate": 0, "clock.force-quantum": 0}
-    assert "21.3 ms" in body(S(), cur=cur)  # 1024 at 48000
+    idle = pc.render_screen(S(), cur, [], 100, 50)[0]   # pw-top answered, nothing plays: the default applies
+    assert "21.3 ms" in "\n".join(t for t, _ in idle)  # 1024 at 48000
 
 
 def test_latency_format():

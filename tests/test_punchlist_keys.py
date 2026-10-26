@@ -47,7 +47,7 @@ def test_no_save_or_restart_actions():
 
 
 @pytest.mark.parametrize("st", [pc.UIState(tab="settings", settings_focus="pane"),
-                                pc.UIState(tab="settings", settings_focus="pane", cursor=pc.CLOCK_BUTTONS_ROW)])
+                                pc.UIState(tab="settings", settings_focus="pane", cursor=pc.audio_index(("buttons",)))])
 def test_s_and_R_do_nothing_on_settings(st):
     for k in ("s", "R"):
         after, actions = key(st, k)
@@ -62,7 +62,7 @@ def test_R_does_nothing_on_devices():
 
 
 def test_save_and_restart_buttons_still_work():
-    st = pc.UIState(tab="settings", settings_focus="pane", cursor=pc.CLOCK_BUTTONS_ROW)
+    st = pc.UIState(tab="settings", settings_focus="pane", cursor=pc.audio_index(("buttons",)))
     save = pc.CLOCK_BUTTONS.index("Save")
     assert key(st, *["right"] * save, "enter")[1] == [("save_clock",)]
     after, _ = key(st, *["right"] * pc.CLOCK_BUTTONS.index("Restart"), "enter")

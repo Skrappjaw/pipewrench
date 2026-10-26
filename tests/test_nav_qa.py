@@ -55,7 +55,7 @@ def step_checks(before, k, after, width, via=None, raw=None):
     check(all(len(t) <= width for t, _ in lines), f"a line is wider than {width}")
     check(after.tab in pc.TABS, "unknown tab")
     if after.tab == "settings":
-        top = pc.LOG_ROW if after.settings_cat == "audio" else pc.RESET_KEYS_ROW
+        top = pc.audio_index(("log",)) if after.settings_cat == "audio" else pc.RESET_KEYS_ROW
         check(0 <= after.cursor <= top, f"Settings cursor {after.cursor} outside 0..{top}")
     if after.mix_menu:
         check(0 <= after.mix_menu_cursor < max(1, len(pc.mix_menu_items(MX, after))), "Mixer menu cursor")

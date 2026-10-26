@@ -2,6 +2,7 @@
 indicator for the current setting. ALSO theres no indicator as to the difference between pipewire and the
 devices and what that means." Then: words "PipeWire & Devices"; "Every card with status. show off if off";
 "visually break up what is on screen". Plan: notes/audio-settings-plan.md."""
+import re
 from pathlib import Path
 
 import pwcore as pc
@@ -53,14 +54,15 @@ def key(st, *keys, current=FREE):
 def test_rows_in_screen_order():
     assert [s.label for s in pc.SETTINGS] == ["Force sample rate", "Force buffer size", "Minimum buffer",
                                               "Max buffer", "Log level"]
-    assert pc.CLOCK_BUTTONS_ROW == 4 and pc.LOG_ROW == 5
-    assert pc.audio_setting(1).key == "clock.force-quantum" and pc.audio_setting(pc.LOG_ROW).key == "log.level"
-    assert pc.audio_setting(pc.CLOCK_BUTTONS_ROW) is None
+    at = pc.audio_index
+    assert pc.audio_setting(at(("setting", 1))).key == "clock.force-quantum"
+    assert pc.audio_setting(at(("log",))).key == "log.level" and pc.audio_setting(at(("buttons",))) is None
+    assert at(("log",)) == len(pc.audio_rows()) - 1
 
 
 def test_log_level_sits_below_the_buttons_and_applies_on_enter():
-    st, _ = key(audio(cursor=pc.CLOCK_BUTTONS_ROW), "down")
-    assert st.cursor == pc.LOG_ROW and key(st, "down")[0].cursor == pc.LOG_ROW
+    st, _ = key(audio(cursor=pc.audio_index(("buttons",))), "down")
+    assert st.cursor == pc.audio_index(("log",)) and key(st, "down")[0].cursor == pc.audio_index(("log",))
     st, _ = key(st, "enter", "right")
     assert st.pending == {"log.level": 3}
     st, actions = key(st, "enter")
@@ -77,9 +79,9 @@ def test_pipewire_now_reads_the_running_drivers():
 def test_running_now_line_and_where_it_comes_from():
     text = "\n".join(pane(audio()))
     assert "Running now" in text and "48 kHz · 256 samples · 5.33 ms" in text
-    assert "buffer: smallest an app asks for" in text and "rate: PipeWire's default" in text
+    assert re.search(r"buffer set by +smallest an app asks for", text) and re.search(r"rate set by +PipeWire's default", text)
     forced = "\n".join(pane(audio(), current=CUR))                 # the fixture forces 48000 / 128
-    assert "buffer: forced" in forced and "rate: forced" in forced
+    assert re.search(r"buffer set by +forced", forced) and re.search(r"rate set by +forced", forced)
 
 
 def test_idle_says_what_applies_when_something_plays():
@@ -100,7 +102,7 @@ def test_force_rows_show_off_and_the_value_running():
 def test_the_page_is_broken_into_boxes():
     text = pane(audio())
     tops = [t.strip().split("─ ", 1)[1].split(" ─")[0] for t in text if t.strip().startswith("┌─ ")]
-    assert tops == ["PipeWire", "Devices", "Realtime", "Advanced"]
+    assert tops == ["PipeWire", "Devices", "Clock", "Advanced"]
     assert sum(1 for t in text if t.strip().startswith("└")) == 4
 
 
@@ -114,13 +116,14 @@ def test_every_card_with_its_status_and_how_it_meets_pipewire():
 
 
 def test_cursor_rows_scroll_into_view_inside_boxes():
-    rows = [t for t, _ in screen(audio(cursor=pc.LOG_ROW), height=24)]
+    rows = [t for t, _ in screen(audio(cursor=pc.audio_rows(None, cards()).index(("log",))), height=24)]
     assert any("> Log level" in t for t in rows)
 
 
 def test_audio_rows_explain_themselves_on_the_status_line():
-    assert "PipeWire's rate" in screen(audio(cursor=0), height=40)[-1][0]
-    assert "log" in screen(audio(cursor=pc.LOG_ROW), height=40)[-1][0].lower()
+    ids = pc.audio_rows(None, cards())
+    assert "PipeWire's rate" in screen(audio(cursor=ids.index(("setting", 0))), height=40)[-1][0]
+    assert "log" in screen(audio(cursor=ids.index(("log",))), height=40)[-1][0].lower()
 
 
 # --- every card, with status, from the inventory -------------------------------------------------------

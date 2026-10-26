@@ -101,14 +101,17 @@ def test_no_rate_warnings_without_a_forced_rate(tmp_path):
 def test_settings_lists_device_rates_and_names_the_one_that_cannot(tmp_path):
     root = proc_tree(tmp_path, {1: "umc404hd-stream0.txt", 5: "gcs8-stream0.txt", 0: None})
     rates = pr.read([card("UMC404HD", 1), card("GCS-8", 5), card("Built-in Audio", 0)], root)
-    st = pc.UIState(tab="settings", settings_focus="pane", cursor=0,
+    ids = pc.audio_rows(None, rates)
+    st = pc.UIState(tab="settings", settings_focus="pane", cursor=ids.index(("setting", 0)),
                     pending={"clock.force-rate": 192000})
     cur = {**CUR, "clock.allowed-rates": [48000, 192000]}
     lines, _ = pc.render_screen(st, cur, None, 100, 50, rates=rates)
     body = "\n".join(t for t, _ in lines)
     umc = next(t for t in body.splitlines() if "UMC404HD" in t)
-    assert "48 kHz" in umc and "44.1 48 88.2 96 176.4 192k" in body   # a long list may take its own line
-    assert "Built-in Audio" in body and "not reported" in body
+    assert "48 kHz" in umc and "Built-in Audio" in body
+    note = lambda label: pc.render_screen(pc.dataclasses.replace(st, cursor=ids.index(("device", label))), cur, None,
+                                          100, 50, rates=rates)[0][-1][0]   # what a card can run: its status line
+    assert "44.1 48 88.2 96 176.4 192k" in note("UMC404HD") and "not reported" in note("Built-in Audio")
     assert "GCS-8 can't run at 192k" in body
     assert "Make sure your device(s) support the rate selected." in body
 

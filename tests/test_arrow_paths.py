@@ -84,7 +84,7 @@ def test_patch_view_menu_switches_grid_monitors_and_ports():
 # --- Settings -----------------------------------------------------------------------------------------
 
 def test_restart_is_a_clock_button():
-    st = pc.UIState(tab="settings", settings_cat="audio", settings_focus="pane", cursor=pc.CLOCK_BUTTONS_ROW,
+    st = pc.UIState(tab="settings", settings_cat="audio", settings_focus="pane", cursor=pc.audio_index(("buttons",)),
                     key_box=False)
     assert pc.CLOCK_BUTTONS[-1] == "Restart"
     st, _ = key(st, *["right"] * len(pc.CLOCK_BUTTONS), "enter")

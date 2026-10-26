@@ -1172,6 +1172,7 @@ class Tui:
             block = self.block
         if self.st.tab == "about" and self.about is None:
             self.about = pc.about_info(self.runner)
+        self.st = pc.with_audio_rows(self.st, pc.audio_rows(self.realtime, self.rates))  # ↑↓ walk what's drawn
         lines, self.hits = pc.render_screen(self.st, self.current, block, w, h, self.devices,
                                             self.patch, self.mixer, self._media_view(), self.about,
                                             self.realtime, self.rates)
