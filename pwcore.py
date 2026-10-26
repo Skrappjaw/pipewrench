@@ -1308,7 +1308,8 @@ def _boxed(cv, title, draw):
     on screen"). draw(inner) fills an inner canvas; its styles and hits move inside the frame."""
     inner = _Canvas(max(10, cv.width - 4))
     draw(inner)
-    cv.add("┌─ " + title + " " + "─" * max(0, cv.width - len(title) - 5) + "┐", "dim")
+    cv.add("┌─ " + title + " " + "─" * max(0, cv.width - len(title) - 5) + "┐",
+           ("dim", [(3, 3 + len(title), "title")]))  # a section heading: title, on a dim frame (ui-conventions)
     top = len(cv.lines)
     for text, style in inner.lines:
         base, spans = style if isinstance(style, tuple) else (style, [])
@@ -1427,7 +1428,7 @@ def _render_device_rates(cv, rates, mix):
         return
     width = max([len(r.label) for r in rates] + [6])
     head = f"  {'Device':<{width}}  {'Status':<10} {'Rate':<9} {'vs PipeWire':<21}"
-    cv.add(head + "Can run", "dim")
+    cv.add(head + "Can run", "title")  # column headers are title (ui-conventions)
     for r in rates:
         rate = r.live or r.running  # PipeWire's rate for a running device, else the kernel's momentary rate
         if r.status == "off" or rate is None:
@@ -1495,7 +1496,7 @@ def _render_keys(cv, st):
     """Key Bindings (Skrappjaw, 2026-10-26): Action · Key · MIDI/CC under a heading per view. Global keys are fixed;
     an action shows its key, * when changed, and why it can't fire when it clashes. MIDI/CC is a placeholder."""
     cv.add("  Key Bindings", "title")
-    cv.add(f"  {'Action':<32} {'Key':^6}   {'MIDI/CC':^7}", "dim")
+    cv.add(f"  {'Action':<32} {'Key':^6}   {'MIDI/CC':^7}", "title")  # column headers are title
     b = pk.bindings(st.keys)
     bad = pk.clashes(b)
     heading = None

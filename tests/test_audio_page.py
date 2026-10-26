@@ -163,3 +163,24 @@ def test_drivers_that_agree_show_one_running_line():
 def test_a_card_with_different_rates_each_way_says_so():
     s = pr.parse_stream("X\n\nPlayback:\n    Rates: 32000\n\nCapture:\n    Rates: 16000\n")
     assert s.rates == frozenset() and pr.describe(s) == "out 32k · in 16k"   # still no common rate to force
+
+
+# --- theme conventions QA, 2026-10-26 (notes/qa-themes-2026-10-26.md) -----------------------------------
+
+def role_at(style, col):
+    base, spans = style if isinstance(style, tuple) else (style, [])
+    return next((r for a, b, r in reversed(spans) if a <= col < b), base)
+
+
+def test_section_box_titles_and_column_headers_use_title():
+    # notes/ui-conventions.md: title = "headings, column headers, box titles"; the frame stays dim.
+    for st in (audio(), pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane")):
+        for text, style in screen(st):
+            pane = text.split("│", 1)[1] if "│" in text else ""
+            col = len(text) - len(pane)
+            if pane.startswith("┌─ "):
+                assert role_at(style, col + 3) == "title" and role_at(style, col) == "dim", pane
+            for head in ("Device ", "Action "):
+                at = pane.find(head)
+                if at >= 0 and pane[:at].strip(" │") == "":
+                    assert role_at(style, col + at) == "title", pane
