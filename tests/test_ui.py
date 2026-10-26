@@ -297,6 +297,20 @@ def test_clock_button_click_presses_it():
     assert actions == [("save_clock",)]
 
 
+def test_clock_buttons_light_only_under_the_cursor():
+    """chip is for key legends only; a button looks lit only when the cursor is on it (Skrappjaw, 2026-10-25)."""
+    def roles(st):
+        lines, hits = screen(st, height=40)
+        row, _, _ = hit_for(hits, ("clock_button", 0))
+        text, style = lines[row]
+        spans = style[1] if isinstance(style, tuple) else []
+        on_top = lambda col: ([r for a, b, r in spans if a <= col < b] or ["normal"])[-1]  # later spans draw over
+        return [on_top(text.index(f"[ {name} ]")) for name in pc.CLOCK_BUTTONS]
+
+    assert roles(UIState(cursor=0)) == ["normal"] * 3
+    assert roles(UIState(cursor=pc.CLOCK_BUTTONS_ROW, clock_button=1)) == ["normal", "selected", "normal"]
+
+
 def test_top_scroll_keys():
     st, _ = key(UIState(tab="top"), "down", "down")
     assert st.top_scroll == 2

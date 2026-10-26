@@ -1126,7 +1126,8 @@ def _clock_buttons(cv, st):
     for n, label in enumerate(CLOCK_BUTTONS):
         c0 = len(line)
         line += f"[ {label} ]"
-        spans.append((c0, len(line), "selected" if on_row and n == st.clock_button else "chip"))
+        if on_row and n == st.clock_button:  # only the cursor lights a button; chip is for key legends
+            spans.append((c0, len(line), "selected"))
         chips.append((c0, len(line), n))
         line += "  "
     row = cv.add(line.rstrip(), ("normal", spans))
