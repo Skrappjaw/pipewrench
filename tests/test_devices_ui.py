@@ -79,7 +79,8 @@ def test_off_cards_group_at_the_bottom_and_turn_on_from_their_menu():
     assert next(s for t, s in lines if t == "  Off") == "title"
     assert next(s for t, s in lines if "HDA ATI HDMI · off" in t) == "dim"
     entries = pc.dev_selectable(dv(), pc.UIState(tab="devices"))
-    assert [o.label for k, o in entries[-3:]] == ["Built-in Audio", "HD Pro Webcam C920", "HDA ATI HDMI"]
+    assert [o.label for k, o in entries[-5:-2]] == ["Built-in Audio", "HD Pro Webcam C920", "HDA ATI HDMI"]
+    assert [k for k, _ in entries[-2:]] == ["view", "actions"]  # View… and Actions… end the list
     st, actions = key(at("HDA ATI HDMI"), "enter")
     assert actions == [] and st.dev_menu[0] == "card"
 
@@ -249,8 +250,8 @@ def pick(st, d, label):
 
 def test_enter_on_a_bus_opens_hide_and_delete():
     st, d = open_menu("SYSTEM")
-    assert menu_labels(st, d) == ["Hide", "Delete bus", "Back"]
-    assert "> Hide" in body(screen(st, d, height=60)[0])
+    assert menu_labels(st, d) == ["Test noise", "Hide", "Delete bus", "Back"]
+    assert "> Test noise" in body(screen(st, d, height=60)[0])
 
 def test_default_and_rename_are_not_on_devices():
     for target in ("SYSTEM", "GCS-8"):
@@ -306,7 +307,8 @@ def test_picking_the_active_profile_just_closes():
 def test_add_bus_row_ends_the_virtual_group():
     entries = pc.dev_selectable(dv(), pc.UIState(tab="devices"))
     i = entries.index(("addbus", None))
-    assert all(k == "card" and o.active == "off" for k, o in entries[i + 1:])  # only the Off group follows
+    assert all(k == "card" and o.active == "off" for k, o in entries[i + 1:-2])  # only the Off group follows,
+    assert [k for k, _ in entries[-2:]] == ["view", "actions"]                 # then View… and Actions…
     st = pc.UIState(tab="devices", dev_cursor=i)
     assert "+ Add bus…" in body(screen(st, height=60)[0])
     assert key(st, "enter")[1] == [("dev_prompt_bus",)]

@@ -19,6 +19,7 @@ ACTIONS = [
     Action("devices", "devices.delete_bus", "x", "delete bus"),
     Action("devices", "devices.test", "t", "test noise"),
     Action("devices", "devices.profile", "p", "card profile"),
+    Action("devices", "devices.preview", "v", "preview files"),
     Action("devices", "devices.apply", "A", "apply files"),
     Action("devices", "devices.restart", "R", "restart WirePlumber"),
     Action("patch", "patch.grid", "g", "grid/column view"),
@@ -29,11 +30,10 @@ ACTIONS = [
 ]
 BY_ID = {a.id: a for a in ACTIONS}
 
-# Keys that act on every tab (or answer a prompt); a binding to one of them never fires.
+# Keys that act on every tab; a binding to one of them never fires.
 GLOBAL = {"q": "quit", **{str(n): f"tab {n}" for n in range(1, 7)},
           "*": "play/pause", "<": "previous track", ">": "next track",
-          "-": "player volume", "+": "player volume", "=": "player volume",
-          "y": "confirm a prompt", "n": "cancel a prompt"}
+          "-": "player volume", "+": "player volume", "=": "player volume"}
 
 
 def label(a):
@@ -109,6 +109,11 @@ def translate(screen, key, b):
     if any(a.screen == screen and a.default == key for a in ACTIONS):
         return None
     return key
+
+
+def is_shortcut(screen, key, b):
+    """Is this key a letter shortcut on this screen, bound or by default?"""
+    return key in active(screen, b) or any(a.screen == screen and a.default == key for a in ACTIONS)
 
 
 def key_for(b, action_id):

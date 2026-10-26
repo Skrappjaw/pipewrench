@@ -49,7 +49,7 @@ def test_clashing_binding_drops_out_of_the_legend():
 
 def test_global_keys_still_win():
     st = pc.UIState(tab="devices", keys={"devices.show_hidden": "q"})
-    assert key(st, "q")[1] == [("quit",)]
+    assert key(st, "q")[0].popup == ("quit",)  # q still asks to quit; the binding never fires
 
 
 def test_settings_keys_rebind_too():

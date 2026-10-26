@@ -29,7 +29,9 @@ guide is about using the screen.
   stopped tab from outside).
 - **The mouse wheel scrolls** whatever list you're in, wherever the pointer is. It never changes a
   value, so scrolling a long list is safe.
-- `q` quits from anywhere.
+- `q` quits from anywhere, after asking (Cancel is preselected).
+- **Letter keys are shortcuts.** Everything they do also has an arrow + Enter path, given in each table.
+  Settings → Preferences → **Shortcut keys** turns them off.
 
 Menus open with Enter and close with Esc (or any other key). Anything that moves audio for every app,
 like changing the default device, goes through a menu so a stray key can't do it.
@@ -45,7 +47,7 @@ Every output and input, then the apps playing or recording under each. ★ marks
 | mouse wheel | scroll the list (it never changes volume) |
 | Space | mute or unmute |
 | Enter (double-click) | the channel's menu |
-| v | live meters on or off |
+| v (shortcut) | live meters on or off; or Settings → Preferences → Meters |
 
 The volume % sits inside the bar. Green is up to 100%, red past it, grey when muted. Past 100% can clip, so
 at 100% → opens a box: **Go louder** unlocks that channel until it's back under 100%, **Don't ask again**
@@ -99,15 +101,19 @@ levels) is on the Mixer.
 
 | Key | Does |
 |---|---|
-| Enter | the card's or bus's menu |
-| p | the card's profile menu |
-| h | show hidden cards and buses (dimmed) |
-| a | add a bus |
-| x | delete a bus (asks first) |
-| t | test sound on a bus |
-| m | list each output's monitor |
-| A | write the generated files (names, buses, clock) |
-| R | restart WirePlumber (asks first) |
+| Enter | the card's or bus's menu, or open the line under the cursor |
+
+| Shortcut | Does | Without it |
+|---|---|---|
+| p | the card's profile menu | Enter on the card |
+| h | show hidden cards and buses (dimmed) | **View…** (the end of the list) → Show hidden |
+| m | list each output's monitor | **View…** → Monitors |
+| a | add a bus | Enter on **+ Add bus…** |
+| x | delete a bus (asks first) | Enter on the bus → Delete bus |
+| t | test sound on a bus | Enter on the bus → Test noise |
+| v | preview the generated files | **Actions…** (the end of the list) → Preview files |
+| A | write the generated files (names, buses, clock) | **Actions…** → Apply files |
+| R | restart WirePlumber (asks first) | **Actions…** → Restart WirePlumber |
 
 Cards on profile `off` (unused HDMI, a webcam you don't use for sound) wait at the bottom under
 **Off**.
@@ -162,9 +168,13 @@ buses). Select a source, then `→` into the destinations and press Enter to con
 | ↑ ↓ | select |
 | ← → | switch between sources and destinations |
 | Enter | connect or disconnect |
-| g | grid view |
-| p | port matrix for the selected pair |
-| m | show every monitor |
+| ↑ from the first source | the **View** line above the columns; Enter opens its menu |
+
+| Shortcut | Does | Without it |
+|---|---|---|
+| g | grid view | View → Grid view (Column view to go back) |
+| p | port matrix for the selected pair | View → Port by port |
+| m | show every monitor | View → Monitors |
 
 ### Monitors (OBS desktop audio)
 
@@ -244,16 +254,18 @@ kernel, and only USB interfaces report one; other cards say `not reported`. When
   rate and PipeWire resamples, and the warning says so;
 - if any card doesn't report its rates: "Make sure your device(s) support the rate selected."
 
-Under the clock rows are three buttons. ↓ to their row, ←→ picks one, and Enter or a click presses it:
+Under the clock rows are four buttons. ↓ to their row, ←→ picks one, and Enter or a click presses it:
 
 - **Apply** sets the changes live, now. Enter on an open clock row does the same, and Esc reverts.
-- **Save** keeps the live clock for the next time PipeWire starts (`s` saves from anywhere in
-  Settings). It writes to PipeWrench's PipeWire file, `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf`,
+- **Save** keeps the live clock for the next time PipeWire starts (the `s` shortcut saves from
+  anywhere in Settings). It writes to PipeWrench's PipeWire file, `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf`,
   and never restarts anything. A forced rate or buffer is saved as PipeWire's default, so apps can still
   ask for another size after a restart. Values that aren't forced, or match PipeWire's own defaults,
   aren't written. Apply any changes before saving.
 - **Reset** loads PipeWire's defaults (no forced rate or buffer, min 32, max 2048) as changes marked
   `*`. Apply sets them live, and Save after that clears the saved clock.
+- **Restart** restarts WirePlumber, after asking (what the `R` shortcut does). Apps like Discord may
+  lose their audio, so pick Cancel if you're on a call.
 
 #### Realtime
 
@@ -285,8 +297,10 @@ keeps it and Esc puts it back. They're kept in `~/.config/pipewrench/ui.json`.
 #### Display
 
 Theme (dark, light, crowbar orange, Pipe Boy in green, amber, cyan or white, Vaporware, Pipecraft, or
-pipeOS-lite and pipeOS-dark), the meters' frame rate, fall speed and peak hold, and the
-Mixer's volume bar.
+pipeOS-lite and pipeOS-dark), the meters' frame rate, fall speed and peak hold, the
+Mixer's volume bar, **Meters** (the Mixer's live levels, what `v` toggles) and **Shortcut keys**. With
+shortcut keys off, letter keys do nothing and drop out of the Keys box; arrows, Enter, Esc, Space, Tab, `1`–`6`,
+the media keys and `q` still work, and every feature has an arrow + Enter path.
 
 **Pipe Boy** is one phosphor colour, after Fallout's Pip-Boy: green, amber, cyan or white. With no other
 colours, status shows by style: good is bold, waiting is underlined, and a problem is a pale block.
@@ -323,12 +337,12 @@ status band says how many it found or what's wrong with one. Everything is in **
 
 #### Keys
 
-Every letter shortcut, one row each, with the key it's on. Enter on a row, then press the new key.
+Every letter shortcut, one row each, with the key it's on (greyed while shortcut keys are off). Enter on a row, then press the new key.
 Backspace (or Delete) takes the key off, so the shortcut does nothing; Esc cancels. **Reset all keys**
 puts every shortcut back after asking.
 
 - A key that's taken on the same screen, or one that works everywhere (`q`, `1`–`6`, the media keys
-  `* - + < >`, `y` and `n`), is refused and the reason shows on the status line.
+  `* - + < >`), is refused and the reason shows on the status line.
 - A clash that's already in the file, from hand editing, shows red with the reason. The first shortcut
   on that screen keeps the key.
 - Arrows, Enter, Esc, Space and Tab can't be rebound.
@@ -359,7 +373,7 @@ have their own lettering.
 | Friends can't hear you | Mixer: is the right input ★ default, unmuted, with a moving meter? |
 | OBS isn't getting desktop audio | Patch → Monitors: is the output's monitor connected to OBS? |
 | A device is missing from the Mixer | Devices: is its card hidden (H) or on profile `off`? |
-| A new name doesn't show | It shows after a WirePlumber restart (Devices → R) or the next login |
+| A new name doesn't show | It shows after a WirePlumber restart (Devices → Actions… → Restart WirePlumber) or the next login |
 | A red "PipeWire not answering" line under the tabs | PipeWire is up but hung. The screen keeps the last thing it saw and the keys still work; PipeWrench checks every 5 s and says "PipeWire is back" when it answers. It never restarts anything itself: `systemctl --user status pipewire wireplumber`, then restart them if you choose |
 
 ## Redrawing the pictures

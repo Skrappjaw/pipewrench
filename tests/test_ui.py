@@ -191,8 +191,12 @@ def test_a_question_stays_up_until_answered():
         assert actions == [] and st.popup == ("restart",)
 
 
-def test_q_quits():
-    assert key(UIState(), "q")[1] == [("quit",)]
+def test_q_asks_then_quits():
+    # Skrappjaw, 2026-10-26: "a popover for quitting with are you sure".
+    st, actions = key(UIState(), "q")
+    assert actions == [] and st.popup == ("quit",) and pc.popup_cursor(st) == 1   # Cancel
+    assert key(st, "enter")[0].popup is None and key(st, "enter")[1] == []
+    assert key(st, "left", "enter")[1] == [("quit",)]
 
 
 
@@ -263,8 +267,10 @@ def test_clock_buttons_apply_save_reset():
     assert actions == [] and "apply first" in st2.message and st2.failed == st2.message
     _, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW), "right", "enter")
     assert actions == [("save_clock",)]
-    st, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW), "right", "right", "right", "enter")  # Reset, clamped
+    st, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW), "right", "right", "enter")  # Reset
     assert actions == [] and st.clock_button == 2
+    st, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW), *["right"] * 5, "enter")  # Restart, clamped: asks
+    assert actions == [] and st.clock_button == 3 and st.popup == ("restart",)
 
 
 def test_s_saves_from_anywhere_in_settings():
@@ -308,8 +314,8 @@ def test_clock_buttons_light_only_under_the_cursor():
         on_top = lambda col: ([r for a, b, r in spans if a <= col < b] or ["normal"])[-1]  # later spans draw over
         return [on_top(text.index(f"[ {name} ]")) for name in pc.CLOCK_BUTTONS]
 
-    assert roles(UIState(cursor=0)) == ["normal"] * 3
-    assert roles(UIState(cursor=pc.CLOCK_BUTTONS_ROW, clock_button=1)) == ["normal", "selected", "normal"]
+    assert roles(UIState(cursor=0)) == ["normal"] * 4
+    assert roles(UIState(cursor=pc.CLOCK_BUTTONS_ROW, clock_button=1)) == ["normal", "selected", "normal", "normal"]
 
 
 def test_top_scroll_keys():
@@ -523,13 +529,13 @@ def test_every_theme_defines_every_role():
 
 def test_ui_file_round_trips_and_tolerates_junk(tmp_path):
     p = tmp_path / "pipewrench" / "ui.json"
-    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "meters": True, "shortcuts": True, "keys": {}}
     pc.save_ui(p, {"theme": "light", "meter_fps": 20, "meter_fall": 80, "peak_hold": 3, "volume_bar": False})
-    assert pc.load_ui(p) == {"theme": "light", "meter_fps": 20, "meter_fall": 80, "peak_hold": 3, "volume_bar": False, "keys": {}}
+    assert pc.load_ui(p) == {"theme": "light", "meter_fps": 20, "meter_fall": 80, "peak_hold": 3, "volume_bar": False, "meters": True, "shortcuts": True, "keys": {}}
     p.write_text("{not json")
-    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "meters": True, "shortcuts": True, "keys": {}}
     p.write_text('{"theme": "neon", "meter_fps": 120}')
-    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
+    assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "meters": True, "shortcuts": True, "keys": {}}
 
 
 def test_messages_are_a_full_width_band_green_with_a_tick_or_red_with_a_cross():
@@ -604,7 +610,7 @@ def test_meter_fall_steps_and_saves():
     assert st.meter_fall == 40 and actions == [("save_ui",)]
     st, _ = key(st, *["left"] * 6)
     assert st.meter_fall == 10
-    assert pc.ui_prefs(st) == {"theme": "dark", "meter_fps": 10, "meter_fall": 10, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
+    assert pc.ui_prefs(st) == {"theme": "dark", "meter_fps": 10, "meter_fall": 10, "peak_hold": 1.5, "volume_bar": True, "meters": True, "shortcuts": True, "keys": {}}
     text = "\n".join(t for t, _ in screen(st, height=80)[0])
     assert "Meter fall" in text and "10 dB/s" in text
     assert text.index("Meter frame rate") < text.index("Meter fall") < text.index("Peak hold") < text.index("  Keys")

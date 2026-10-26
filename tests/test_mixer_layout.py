@@ -136,4 +136,4 @@ def test_load_ui_defaults_bar_on(tmp_path):
 
 
 def test_keys_follow_the_bar_row():
-    assert pc.KEYS_ROW == pc.BAR_ROW + 1
+    assert pc.KEYS_ROW == pc.SHORTCUTS_ROW + 1 and pc.SHORTCUTS_ROW == pc.METERS_ROW + 1 == pc.BAR_ROW + 2

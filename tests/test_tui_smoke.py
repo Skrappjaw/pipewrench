@@ -55,6 +55,12 @@ class Pty:
         self.send(f"\x1b[<0;{col + 1};{row + 1}M")
         self.send(f"\x1b[<0;{col + 1};{row + 1}m")
 
+    def quit(self):
+        """q asks first (Skrappjaw, 2026-10-26); ← onto Quit, Enter."""
+        self.send("q")
+        self.expect("Quit PipeWrench")
+        self.send("\x1bOD\r")
+
     def wait_exit(self, timeout=5.0):
         end = time.time() + timeout
         while time.time() < end:
@@ -91,7 +97,7 @@ def test_tab_key_mouse_click_and_quit(app):
     col = 1 + sum(len(pc.TAB_TITLES[t]) + 3 for t in pc.TABS[:pc.TABS.index("settings")]) + 3
     app.click(0, col)
     app.expect("Force sample rate")
-    app.send("q")
+    app.quit()
     assert app.wait_exit() == 0
 
 
@@ -101,7 +107,7 @@ def test_save_keeps_the_clock_for_the_next_pipewire_start(app, tmp_path):
     app.expect("Force sample rate")
     app.send("s")
     app.expect("next time PipeWire starts")
-    app.send("q")
+    app.quit()
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
     assert saved["clock_rate"] == 48000 and saved["clock_quantum"] == 128
@@ -120,7 +126,7 @@ def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
     app.expect("bus name")
     app.send("OBS\r")
     app.expect("OBS created")  # curses redraws only what changed; "bus " was already on screen
-    app.send("q")
+    app.quit()
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
     assert saved["buses"] == [{"name": "OBS", "label": "OBS"}]
@@ -139,7 +145,7 @@ def test_patch_tab_shows_both_views(app):
     app.expect("column view")
     app.send("p")
     app.expect("Ports:")
-    app.send("q")
+    app.quit()
     assert app.wait_exit() == 0
 
 
@@ -149,8 +155,7 @@ def test_mixer_enter_opens_a_menu_and_card_profile_lands_on_devices(app):
     app.expect("Card profile")
     app.send("\x1bOB" * 4 + "\r")  # default, Mute, Test sound, Rename…, then Card profile…
     app.expect("Hide card")     # Devices, with that card's menu open
-    app.send("q")
-    app.send("q")
+    app.quit()
     assert app.wait_exit() == 0
 
 
@@ -164,7 +169,7 @@ def test_mixer_rename_is_enter_down_enter_type_enter(app, tmp_path):
     app.expect("Restart WirePlumber now")
     app.send("\x1b")           # Esc closes the popover
     app.expect("cancelled")
-    app.send("q")
+    app.quit()
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
     assert list(saved["labels"].values()) == ["Pad"]
@@ -186,7 +191,7 @@ def test_mixer_rename_empty_restores_the_default(app, tmp_path):
     app.expect("Restart WirePlumber now")
     app.send("\x1b")           # Esc closes the popover
     app.expect("cancelled")
-    app.send("q")
+    app.quit()
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
     assert saved["labels"] == {}
@@ -205,10 +210,10 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
         app.send("\r" + "\x1bOB" * pc.THEME_ROW + "\r\x1bOD")  # into it, the theme row, open it, left: light → dark
         app.expect("theme: dark")
         app.send("\r")  # Enter keeps it; leaving mid-edit would put light back
-        assert json.loads((tmp_path / "pipewrench" / "ui.json").read_text()) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
+        assert json.loads((tmp_path / "pipewrench" / "ui.json").read_text()) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "meters": True, "shortcuts": True, "keys": {}}
         app.send(tab("patch"))
         app.expect("Destinations")
-        app.send("q")
+        app.quit()
         assert app.wait_exit() == 0
     finally:
         try:
@@ -228,7 +233,7 @@ def test_crowbar_theme_starts(tmp_path, term):
         app.send(tab("settings"))
         app.send("\x1bOB")  # Preferences
         app.expect("crowbar")
-        app.send("q")
+        app.quit()
         assert app.wait_exit() == 0
     finally:
         try:
@@ -243,7 +248,7 @@ def test_numpad_keys_reach_the_media_bar(app):
     app.expect("Playback")
     app.send("\x1bOj")  # numpad *
     app.expect("no media player found")  # fixtures have no player, so the key got through
-    app.send("q")
+    app.quit()
     assert app.wait_exit() == 0
 
 
@@ -263,7 +268,7 @@ def test_rebind_a_key_in_settings(app, tmp_path):
     app.expect("show hidden: z")
     app.send("\x1bOA\x7f")                   # Mixer · meters, Backspace unbinds
     app.expect("meters: no key")
-    app.send("q")
+    app.quit()
     assert app.wait_exit() == 0
     keys = json.loads((tmp_path / "pipewrench" / "ui.json").read_text())["keys"]
     assert keys == {"devices.show_hidden": "z", "mixer.meters": None}
@@ -281,7 +286,7 @@ def test_volume_at_100_asks_and_dont_ask_again_saves_the_boost(app, tmp_path):
     app.expect("Volume past 100%")
     app.send("\x1bOD\r")                   # ← onto Don't ask again, Enter
     app.expect("boost unlocked")
-    app.send("q")
+    app.quit()
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
     assert saved["boost"] == [rows[i][2].name]

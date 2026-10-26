@@ -103,13 +103,16 @@ def load_ui(path):
             "meter_fall": ui.get("meter_fall") if ui.get("meter_fall") in METER_FALL else 20,
             "peak_hold": ui.get("peak_hold") if ui.get("peak_hold") in PEAK_HOLD else 1.5,
             "volume_bar": ui.get("volume_bar") if isinstance(ui.get("volume_bar"), bool) else True,
+            "meters": ui.get("meters") if isinstance(ui.get("meters"), bool) else True,
+            "shortcuts": ui.get("shortcuts") if isinstance(ui.get("shortcuts"), bool) else True,
             "keys": pk.clean(ui.get("keys"))}
 
 
 def ui_prefs(st):
     """What ui.json keeps, from the live state."""
     return {"theme": st.theme, "meter_fps": st.meter_fps, "meter_fall": st.meter_fall, "peak_hold": st.peak_hold,
-            "volume_bar": st.volume_bar, "keys": pk.overrides(pk.bindings(st.keys))}
+            "volume_bar": st.volume_bar, "meters": st.meters, "shortcuts": st.shortcuts,
+            "keys": pk.overrides(pk.bindings(st.keys))}
 
 
 def save_ui(path, ui):
@@ -366,6 +369,9 @@ class UIState:
     patch_port_col: int = 0      # destination port
     patch_menu: bool = False     # the slot menu under the destination
     patch_menu_cursor: int = 0
+    patch_head: bool = False     # the View line above the columns has the cursor (↑ from the first source)
+    patch_head_menu: bool = False
+    patch_head_cursor: int = 0
     popup: tuple = None          # the open popover: a kind tuple (POPUPS), answered with ←→ and Enter
     popup_button: int = None     # its selected button; None is the kind's default (Cancel, or the only one)
     message: str = ""
@@ -376,6 +382,7 @@ class UIState:
     meter_fall: int = 20         # dB a second
     peak_hold: float = 1.5       # seconds; 0 is off
     volume_bar: bool = True      # the bar under each Mixer channel; off leaves just the %
+    shortcuts: bool = True       # letter shortcut keys; off, everything goes by arrows and Enter (Skrappjaw's A/B, 2026-10-26)
     keys: dict = field(default_factory=dict)  # key binding overrides {action id: key or None} (pwkeys)
     key_capture: str = None      # Settings → Keys: the action id waiting for its new key
     editing: bool = False        # Settings: Enter opened the row's value; ←→ change it (Skrappjaw, 2026-10-25)
@@ -400,7 +407,8 @@ def handle_key(st, key, current, devices=None, patch=None, mixer=None):
     if st.popup:
         return _key_popup(st, key)
     if key == "q":
-        return st, [("quit",)]
+        st.popup, st.popup_button = ("quit",), None
+        return st, []
     if key in ("tab", "btab"):
         st, actions = _leave(st)
         st.tab = TABS[(TABS.index(st.tab) + (1 if key == "tab" else -1)) % len(TABS)]
@@ -412,6 +420,8 @@ def handle_key(st, key, current, devices=None, patch=None, mixer=None):
     if key in MEDIA_KEYS:
         return st, [MEDIA_KEYS[key]]
     if st.tab in pk.SCREENS and not (st.dev_menu or st.mix_menu or st.patch_menu):
+        if not st.shortcuts and pk.is_shortcut(st.tab, key, pk.bindings(st.keys)):
+            return st, []  # shortcut keys are off: every feature is on an arrow + Enter path
         key = pk.translate(st.tab, key, pk.bindings(st.keys))
         if key is None:
             return st, []
@@ -431,19 +441,21 @@ def handle_key(st, key, current, devices=None, patch=None, mixer=None):
 SETTINGS_CATS = [("audio", "Audio"), ("prefs", "Preferences")]
 MENU_W = 15                         # the menu column, its │ included
 CLOCK_BUTTONS_ROW = len(SETTINGS)   # Audio: the clock rows, then Apply · Save · Reset
-CLOCK_BUTTONS = ["Apply", "Save", "Reset"]
+CLOCK_BUTTONS = ["Apply", "Save", "Reset", "Restart"]
 # Preferences: Display (PipeWrench's own rows; they apply at once), then Keys.
 THEME_ROW = 0
 FPS_ROW = THEME_ROW + 1
 FALL_ROW = FPS_ROW + 1
 HOLD_ROW = FALL_ROW + 1
 BAR_ROW = HOLD_ROW + 1
-KEYS_ROW = BAR_ROW + 1     # one row per pwkeys action
+METERS_ROW = BAR_ROW + 1
+SHORTCUTS_ROW = METERS_ROW + 1
+KEYS_ROW = SHORTCUTS_ROW + 1     # one row per pwkeys action
 RESET_KEYS_ROW = KEYS_ROW + len(pk.ACTIONS)
 
 
 PREF_ROWS = {THEME_ROW: "theme", FPS_ROW: "meter_fps", FALL_ROW: "meter_fall", HOLD_ROW: "peak_hold",
-             BAR_ROW: "volume_bar"}
+             BAR_ROW: "volume_bar", METERS_ROW: "meters", SHORTCUTS_ROW: "shortcuts"}
 
 
 def _leave(st):
@@ -453,7 +465,7 @@ def _leave(st):
     dropped = bool(st.pending)
     st.pending, st.editing, st.edit_from, st.key_capture = {}, False, None, None
     st.mix_menu = st.dev_menu = None
-    st.patch_menu = st.patch_ports = False
+    st.patch_menu = st.patch_ports = st.patch_head = st.patch_head_menu = False
     st.settings_focus, st.cursor = "menu", 0
     if dropped:
         st.message = "unapplied changes dropped"
@@ -547,6 +559,9 @@ def _key_audio(st, key, current):
             return _save_clock(st)
         if button == "Reset":
             return _reset_clock(st, current)
+        if button == "Restart":  # restart WirePlumber, after the popover (the R shortcut's arrow path)
+            st.popup, st.popup_button = ("restart",), None
+            return st, []
         return _apply_clock(st, current)
     elif key == "left":
         return _leave(st)
@@ -653,8 +668,9 @@ def _edit_pref(st, key):
 
 
 def _step_pref(st, key):
-    if st.cursor == BAR_ROW:
-        st.volume_bar = not st.volume_bar
+    if st.cursor in (BAR_ROW, METERS_ROW, SHORTCUTS_ROW):  # on/off rows
+        attr = PREF_ROWS[st.cursor]
+        setattr(st, attr, not getattr(st, attr))
         return st, [("save_ui",)]
     if st.cursor in (FPS_ROW, FALL_ROW, HOLD_ROW):
         name, choices = {FPS_ROW: ("meter_fps", METER_FPS), FALL_ROW: ("meter_fall", METER_FALL),
@@ -705,7 +721,8 @@ def _dev_lines(devices, st):
     lines += rows(inv.virtual)
     lines += [("pending", b) for b in devices["pending"]]
     lines.append(("addbus", None))
-    return lines + ([("off", None)] + off if off else [])
+    # View and Actions: every Devices shortcut by arrows and Enter (Skrappjaw, 2026-10-26)
+    return lines + ([("off", None)] + off if off else []) + [("view", None), ("actions", None)]
 
 
 def dev_selectable(devices, st):
@@ -827,6 +844,12 @@ def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer
         side = "src" if kind == "patch_src" else "dst"
         st = dataclasses.replace(st, patch_side=side, patch_menu=False, **{f"patch_{side}": target[1]})
         keys = ["enter"] if event == "double" and side == "dst" else []
+    elif kind == "patch_head":  # a click on the View line opens its menu
+        st = dataclasses.replace(st, patch_head=True, patch_head_menu=False, patch_menu=False)
+        keys = ["enter"]
+    elif kind == "patch_head_item":
+        st = dataclasses.replace(st, patch_head_cursor=target[1])
+        keys = ["enter"]
     elif kind == "patch_cell":
         st = dataclasses.replace(st, patch_src=target[1], patch_dst=target[2], patch_menu=False)
         keys = ["enter"] if event == "double" else []
@@ -910,22 +933,23 @@ def _chip_key(label):
     return {"Enter": "enter", "Esc": "esc", "Space": " "}.get(label) or (label if len(label) == 1 else None)
 
 
-def _bound(items, screen, keys):
-    """A legend with each shortcut chip showing its bound key; unbound or clashing shortcuts drop out."""
+def _bound(items, screen, keys, enabled=True):
+    """A legend with each shortcut chip showing its bound key; unbound or clashing shortcuts drop out, and
+    every shortcut drops out while shortcut keys are off."""
     b, out = pk.bindings(keys), []
     for k, slug in items:
         head, _, rest = k.partition(" ")
         a = next((a for a in pk.ACTIONS if a.screen == screen and a.default == head), None)
         if a is None:
             out.append((k, slug))
-        elif pk.key_for(b, a.id):
+        elif enabled and pk.key_for(b, a.id):
             out.append((pk.key_for(b, a.id) + (" " + rest if rest else ""), slug))
     return out
 
 
 def legend(st):
     items = _legend(st)
-    return _bound(items, st.tab, st.keys) if st.tab in pk.SCREENS and st.keys else items
+    return _bound(items, st.tab, st.keys, st.shortcuts) if st.tab in pk.SCREENS and (st.keys or not st.shortcuts) else items
 
 
 def _legend(st):
@@ -945,6 +969,9 @@ def _legend(st):
         return LEGENDS["keys" if KEYS_ROW <= st.cursor < RESET_KEYS_ROW else "preferences"]
     if st.tab == "settings" and st.cursor == CLOCK_BUTTONS_ROW:
         return LEGENDS["settings buttons"]
+    if st.tab == "patch" and st.patch_head:
+        return ([("↑↓", "choose"), ("Enter", "pick"), ("Esc", "back")] if st.patch_head_menu
+                else [("Enter", "view options"), ("↓", "back to the list")])
     if st.tab == "patch" and st.patch_menu:
         return LEGENDS["patch menu"]
     if st.tab == "patch":
@@ -991,6 +1018,7 @@ POPUPS = {
     "dev_delete_bus": ("Delete bus", [("Delete", "ok"), ("Cancel", "cancel")], 1),
     "dev_profile": ("Switch profile", [("Switch", "ok"), ("Cancel", "cancel")], 1),
     "reset_keys": ("Reset keys", [("Reset", "ok"), ("Cancel", "cancel")], 1),
+    "quit": ("Quit", [("Quit", "ok"), ("Cancel", "cancel")], 1),
     "pw_down": ("PipeWire not answering", [("OK", "close")], 0),
     "vol_boost": ("Volume past 100%", [("Go louder", "go"), ("Don't ask again", "always"), ("Cancel", "cancel")], 2),
 }
@@ -1084,7 +1112,8 @@ def _confirm_question(confirm, devices=None):
     return {"restart": "Restart WirePlumber?",
             "restart_labels": "Restart WirePlumber now to show it? Apps like Discord may lose their audio.",
             "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now.",
-            "reset_keys": "Reset every key to its default?"}[kind]
+            "reset_keys": "Reset every key to its default?",
+            "quit": "Quit PipeWrench?"}[kind]
 
 
 def render_screen(st, current, block, width, height, devices=None, patch=None, mixer=None, media=None,
@@ -1288,6 +1317,9 @@ def _render_prefs(cv, st):
     _display_row(cv, st, HOLD_ROW, "Peak hold", f"{st.peak_hold:g} s" if st.peak_hold else "off",
                  f"a peak marker hangs, then falls {PEAK_FALL} dB/s")
     _display_row(cv, st, BAR_ROW, "Volume bar", "on" if st.volume_bar else "off", "the bar under each Mixer channel")
+    _display_row(cv, st, METERS_ROW, "Meters", "on" if st.meters else "off", "live levels on the Mixer")
+    _display_row(cv, st, SHORTCUTS_ROW, "Shortcut keys", "on" if st.shortcuts else "off",
+                 "letter keys; off, use arrows and Enter")
     cv.add("")
     _render_keys(cv, st)
 
@@ -1295,6 +1327,8 @@ def _render_prefs(cv, st):
 def _render_keys(cv, st):
     """One row per shortcut: its key, * when changed, and why it can't fire when it clashes."""
     cv.add("  Keys", "title")
+    if not st.shortcuts:
+        cv.add("  shortcut keys are off (Display → Shortcut keys); these come back when it's on", "dim")
     b = pk.bindings(st.keys)
     bad = pk.clashes(b)
     for n, a in enumerate(pk.ACTIONS):
@@ -1303,7 +1337,8 @@ def _render_keys(cv, st):
         mark = "*" if b[a.id] != a.default else " "
         note = bad.get(a.id) or ("press a key" if st.key_capture == a.id else "")
         line = f"{'> ' if st.cursor == idx else '  '}{pk.label(a):<34} {k:^5} {mark} {note}".rstrip()
-        row = cv.add(line, "selected" if st.cursor == idx else "alert" if a.id in bad else "normal")
+        row = cv.add(line, "selected" if st.cursor == idx else "dim" if not st.shortcuts
+                     else "alert" if a.id in bad else "normal")
         cv.hit(row, 0, len(line), ("setting", idx))
     line = f"{'> ' if st.cursor == RESET_KEYS_ROW else '  '}Reset all keys"
     row = cv.add(line, "selected" if st.cursor == RESET_KEYS_ROW else "normal")
@@ -1506,6 +1541,10 @@ def _device_line_text(kind, obj, devices, selected):
         return f"  {'MIDI' if kind == 'midi' else kind.title()}", "title"
     if kind == "addbus":
         return f"{prefix}+ Add bus…", "dim"
+    if kind == "view":
+        return f"{prefix}View…", "dim"
+    if kind == "actions":
+        return f"{prefix}Actions…", "dim"
     if kind == "pending":
         return f"{prefix}+ duplex {_fit(obj['label'], 30):<30} pending: A creates it  {obj['name']}", "pending"
     if obj.kind == "midi":  # no state, volume or node of its own: every ALSA MIDI port shares the bridge
@@ -1554,7 +1593,7 @@ def _render_devices(cv, st, devices, body_h):
         if idx is not None:
             n_sel += 1
         if idx == cursor and _menu_target(devices, st) is not None:
-            title = obj.label if kind in ("row", "card") else obj["name"]
+            title = obj.label if kind in ("row", "card") else kind.title() if obj is None else obj["name"]
             lines += _menu_lines(devices, st, title)
             menu_at = len(lines) - 1
     room = max(1, body_h - 2)  # blank line and note sit below
@@ -1973,12 +2012,49 @@ def _key_slot_menu(st, key, g, s, d):
     return st, [("patch_cmds", pp.slot_cmds(g, s, runs[st.patch_menu_cursor]))]
 
 
+def patch_head_items(st):
+    """[(label, op)] for the Patch View menu: what g, m and p do, by arrows and Enter (Skrappjaw, 2026-10-26)."""
+    return [("Column view" if st.patch_view == "grid" else "Grid view", ("grid",)),
+            (f"Monitors: {'on' if st.patch_monitors else 'off'}", ("monitors",)), ("Port by port", ("ports",)),
+            ("Back", ("back",))]
+
+
+def _key_patch_head(st, key):
+    if not st.patch_head_menu:
+        if key in ("down", "esc"):
+            st.patch_head = False
+        elif key == "enter":
+            st.patch_head_menu, st.patch_head_cursor = True, 0
+        return st, []
+    items = patch_head_items(st)
+    if key in ("up", "down"):
+        st.patch_head_cursor = max(0, min(len(items) - 1, st.patch_head_cursor + (1 if key == "down" else -1)))
+        return st, []
+    st.patch_head_menu = False
+    if key != "enter":
+        return st, []
+    op = items[st.patch_head_cursor][1][0]
+    if op == "grid":
+        st.patch_view, st.patch_ports = ("cols" if st.patch_view == "grid" else "grid"), False
+    elif op == "monitors":
+        st.patch_monitors = not st.patch_monitors
+    elif op == "ports":
+        st.patch_head, st.patch_ports, st.patch_port_row, st.patch_port_col = False, True, 0, 0
+    return st, []
+
+
 def _key_patch(st, key, g):
     if g is None:
         return st, []
     if st.patch_menu:
         _, s, d = _patch_pair(g, st)
         return _key_slot_menu(st, key, g, s, d)
+    if st.patch_head:
+        return _key_patch_head(st, key)
+    if (key == "up" and st.patch_src == 0 and not st.patch_ports
+            and (st.patch_view == "grid" or st.patch_side == "src")):
+        st.patch_head, st.patch_head_cursor = True, 0  # the View line: g m p by arrows and Enter
+        return st, []
     if key == "g":
         st.patch_view = "grid" if st.patch_view == "cols" else "cols"
         st.patch_ports = False
@@ -2071,6 +2147,18 @@ def _render_patch(cv, st, g, body_h):
         cv.add("  no audio sources or destinations", "dim")
         return
     room = max(1, body_h - 2)  # blank line and pair status sit below
+    head = (f"{'> ' if st.patch_head else '  '}View: {'grid' if st.patch_view == 'grid' else 'columns'}"
+            f" · monitors {'on' if st.patch_monitors else 'off'}{' · port by port' if st.patch_ports else ''}")
+    row = cv.add(head, "anchor" if st.patch_head_menu else "selected" if st.patch_head else "dim")
+    cv.hit(row, 0, len(head), ("patch_head",))
+    room -= 1
+    if st.patch_head_menu:
+        for i, (label, _) in enumerate(patch_head_items(st)):
+            line = f"    {'> ' if i == st.patch_head_cursor else '  '}{label}"
+            cv.hit(cv.add(line, "selected" if i == st.patch_head_cursor else "normal"), 0, len(line),
+                   ("patch_head_item", i))
+            room -= 1
+    room = max(1, room)
     if st.patch_ports:
         _render_port_matrix(cv, st, g, s, d, room)
     elif st.patch_view == "grid":
@@ -2228,6 +2316,8 @@ def _menu_target(devices, st):
             return k, obj
         if k == kind == "pending" and obj["name"] == ref:
             return k, obj
+        if k == kind and kind in ("view", "actions"):
+            return k, obj
     return None
 
 
@@ -2247,12 +2337,19 @@ def dev_menu_items(devices, st):
             n = len(hidden_chans)
             items.append((f"Unhide {n} channel{'s' if n > 1 else ''}", ("unhide", hidden_chans)))
         return items + [("Back", ("back",))]
+    if kind == "view":
+        return [(f"Show hidden: {'on' if st.dev_show_hidden else 'off'}", ("toggle", "dev_show_hidden")),
+                (f"Monitors: {'on' if st.dev_monitors else 'off'}", ("toggle", "dev_monitors")), ("Back", ("back",))]
+    if kind == "actions":
+        return [("Preview files", ("preview",)), ("Apply files", ("apply",)),
+                ("Restart WirePlumber…", ("restart",)), ("Back", ("back",))]
     if kind == "pending":
         return [("Create now", ("create", obj["name"])), ("Rename…", ("rename", obj["name"], obj["label"])),
                 ("Delete bus", ("delete", obj["name"])), ("Back", ("back",))]
     # A bus (the only row with a cursor): default, rename and test live on the Mixer.
-    return [("Unhide" if obj.name in hidden else "Hide", ("hide", obj.name)), ("Delete bus", ("delete", obj.name)),
-            ("Back", ("back",))]
+    test = [("Test noise", ("test", obj.name))] if obj.direction in ("out", "duplex") else []
+    return test + [("Unhide" if obj.name in hidden else "Hide", ("hide", obj.name)),
+                   ("Delete bus", ("delete", obj.name)), ("Back", ("back",))]
 
 
 def _open_menu(st, kind, obj):
@@ -2260,6 +2357,8 @@ def _open_menu(st, kind, obj):
         st.dev_menu = ("card", obj.id)
         names = [p.name for p in obj.profiles]
         st.dev_menu_cursor = names.index(obj.active) if obj.active in names else 0
+    elif kind in ("view", "actions"):
+        st.dev_menu, st.dev_menu_cursor = (kind, None), 0
     else:
         st.dev_menu = (kind, obj.name if kind == "row" else obj["name"])
         st.dev_menu_cursor = 0
@@ -2303,6 +2402,14 @@ def _key_menu(st, key, devices):
             return st, []
     if op[0] == "test":
         return st, [("dev_test", op[1])]
+    if op[0] == "toggle":
+        setattr(st, op[1], not getattr(st, op[1]))
+        return st, []
+    if op[0] in ("preview", "apply"):
+        return st, [(f"dev_{op[0]}",)]
+    if op[0] == "restart":
+        st.popup, st.popup_button = ("restart",), None
+        return st, []
     if op[0] == "hide":
         return st, [("dev_hide", op[1])]
     if op[0] == "unhide":

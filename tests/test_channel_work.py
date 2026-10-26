@@ -103,7 +103,7 @@ def test_card_profile_jumps_to_card_with_menu_open():
 
 def test_cursor_skips_channels():
     kinds = {kind for kind, _ in pc.dev_selectable(dv(), pc.UIState(tab="devices"))}
-    assert kinds <= {"card", "row", "pending", "addbus"}
+    assert kinds <= {"card", "row", "pending", "addbus", "view", "actions"}
     rows = [obj for kind, obj in pc.dev_selectable(dv(), pc.UIState(tab="devices")) if kind == "row"]
     assert rows and all(r.kind == "virtual" for r in rows)
 
@@ -126,7 +126,7 @@ def test_bus_menu_is_hide_and_delete():
     st = pc.UIState(tab="devices")
     i = next(n for n, (k, o) in enumerate(pc.dev_selectable(dv(), st)) if k == "row" and o.name == "MUSIC")
     st, _ = dkey(pc.UIState(tab="devices", dev_cursor=i), "enter")
-    assert [label for label, _ in pc.dev_menu_items(dv(), st)] == ["Hide", "Delete bus", "Back"]
+    assert [label for label, _ in pc.dev_menu_items(dv(), st)] == ["Test noise", "Hide", "Delete bus", "Back"]
 
 
 def test_card_menu_offers_unhide_channels_from_old_configs():

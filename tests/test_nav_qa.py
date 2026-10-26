@@ -113,9 +113,9 @@ def walk(seed, n):
     return steps
 
 
-def run(steps, start_tab):
+def run(steps, start_tab, shortcuts=True):
     """None if every step holds, else (index, message)."""
-    st = pc.UIState(tab=start_tab)
+    st = pc.UIState(tab=start_tab, shortcuts=shortcuts)
     for i, step in enumerate(steps):
         width = WIDTHS[i % len(WIDTHS)]
         before = st
@@ -147,18 +147,18 @@ def run(steps, start_tab):
     return None
 
 
-def shrink(steps, start_tab):
+def shrink(steps, start_tab, shortcuts=True):
     """Drop steps one at a time while the walk still fails, for a short reproduction."""
-    found = run(steps, start_tab)
+    found = run(steps, start_tab, shortcuts)
     steps = steps[:found[0] + 1]
     i = 0
     while i < len(steps):
         trial = steps[:i] + steps[i + 1:]
-        if trial and run(trial, start_tab):
+        if trial and run(trial, start_tab, shortcuts):
             steps = trial
         else:
             i += 1
-    return steps, run(steps, start_tab)
+    return steps, run(steps, start_tab, shortcuts)
 
 
 @pytest.mark.parametrize("start_tab", pc.TABS)
@@ -168,3 +168,12 @@ def test_random_navigation_keeps_every_invariant(seed, start_tab):
     if run(steps, start_tab):
         short, (at, why) = shrink(steps, start_tab)
         pytest.fail(f"{why} after {len(short)} steps from {start_tab}: {short}")
+
+
+@pytest.mark.parametrize("start_tab", pc.TABS)
+def test_random_navigation_with_shortcut_keys_off(start_tab):
+    # Skrappjaw's A/B, 2026-10-26: with letter shortcuts off, nothing traps the walk and every invariant holds.
+    steps = walk(700 + pc.TABS.index(start_tab), 400)
+    if run(steps, start_tab, shortcuts=False):
+        short, (at, why) = shrink(steps, start_tab, shortcuts=False)
+        pytest.fail(f"{why} after {len(short)} steps from {start_tab} (shortcuts off): {short}")
