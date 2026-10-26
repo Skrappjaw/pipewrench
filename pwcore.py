@@ -642,8 +642,9 @@ def _key_settings_menu(st, key):
 
 def _key_audio(st, key, current):
     st.cursor = max(0, min(CLOCK_BUTTONS_ROW, st.cursor))
-    if st.editing:
+    if st.editing and st.cursor < CLOCK_BUTTONS_ROW:
         return _edit_clock(st, key, current)
+    _end_edit(st)
     if key in ("up", "down"):
         st.cursor = max(0, min(CLOCK_BUTTONS_ROW, st.cursor + (1 if key == "down" else -1)))
     elif st.cursor == CLOCK_BUTTONS_ROW and key == "left" and st.clock_button == 0:
@@ -725,8 +726,9 @@ def _reset_clock(st, current):
 
 def _key_prefs(st, key, current):
     st.cursor = max(0, min(RESET_KEYS_ROW, st.cursor))
-    if st.editing:
+    if st.editing and st.cursor in PREF_ROWS:
         return _edit_pref(st, key)
+    _end_edit(st)
     if key in ("up", "down"):
         st.cursor = max(0, min(RESET_KEYS_ROW, st.cursor + (1 if key == "down" else -1)))
     elif key == "left":
@@ -911,8 +913,8 @@ def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer
         if not (st.editing and target[1] == st.cursor):
             st = _begin_edit(_end_edit(dataclasses.replace(st, cursor=target[1], settings_focus="pane")))
         keys = ["right" if target[2] > 0 else "left"] if event in ("click", "double") else []
-    elif kind == "clock_button":  # a button: one click presses it
-        st = dataclasses.replace(st, cursor=CLOCK_BUTTONS_ROW, clock_button=target[1], settings_focus="pane")
+    elif kind == "clock_button":  # a button: one click presses it, and closes an open row first
+        st = _end_edit(dataclasses.replace(st, cursor=CLOCK_BUTTONS_ROW, clock_button=target[1], settings_focus="pane"))
         keys = ["enter"] if event in ("click", "double") else []
     elif kind == "key":  # a legend chip
         keys = [target[1]] if event in ("click", "double") else []

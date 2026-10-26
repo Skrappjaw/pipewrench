@@ -14,8 +14,9 @@ guide is about using the screen.
 
 ![The Mixer](guide/mixer.png)
 
-- **Tabs** along the top: Mixer, Devices, Patch, Settings, Top, About. Switch with `Tab`, the number
-  keys `1`–`6`, or a click.
+- **Tabs** along the top: Mixer, Devices, Patch, Settings, Top, About. Switch with `Tab` (`Shift+Tab`
+  goes back), the number keys `1`–`6`, or a click. Leaving a tab resets it: open menus close and
+  unapplied Settings changes are dropped, so a tab always opens clean.
 - **The keys box** at the bottom lists every key the current view takes. Each key is a chip, and
   clicking a single-key chip presses it.
 - **The status line** under it shows what just happened, or a y/n question. Any key other than `y`
@@ -204,8 +205,12 @@ only. Enter links or unlinks the port under the cursor.
 ## Settings
 
 A menu on the left picks the category, and the category opens on the right. Settings opens on the
-menu: ↑↓ picks **Audio** or **Preferences**, and Enter or → goes into it. Esc comes back to the menu,
-once any unapplied change has been reverted. A click on a category opens it.
+menu: ↑↓ picks **Audio** or **Preferences**, and Enter or → goes into it. ← or Esc comes back to the
+menu, and coming back drops any unapplied change. A click on a category opens it.
+
+A value never changes on a stray arrow: **Enter opens a row**, then ←→ change it. Enter applies (or keeps)
+it, Esc puts the row back, and ↑↓ close it, keeping the change. A tap on a row's ◀ ▶ opens it and steps it
+in one go.
 
 ![Settings, with a realtime problem](guide/settings.png)
 
@@ -213,8 +218,10 @@ once any unapplied change has been reverted. A click on a category opens it.
 
 #### Clock
 
-PipeWire's sample rate and buffer sizes. ←→ changes a value, marked `*` until applied. Smaller
-buffers mean less latency and more risk of dropouts. **Force buffer size** is the one to change for
+PipeWire's sample rate and buffer sizes. An open row's change is marked `*` until applied. Smaller
+buffers mean less latency and more risk of dropouts. Each buffer row shows its latency at the rate in
+use, and the rate row the latency of the buffer in use: one buffer's period, buffer ÷ rate (128 at 48k
+is 2.67 ms; 128 at 192k is 0.67 ms). It's not the round trip, which adds the interface's own buffers. **Force buffer size** is the one to change for
 tracking (128 or lower) versus mixing (1024).
 
 Below the rows, each sound card that's on lists the rates it supports and the rate it's running at,
@@ -228,7 +235,7 @@ kernel, and only USB interfaces report one; other cards say `not reported`. When
 
 Under the clock rows are three buttons. ↓ to their row, ←→ picks one, and Enter or a click presses it:
 
-- **Apply** sets the changes live, now. Enter on a clock row does the same, and Esc reverts.
+- **Apply** sets the changes live, now. Enter on an open clock row does the same, and Esc reverts.
 - **Save** keeps the live clock for the next time PipeWire starts (`s` saves from anywhere in
   Settings). It writes to PipeWrench's PipeWire file, `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf`,
   and never restarts anything. A forced rate or buffer is saved as PipeWire's default, so apps can still
@@ -259,7 +266,8 @@ green:
 
 ### Preferences
 
-PipeWrench's own settings. They apply at once and are kept in `~/.config/pipewrench/ui.json`.
+PipeWrench's own settings. Open a row with Enter; ←→ then change it live (a theme shows at once), Enter
+keeps it and Esc puts it back. They're kept in `~/.config/pipewrench/ui.json`.
 
 ![Settings → Preferences](guide/settings-preferences.png)
 

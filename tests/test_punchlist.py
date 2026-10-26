@@ -204,3 +204,12 @@ def test_clicking_a_tab_or_category_resets_too():
     row, c0, _ = next((r, a, b) for r, a, b, t in hits if t == ("settings_cat", "prefs"))
     left, _ = pc.handle_mouse(st, hits, row, c0, "click", CUR)
     assert left.settings_cat == "prefs" and left.pending == {} and not left.editing
+
+
+def test_tapping_a_clock_button_while_editing_ends_the_edit():
+    """Found by the QA sweep: an open row plus a tap on Save crashed (IndexError)."""
+    st, _ = key(S(cursor=FORCE_Q), "enter")
+    lines, hits = pc.render_screen(st, CUR, None, 100, 50)
+    row, c0, _ = next((r, a, b) for r, a, b, t in hits if t == ("clock_button", 1))
+    st, actions = pc.handle_mouse(st, hits, row, c0, "click", CUR)
+    assert not st.editing and actions == [("save_clock",)]
