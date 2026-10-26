@@ -113,9 +113,9 @@ def walk(seed, n):
     return steps
 
 
-def run(steps, start_tab, shortcuts=True):
+def run(steps, start_tab, key_box=True):
     """None if every step holds, else (index, message)."""
-    st = pc.UIState(tab=start_tab, shortcuts=shortcuts)
+    st = pc.UIState(tab=start_tab, key_box=key_box)
     for i, step in enumerate(steps):
         width = WIDTHS[i % len(WIDTHS)]
         before = st
@@ -125,7 +125,7 @@ def run(steps, start_tab, shortcuts=True):
                 k = step[1]
                 st, raw = press(st, k)
             elif step[0] == "chip":
-                keys = [pc._chip_key(label) for label, _ in pc.legend(st)]
+                keys = [pc._chip_key(label) for label, _ in pc.legend(st)] if st.key_box else KEYS  # no box: no chips
                 keys = [k for k in keys if k]
                 k = keys[int(step[1] * len(keys))] if keys else "esc"
                 st, raw = press(st, k)
@@ -147,18 +147,18 @@ def run(steps, start_tab, shortcuts=True):
     return None
 
 
-def shrink(steps, start_tab, shortcuts=True):
+def shrink(steps, start_tab, key_box=True):
     """Drop steps one at a time while the walk still fails, for a short reproduction."""
-    found = run(steps, start_tab, shortcuts)
+    found = run(steps, start_tab, key_box)
     steps = steps[:found[0] + 1]
     i = 0
     while i < len(steps):
         trial = steps[:i] + steps[i + 1:]
-        if trial and run(trial, start_tab, shortcuts):
+        if trial and run(trial, start_tab, key_box):
             steps = trial
         else:
             i += 1
-    return steps, run(steps, start_tab, shortcuts)
+    return steps, run(steps, start_tab, key_box)
 
 
 @pytest.mark.parametrize("start_tab", pc.TABS)
@@ -171,9 +171,9 @@ def test_random_navigation_keeps_every_invariant(seed, start_tab):
 
 
 @pytest.mark.parametrize("start_tab", pc.TABS)
-def test_random_navigation_with_shortcut_keys_off(start_tab):
-    # Skrappjaw's A/B, 2026-10-26: with letter shortcuts off, nothing traps the walk and every invariant holds.
+def test_random_navigation_with_the_keys_box_hidden(start_tab):
+    # Skrappjaw, 2026-10-26: with the Keys box hidden, nothing traps the walk and every invariant holds.
     steps = walk(700 + pc.TABS.index(start_tab), 400)
-    if run(steps, start_tab, shortcuts=False):
-        short, (at, why) = shrink(steps, start_tab, shortcuts=False)
-        pytest.fail(f"{why} after {len(short)} steps from {start_tab} (shortcuts off): {short}")
+    if run(steps, start_tab, key_box=False):
+        short, (at, why) = shrink(steps, start_tab, key_box=False)
+        pytest.fail(f"{why} after {len(short)} steps from {start_tab} (Keys box hidden): {short}")

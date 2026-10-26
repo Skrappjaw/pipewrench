@@ -210,7 +210,7 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
         app.send("\r" + "\x1bOB" * pc.THEME_ROW + "\r\x1bOD")  # into it, the theme row, open it, left: light → dark
         app.expect("theme: dark")
         app.send("\r")  # Enter keeps it; leaving mid-edit would put light back
-        assert json.loads((tmp_path / "pipewrench" / "ui.json").read_text()) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "meters": True, "shortcuts": True, "keys": {}}
+        assert json.loads((tmp_path / "pipewrench" / "ui.json").read_text()) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "meters": True, "key_box": True, "keys": {}}
         app.send(tab("patch"))
         app.expect("Destinations")
         app.quit()

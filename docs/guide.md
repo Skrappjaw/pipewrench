@@ -18,7 +18,7 @@ guide is about using the screen.
   goes back), the number keys `1`–`6`, or a click. Leaving a tab resets it: open menus close and
   unapplied Settings changes are dropped, so a tab always opens clean.
 - **The keys box** at the bottom lists every key the current view takes. Each key is a chip, and
-  clicking a single-key chip presses it.
+  clicking a single-key chip presses it. Settings → Preferences → **Keys box** hides it; the keys still work.
 - **The status band** under it shows what just happened: `✓` on green when it worked, `✖` on red when it
   didn't. It stays until the next message.
 - **Questions and warnings** open in a box over the screen and stay until you answer: ←→ pick a
@@ -31,7 +31,6 @@ guide is about using the screen.
   value, so scrolling a long list is safe.
 - `q` quits from anywhere, after asking (Cancel is preselected).
 - **Letter keys are shortcuts.** Everything they do also has an arrow + Enter path, given in each table.
-  Settings → Preferences → **Shortcut keys** turns them off.
 
 Menus open with Enter and close with Esc (or any other key). Anything that moves audio for every app,
 like changing the default device, goes through a menu so a stray key can't do it.
@@ -298,9 +297,9 @@ keeps it and Esc puts it back. They're kept in `~/.config/pipewrench/ui.json`.
 
 Theme (dark, light, crowbar orange, Pipe Boy in green, amber, cyan or white, Vaporware, Pipecraft, or
 pipeOS-lite and pipeOS-dark), the meters' frame rate, fall speed and peak hold, the
-Mixer's volume bar, **Meters** (the Mixer's live levels, what `v` toggles) and **Shortcut keys**. With
-shortcut keys off, letter keys do nothing and drop out of the Keys box; arrows, Enter, Esc, Space, Tab, `1`–`6`,
-the media keys and `q` still work, and every feature has an arrow + Enter path.
+Mixer's volume bar, **Meters** (the Mixer's live levels, what `v` toggles) and **Keys box**. With the
+Keys box off, the key list at the bottom of the screen is gone and the view gets those lines. Every key,
+letter shortcuts included, still works.
 
 **Pipe Boy** is one phosphor colour, after Fallout's Pip-Boy: green, amber, cyan or white. With no other
 colours, status shows by style: good is bold, waiting is underlined, and a problem is a pale block.
@@ -337,7 +336,7 @@ status band says how many it found or what's wrong with one. Everything is in **
 
 #### Keys
 
-Every letter shortcut, one row each, with the key it's on (greyed while shortcut keys are off). Enter on a row, then press the new key.
+Every letter shortcut, one row each, with the key it's on. Enter on a row, then press the new key.
 Backspace (or Delete) takes the key off, so the shortcut does nothing; Esc cancels. **Reset all keys**
 puts every shortcut back after asking.
 

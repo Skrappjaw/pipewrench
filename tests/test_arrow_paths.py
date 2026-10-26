@@ -1,5 +1,5 @@
 """Every letter shortcut's job has an arrow + Enter path, so shortcut keys can be off (Skrappjaw, 2026-10-26: "good
-navigation doesnt need them"). These tests use only ↑↓←→, Enter and Esc, with shortcuts off."""
+navigation doesnt need them"). These tests use only ↑↓←→, Enter and Esc, with the Keys box hidden."""
 import json
 from pathlib import Path
 
@@ -33,7 +33,7 @@ def dev_menu(st):
 
 
 def devices(**kw):
-    return pc.UIState(tab="devices", shortcuts=False, **kw)
+    return pc.UIState(tab="devices", key_box=False, **kw)
 
 
 def pick(st, label, menu=dev_menu, **kw):
@@ -78,7 +78,7 @@ def test_a_bus_menu_offers_test_noise():
 # --- Patch ------------------------------------------------------------------------------------------
 
 def patch(**kw):
-    return pc.UIState(tab="patch", shortcuts=False, **kw)
+    return pc.UIState(tab="patch", key_box=False, **kw)
 
 
 def head_menu(st):
@@ -109,7 +109,7 @@ def test_patch_view_menu_switches_grid_monitors_and_ports():
 
 def test_restart_is_a_clock_button():
     st = pc.UIState(tab="settings", settings_cat="audio", settings_focus="pane", cursor=pc.CLOCK_BUTTONS_ROW,
-                    shortcuts=False)
+                    key_box=False)
     assert pc.CLOCK_BUTTONS[-1] == "Restart"
     st, _ = key(st, *["right"] * len(pc.CLOCK_BUTTONS), "enter")
     assert st.popup == ("restart",)

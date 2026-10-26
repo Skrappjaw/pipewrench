@@ -104,14 +104,14 @@ def load_ui(path):
             "peak_hold": ui.get("peak_hold") if ui.get("peak_hold") in PEAK_HOLD else 1.5,
             "volume_bar": ui.get("volume_bar") if isinstance(ui.get("volume_bar"), bool) else True,
             "meters": ui.get("meters") if isinstance(ui.get("meters"), bool) else True,
-            "shortcuts": ui.get("shortcuts") if isinstance(ui.get("shortcuts"), bool) else True,
+            "key_box": ui.get("key_box") if isinstance(ui.get("key_box"), bool) else True,
             "keys": pk.clean(ui.get("keys"))}
 
 
 def ui_prefs(st):
     """What ui.json keeps, from the live state."""
     return {"theme": st.theme, "meter_fps": st.meter_fps, "meter_fall": st.meter_fall, "peak_hold": st.peak_hold,
-            "volume_bar": st.volume_bar, "meters": st.meters, "shortcuts": st.shortcuts,
+            "volume_bar": st.volume_bar, "meters": st.meters, "key_box": st.key_box,
             "keys": pk.overrides(pk.bindings(st.keys))}
 
 
@@ -382,7 +382,7 @@ class UIState:
     meter_fall: int = 20         # dB a second
     peak_hold: float = 1.5       # seconds; 0 is off
     volume_bar: bool = True      # the bar under each Mixer channel; off leaves just the %
-    shortcuts: bool = True       # letter shortcut keys; off, everything goes by arrows and Enter (Skrappjaw's A/B, 2026-10-26)
+    key_box: bool = True         # the key list at the bottom of the screen; off hides it, keys still work (Skrappjaw, 2026-10-26)
     keys: dict = field(default_factory=dict)  # key binding overrides {action id: key or None} (pwkeys)
     key_capture: str = None      # Settings → Keys: the action id waiting for its new key
     editing: bool = False        # Settings: Enter opened the row's value; ←→ change it (Skrappjaw, 2026-10-25)
@@ -420,8 +420,6 @@ def handle_key(st, key, current, devices=None, patch=None, mixer=None):
     if key in MEDIA_KEYS:
         return st, [MEDIA_KEYS[key]]
     if st.tab in pk.SCREENS and not (st.dev_menu or st.mix_menu or st.patch_menu):
-        if not st.shortcuts and pk.is_shortcut(st.tab, key, pk.bindings(st.keys)):
-            return st, []  # shortcut keys are off: every feature is on an arrow + Enter path
         key = pk.translate(st.tab, key, pk.bindings(st.keys))
         if key is None:
             return st, []
@@ -449,13 +447,13 @@ FALL_ROW = FPS_ROW + 1
 HOLD_ROW = FALL_ROW + 1
 BAR_ROW = HOLD_ROW + 1
 METERS_ROW = BAR_ROW + 1
-SHORTCUTS_ROW = METERS_ROW + 1
-KEYS_ROW = SHORTCUTS_ROW + 1     # one row per pwkeys action
+KEY_BOX_ROW = METERS_ROW + 1
+KEYS_ROW = KEY_BOX_ROW + 1     # one row per pwkeys action
 RESET_KEYS_ROW = KEYS_ROW + len(pk.ACTIONS)
 
 
 PREF_ROWS = {THEME_ROW: "theme", FPS_ROW: "meter_fps", FALL_ROW: "meter_fall", HOLD_ROW: "peak_hold",
-             BAR_ROW: "volume_bar", METERS_ROW: "meters", SHORTCUTS_ROW: "shortcuts"}
+             BAR_ROW: "volume_bar", METERS_ROW: "meters", KEY_BOX_ROW: "key_box"}
 
 
 def _leave(st):
@@ -668,7 +666,7 @@ def _edit_pref(st, key):
 
 
 def _step_pref(st, key):
-    if st.cursor in (BAR_ROW, METERS_ROW, SHORTCUTS_ROW):  # on/off rows
+    if st.cursor in (BAR_ROW, METERS_ROW, KEY_BOX_ROW):  # on/off rows
         attr = PREF_ROWS[st.cursor]
         setattr(st, attr, not getattr(st, attr))
         return st, [("save_ui",)]
@@ -933,23 +931,22 @@ def _chip_key(label):
     return {"Enter": "enter", "Esc": "esc", "Space": " "}.get(label) or (label if len(label) == 1 else None)
 
 
-def _bound(items, screen, keys, enabled=True):
-    """A legend with each shortcut chip showing its bound key; unbound or clashing shortcuts drop out, and
-    every shortcut drops out while shortcut keys are off."""
+def _bound(items, screen, keys):
+    """A legend with each shortcut chip showing its bound key; unbound or clashing shortcuts drop out."""
     b, out = pk.bindings(keys), []
     for k, slug in items:
         head, _, rest = k.partition(" ")
         a = next((a for a in pk.ACTIONS if a.screen == screen and a.default == head), None)
         if a is None:
             out.append((k, slug))
-        elif enabled and pk.key_for(b, a.id):
+        elif pk.key_for(b, a.id):
             out.append((pk.key_for(b, a.id) + (" " + rest if rest else ""), slug))
     return out
 
 
 def legend(st):
     items = _legend(st)
-    return _bound(items, st.tab, st.keys, st.shortcuts) if st.tab in pk.SCREENS and (st.keys or not st.shortcuts) else items
+    return _bound(items, st.tab, st.keys) if st.tab in pk.SCREENS and st.keys else items
 
 
 def _legend(st):
@@ -1130,7 +1127,7 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
         cv.hit(row, c0, c1, ("tab", tab))
     cv.add(f" {st.pw_down} ".center(width, "─")[:width] if st.pw_down else "─" * width,
            "alert" if st.pw_down else "dim")
-    footer, chips = _key_box(legend(st), width)
+    footer, chips = _key_box(legend(st), width) if st.key_box else ([], [])  # hidden: the body gets its lines
     body_h = height - len(cv.lines) - 2 - len(footer)  # the now-playing bar and the status line
     if st.tab == "mixer":
         _render_mixer(cv, st, mixer, body_h)
@@ -1318,8 +1315,8 @@ def _render_prefs(cv, st):
                  f"a peak marker hangs, then falls {PEAK_FALL} dB/s")
     _display_row(cv, st, BAR_ROW, "Volume bar", "on" if st.volume_bar else "off", "the bar under each Mixer channel")
     _display_row(cv, st, METERS_ROW, "Meters", "on" if st.meters else "off", "live levels on the Mixer")
-    _display_row(cv, st, SHORTCUTS_ROW, "Shortcut keys", "on" if st.shortcuts else "off",
-                 "letter keys; off, use arrows and Enter")
+    _display_row(cv, st, KEY_BOX_ROW, "Keys box", "on" if st.key_box else "off",
+                 "the key list at the bottom of the screen")
     cv.add("")
     _render_keys(cv, st)
 
@@ -1327,8 +1324,6 @@ def _render_prefs(cv, st):
 def _render_keys(cv, st):
     """One row per shortcut: its key, * when changed, and why it can't fire when it clashes."""
     cv.add("  Keys", "title")
-    if not st.shortcuts:
-        cv.add("  shortcut keys are off (Display → Shortcut keys); these come back when it's on", "dim")
     b = pk.bindings(st.keys)
     bad = pk.clashes(b)
     for n, a in enumerate(pk.ACTIONS):
@@ -1337,8 +1332,7 @@ def _render_keys(cv, st):
         mark = "*" if b[a.id] != a.default else " "
         note = bad.get(a.id) or ("press a key" if st.key_capture == a.id else "")
         line = f"{'> ' if st.cursor == idx else '  '}{pk.label(a):<34} {k:^5} {mark} {note}".rstrip()
-        row = cv.add(line, "selected" if st.cursor == idx else "dim" if not st.shortcuts
-                     else "alert" if a.id in bad else "normal")
+        row = cv.add(line, "selected" if st.cursor == idx else "alert" if a.id in bad else "normal")
         cv.hit(row, 0, len(line), ("setting", idx))
     line = f"{'> ' if st.cursor == RESET_KEYS_ROW else '  '}Reset all keys"
     row = cv.add(line, "selected" if st.cursor == RESET_KEYS_ROW else "normal")

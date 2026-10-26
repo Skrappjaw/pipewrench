@@ -111,11 +111,6 @@ def translate(screen, key, b):
     return key
 
 
-def is_shortcut(screen, key, b):
-    """Is this key a letter shortcut on this screen, bound or by default?"""
-    return key in active(screen, b) or any(a.screen == screen and a.default == key for a in ACTIONS)
-
-
 def key_for(b, action_id):
     """The key shown for an action in the legend, or None when it's unbound or its binding can't fire."""
     a, k = BY_ID[action_id], b.get(action_id)
