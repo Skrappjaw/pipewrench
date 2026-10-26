@@ -86,6 +86,7 @@ class Card:
     profiles: list
     active: str
     rows: list = field(default_factory=list)
+    alsa_card: int = None     # the kernel's card number (api.alsa.card), for pwrates
 
 
 @dataclass
@@ -292,7 +293,14 @@ def _card(obj):
     active = next((x.get("name") for x in params.get("Profile") or [] if isinstance(x, dict)), None)
     return Card(id=obj["id"], name=p.get("device.name", str(obj["id"])),
                 label=p.get("device.description") or p.get("device.nick") or p.get("device.name", str(obj["id"])),
-                profiles=profiles, active=active)
+                profiles=profiles, active=active, alsa_card=_int_or_none(p.get("api.alsa.card")))
+
+
+def _int_or_none(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def _sort(rows):

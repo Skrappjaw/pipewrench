@@ -1,0 +1,40 @@
+BOSS GCS-8 at usb-0000:00:14.0-6.2.2, high speed : USB Audio
+
+Playback:
+  Status: Running
+    Interface = 1
+    Altset = 1
+    Packet Size = 396
+    Momentary freq = 48000 Hz (0x6.0000)
+  Interface 1
+    Altset 1
+    Format: FLOAT_LE
+    Channels: 14
+    Endpoint: 0x0d (13 OUT) (ASYNC)
+    Rates: 48000
+    Data packet interval: 125 us
+    Bits: 32
+    Channel map: FL FR FC LFE RL RR FLC FRC RC SL SR TC -- --
+    Sync Endpoint: 0x8e (14 IN)
+    Sync EP Interface: 2
+    Sync EP Altset: 1
+    Implicit Feedback Mode: Yes
+
+Capture:
+  Status: Running
+    Interface = 2
+    Altset = 1
+    Packet Size = 564
+    Momentary freq = 48000 Hz (0x6.0000)
+  Interface 2
+    Altset 1
+    Format: FLOAT_LE
+    Channels: 20
+    Endpoint: 0x8e (14 IN) (ASYNC)
+    Rates: 48000
+    Data packet interval: 125 us
+    Bits: 32
+    Sync Endpoint: 0x0d (13 OUT)
+    Sync EP Interface: 1
+    Sync EP Altset: 1
+    Implicit Feedback Mode: Yes

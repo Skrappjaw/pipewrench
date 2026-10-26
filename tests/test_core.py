@@ -126,7 +126,9 @@ def test_validate_forced_buffer_outside_range_warns():
 def test_validate_rate_not_allowed_warns():
     cur = pc.parse_settings(settings_text())
     assert any("allowed" in w for w in pc.validate(cur, {"clock.force-rate": 96000}))
-    assert pc.validate(cur, {"clock.force-rate": 48000}) == []
+    # in allowed rates, device rates not read: only the generic reminder (Skrappjaw, 2026-10-25)
+    assert pc.validate(cur, {"clock.force-rate": 48000}) == ["Make sure your device(s) support the rate selected."]
+    assert pc.validate(cur, {"clock.force-rate": 48000}, devices=[]) == []
 
 
 def test_ordered_changes_keeps_min_max_valid():

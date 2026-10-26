@@ -8,6 +8,7 @@ import pipewrench
 
 FIX = Path(__file__).parent / "fixtures"
 READ = ["pw-metadata", "-n", "settings", "0"]
+DUMP = ["pw-dump"]  # a read too: device rates for status and rate (an empty graph here)
 
 
 class FakeRunner:
@@ -22,11 +23,13 @@ class FakeRunner:
         self.calls.append(argv)
         if argv == READ:
             return 0, (FIX / "settings.txt").read_text()
+        if argv == DUMP:
+            return 0, "[]"
         return (1, "write failed") if self.fail_writes else (0, "")
 
     @property
     def writes(self):
-        return [c for c in self.calls if c != READ]
+        return [c for c in self.calls if c not in (READ, DUMP)]
 
 
 def run(*argv, runner=None, execvp=None):

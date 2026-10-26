@@ -217,6 +217,15 @@ PipeWire's sample rate and buffer sizes. ←→ changes a value, marked `*` unti
 buffers mean less latency and more risk of dropouts. **Force buffer size** is the one to change for
 tracking (128 or lower) versus mixing (1024).
 
+Below the rows, each sound card that's on lists the rates it supports and the rate it's running at,
+for example `UMC404HD 192k  44.1 48 88.2 96 176.4 192k · running 48k`. The list comes from the
+kernel, and only USB interfaces report one; other cards say `not reported`. When you change the rate:
+
+- a card that can't run it is named (`GCS-8 can't run at 192k (it supports 48k)`);
+- a rate outside **allowed rates** runs the graph at that rate while your devices stay at the default
+  rate and PipeWire resamples, and the warning says so;
+- if any card doesn't report its rates: "Make sure your device(s) support the rate selected."
+
 Under the clock rows are three buttons. ↓ to their row, ←→ picks one, and Enter or a click presses it:
 
 - **Apply** sets the changes live, now. Enter on a clock row does the same, and Esc reverts.

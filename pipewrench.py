@@ -28,6 +28,7 @@ import pwconfig as pcfg  # noqa: E402
 import pwinventory as pi  # noqa: E402
 import pwmedia as pm  # noqa: E402
 import pwpatch as pp  # noqa: E402
+import pwrates as prates  # noqa: E402
 import pwrealtime as prt  # noqa: E402
 
 SETTERS = {"rate": "clock.force-rate", "buf": "clock.force-quantum", "min": "clock.min-quantum",
@@ -132,6 +133,10 @@ def _cli(argv, runner, out, err, execvp, ask):
         allowed = cur.get("clock.allowed-rates")
         out.write(f"{'allowed rates':<14} {', '.join(map(str, allowed)) if isinstance(allowed, list) else '?'}\n")
         out.write(f"{'defaults':<14} rate {cur.get('clock.rate', '?')} · quantum {cur.get('clock.quantum', '?')}\n")
+        for r in _device_rates(runner) or []:
+            what = prates.describe(r.stream) if r.known else "not reported"
+            running = f" · running {prates.khz(r.running)}" if r.running else ""
+            out.write(f"{'device rates':<14} {r.label}: {what}{running}\n")
         return 0
     if cmd in SETTERS:
         if len(args) != 1:
@@ -140,7 +145,8 @@ def _cli(argv, runner, out, err, execvp, ask):
         try:
             cmds = [pc.set_cmd(key, value)]
             cur = _read(runner)
-            warnings = pc.validate(cur, {key: value})
+            devices = _device_rates(runner) if key == "clock.force-rate" else None
+            warnings = pc.validate(cur, {key: value}, devices)
         except ValueError as e:
             raise CliError(str(e), 2)
         for w in warnings:
@@ -165,6 +171,16 @@ def _cli(argv, runner, out, err, execvp, ask):
             out.write(f"{'fix:' if n == 0 else '':<16} {line}\n")
         return 0 if s.ok else 1
     raise CliError(f"unknown command {cmd!r}\n\nusage:\n{USAGE}", 2)
+
+
+def _device_rates(runner):
+    """pwrates for the cards that are on, or None when they can't be read (no pw-dump, fixtures mode)."""
+    if os.environ.get("PIPEWRENCH_FIXTURES"):  # /proc is this machine's, not the recorded one's
+        return None
+    try:
+        return prates.read(pi.inventory(pi.read_dump(runner)).cards)
+    except (pi.InventoryError, ValueError, OSError):
+        return None
 
 
 def _dump(runner):
@@ -715,6 +731,7 @@ class Tui:
         self.mixer = None
         self.about = None  # versions for the About tab; read when it first shows
         self.realtime = None  # pwrealtime.Status for Settings; read on each Settings refresh
+        self.rates = None  # pwrates.CardRates per card that's on, for Settings; read with realtime
         self.meters = Meters()
         self.midi = MidiActivity()
         self.media, self.media_at = None, 0.0  # the player the bar shows, and when it was read
@@ -804,6 +821,7 @@ class Tui:
             self._refresh_mixer()
         if self.st.tab == "settings":
             self.realtime = "fixtures" if os.environ.get("PIPEWRENCH_FIXTURES") else prt.check(run=self.runner)
+            self.rates = _device_rates(self.runner)
 
     def _refresh_mixer(self):
         """Devices and app streams from one pw-dump; hidden rows come from devices.json."""
@@ -983,7 +1001,7 @@ class Tui:
             self.about = pc.about_info(self.runner)
         lines, self.hits = pc.render_screen(self.st, self.current, block, w, h, self.devices,
                                             self.patch, self.mixer, self._media_view(), self.about,
-                                            self.realtime)
+                                            self.realtime, self.rates)
         scr.erase()
         for y, (text, style) in enumerate(lines):
             try:

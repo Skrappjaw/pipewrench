@@ -67,7 +67,7 @@ def test_settings_render_shows_allowed_rates_and_warning():
     lines, _ = screen(st)
     body = "\n".join(t for t, _ in lines)
     assert "allowed rates: 48000" in body
-    assert "not in allowed" in body
+    assert "isn't in allowed" in body
 
 
 @pytest.mark.parametrize("width", [40, 80, 120])

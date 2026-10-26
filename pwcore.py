@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pwinventory as pi
 import pwkeys as pk
+import pwrates
 import pwmedia as pm
 import pwpatch as pp
 import pwrealtime as prt
@@ -323,8 +324,9 @@ def set_cmd(key, value):
     return ["pw-metadata", "-n", "settings", "0", key, str(value)]
 
 
-def validate(current, changes):
-    """Raise ValueError for impossible combinations; return warnings for ones PipeWire will adjust."""
+def validate(current, changes, devices=None):
+    """Raise ValueError for impossible combinations; return warnings for ones PipeWire will adjust.
+    devices: pwrates.read()'s list, so a forced rate is checked against what each card supports."""
     merged = {**current, **changes}
     lo, hi = merged.get("clock.min-quantum"), merged.get("clock.max-quantum")
     if isinstance(lo, int) and isinstance(hi, int) and lo > hi:
@@ -333,11 +335,9 @@ def validate(current, changes):
     fq = merged.get("clock.force-quantum")
     if fq and isinstance(lo, int) and isinstance(hi, int) and not lo <= fq <= hi:
         warnings.append(f"force buffer {fq} is outside min/max {lo}-{hi}; PipeWire will clamp it")
-    fr = merged.get("clock.force-rate")
-    allowed = merged.get("clock.allowed-rates")
-    if fr and isinstance(allowed, list) and allowed and fr not in allowed:
-        rates = ", ".join(map(str, allowed))
-        warnings.append(f"rate {fr} is not in allowed rates ({rates}); the device may not switch")
+    if "clock.force-rate" in changes:
+        warnings += pwrates.warnings(merged.get("clock.force-rate"), merged.get("clock.allowed-rates"),
+                                     merged.get("clock.rate"), devices)
     return warnings
 
 
@@ -970,7 +970,7 @@ def _confirm_question(confirm, devices=None):
 
 
 def render_screen(st, current, block, width, height, devices=None, patch=None, mixer=None, media=None,
-                  about=None, realtime=None):
+                  about=None, realtime=None, rates=None):
     cv = _Canvas(width)
     text, spans = " ", []
     for tab in TABS:
@@ -993,7 +993,7 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
     elif st.tab == "about":
         _render_about(cv, about, st.theme)
     elif st.tab == "settings":
-        _render_settings(cv, st, current, body_h, realtime)
+        _render_settings(cv, st, current, body_h, realtime, rates)
     else:
         _render_top(cv, st, block, body_h)
     body_end = height - 2 - len(footer)
@@ -1053,7 +1053,7 @@ def _media_bar(cv, media):
         cv.hit(row, c0 + a, c0 + b, ("key", k))
 
 
-def _render_settings(cv, st, current, body_h, realtime=None):
+def _render_settings(cv, st, current, body_h, realtime=None, rates=None):
     """The category menu on the left, the open category on the right, scrolled so its cursor row shows.
     While the menu has the keys the pane shows no cursor and the open category is an anchor."""
     focused = st.settings_focus == "pane"
@@ -1062,7 +1062,7 @@ def _render_settings(cv, st, current, body_h, realtime=None):
     if st.settings_cat == "prefs":
         _render_prefs(pane, view)
     else:
-        _render_audio(pane, view, current, realtime)
+        _render_audio(pane, view, current, realtime, rates)
     cursor = next((n for n, (_, style) in enumerate(pane.lines) if style == "selected"), 0)
     rows = list(_window(len(pane.lines), min(len(pane.lines) - 1, cursor + 3), max(1, body_h)))
     top = len(cv.lines)
@@ -1087,7 +1087,7 @@ def _render_settings(cv, st, current, body_h, realtime=None):
             cv.hit(top + rows.index(r), MENU_W + c0, MENU_W + c1, t)
 
 
-def _render_audio(cv, st, current, realtime=None):
+def _render_audio(cv, st, current, realtime=None, rates=None):
     cv.add("  Clock", "title")
     for i, s in enumerate(SETTINGS):
         value = st.pending.get(s.key, current.get(s.key))
@@ -1105,18 +1105,33 @@ def _render_audio(cv, st, current, realtime=None):
     allowed = ", ".join(map(str, allowed)) if isinstance(allowed, list) else "?"
     cv.add(f"  allowed rates: {allowed}   defaults: rate {current.get('clock.rate', '?')}"
            f" · quantum {current.get('clock.quantum', '?')}", "dim")
+    _render_device_rates(cv, rates)
     try:
-        warnings = validate(current, st.pending) if st.pending else []
+        warnings = validate(current, st.pending, rates) if st.pending else []
     except ValueError as e:
         warnings = [str(e)]
     for w in warnings:
-        cv.add(f"  ! {w}", "alert")
+        for n, line in enumerate(textwrap.wrap(w, max(10, cv.width - 4))):
+            cv.add(("  ! " if n == 0 else "    ") + line, "alert")
     _clock_buttons(cv, st)
     for line in textwrap.wrap("Apply: live now · Save: for the next PipeWire start · Reset: PipeWire's defaults",
                               max(10, cv.width - 2)):
         cv.add("  " + line, "dim")
     cv.add("")
     _render_realtime(cv, realtime)
+
+
+def _render_device_rates(cv, rates):
+    """What each card on can run at, from the kernel (pwrates). Only USB cards report a list."""
+    if not rates:
+        return
+    width = max(len(r.label) for r in rates)
+    for r in rates:
+        if r.known:
+            what = pwrates.describe(r.stream) + (f" · running {pwrates.khz(r.running)}" if r.running else "")
+        else:
+            what = "not reported"
+        cv.add(f"  {r.label:<{width}}  {what}", "dim")
 
 
 def _clock_buttons(cv, st):
