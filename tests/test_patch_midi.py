@@ -89,7 +89,7 @@ def test_connect_and_disconnect_a_midi_pair(g):
     nano, reaper = one(midi(g.sources), "nanoKONTROL2 _ CTRL"), one(midi(g.dests), "REAPER")
     assert pp.toggle_cmds(g, nano, reaper) == [["pw-link", str(nano.ports[0].id), "1012"]]
     kb = one(midi(g.sources), "KB16-01 MIDI 1")
-    assert pp.toggle_cmds(g, kb, reaper) == [["pw-link", "-d", "1018"]]
+    assert pp.toggle_cmds(g, kb, reaper) == [["pw-link", "-d", str(kb.ports[0].id), "1012"]]
     assert pp.slots(nano, reaper) is None
 
 

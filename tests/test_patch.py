@@ -110,14 +110,16 @@ def test_pairs_mono_to_both_and_both_to_mono(g):
     assert len(pp.pair_ports(src(g, "GCS-8 CH 1").ports, mono_in)) == 2
 
 
-def test_connect_skips_existing_and_disconnect_uses_link_ids(g):
+def test_connect_skips_existing_and_disconnect_names_the_port_pair(g):
     s, t = src(g, "GCS-8 CH 1"), dst(g, "GCS-8 CH 3-AUX")
     cmds = pp.connect_cmds(g, s, t)
     assert cmds == [["pw-link", str(s.ports[0].id), str(t.ports[0].id)],
                     ["pw-link", str(s.ports[1].id), str(t.ports[1].id)]]
     assert pp.connect_cmds(g, src(g, "Discord"), dst(g, "GCS-8 CH 4-AUX")) == []
     dis = pp.disconnect_cmds(g, src(g, "Discord"), dst(g, "GCS-8 CH 4-AUX"))
-    assert len(dis) == 2 and all(c[:2] == ["pw-link", "-d"] for c in dis)
+    linked = [(a, b) for (a, b) in g.links if any(c[2:] == [str(a), str(b)] for c in dis)]
+    assert len(dis) == 2 and all(c[:2] == ["pw-link", "-d"] and len(c) == 4 for c in dis)
+    assert len(linked) == 2  # by output and input port id, never a link id from the snapshot
     assert pp.disconnect_cmds(g, s, t) == []
 
 
@@ -133,7 +135,7 @@ def test_port_level_pairs_and_toggle(g):
         ("FL", "FL", False), ("FL", "FR", False), ("FR", "FL", False), ("FR", "FR", False)]
     assert pp.port_toggle_cmd(g, rows[1][0], rows[1][1]) == ["pw-link", str(rows[1][0].id), str(rows[1][1].id)]
     d0, d1, _ = pp.port_pairs(g, src(g, "Discord"), dst(g, "GCS-8 CH 4-AUX"))[0]
-    assert pp.port_toggle_cmd(g, d0, d1)[:2] == ["pw-link", "-d"]
+    assert pp.port_toggle_cmd(g, d0, d1) == ["pw-link", "-d", str(d0.id), str(d1.id)]
 
 
 def test_graph_tolerates_junk():
@@ -210,4 +212,5 @@ def test_slot_cmds_link_into_a_later_slot_and_count_as_full():
     assert g.state(s, r) == "full"
     runs = pp.slots(s, r)
     assert g.slot_sources(runs[2]) == [s] and g.first_free(runs) == 0
-    assert all(c[1] == "-d" for c in pp.slot_cmds(g, s, runs[2]))  # picking it again disconnects
+    drop = pp.slot_cmds(g, s, runs[2])  # picking it again disconnects, by port pair
+    assert drop and all(c[1] == "-d" and (int(c[2]), int(c[3])) in g.links for c in drop)

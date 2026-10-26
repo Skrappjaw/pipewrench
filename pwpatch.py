@@ -216,9 +216,14 @@ def connect_cmds(g, s, d):
             if (a.id, b.id) not in g.links]
 
 
+def unlink_cmd(a, b):
+    """Disconnect by the port pair, not the link id: pw-link finds the live link itself, and an id from an
+    older pw-dump may be gone or reused by now."""
+    return ["pw-link", "-d", str(a.id), str(b.id)]
+
+
 def disconnect_cmds(g, s, d):
-    return [["pw-link", "-d", str(g.links[(a.id, b.id)])]
-            for a in s.ports for b in d.ports if (a.id, b.id) in g.links]
+    return [unlink_cmd(a, b) for a in s.ports for b in d.ports if (a.id, b.id) in g.links]
 
 
 def toggle_cmds(g, s, d):
@@ -227,7 +232,7 @@ def toggle_cmds(g, s, d):
 
 def slot_cmds(g, s, slot):
     """Toggle a source on one slot: drop its links into those inputs, else link it in by position."""
-    drop = [["pw-link", "-d", str(g.links[(a.id, b.id)])] for a in s.ports for b in slot if (a.id, b.id) in g.links]
+    drop = [unlink_cmd(a, b) for a in s.ports for b in slot if (a.id, b.id) in g.links]
     return drop or [["pw-link", str(a.id), str(b.id)] for a, b in zip(s.ports, slot)]
 
 
@@ -238,5 +243,5 @@ def port_pairs(g, s, d):
 
 def port_toggle_cmd(g, a, b):
     if (a.id, b.id) in g.links:
-        return ["pw-link", "-d", str(g.links[(a.id, b.id)])]
+        return unlink_cmd(a, b)
     return ["pw-link", str(a.id), str(b.id)]
