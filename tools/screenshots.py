@@ -305,9 +305,10 @@ def shots():
     yield "settings-preferences", frame(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane",
                                                    cursor=pc.BAR_ROW), height=40, media=MEDIA)
     yield "settings-keys", frame(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane",
-                                            cursor=pc.KEYS_ROW + 1,
+                                            cursor=pc.KEYS_ROW + [x for _, x in pc.BINDING_ROWS].index(
+                                                pc.pk.BY_ID["devices.show_hidden"]),
                                             keys={"devices.show_hidden": "z", "mixer.meters": None}),
-                                 height=40, media=MEDIA)
+                                 height=50, media=MEDIA)
     yield "about-pipecraft", frame(pc.UIState(tab="about", theme="pipecraft"), media=MEDIA,
                                    about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"})
     yield "top", frame(pc.UIState(tab="top"), block=block, media=MEDIA)

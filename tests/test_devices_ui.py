@@ -172,12 +172,6 @@ def test_bus_add_and_live_delete_with_confirm():
     st, actions = key(at("GCS-8"), "x")
     assert actions == [] and "bus" in st.message
 
-def test_R_restarts_with_warning():
-    st, actions = key(pc.UIState(tab="devices"), "R")
-    assert actions == [] and st.popup == ("restart",)
-    assert key(st, "left", "enter")[1] == [("restart_wireplumber",)]
-
-
 def test_nothing_happens_until_devices_load():
     for k in ("d", "right", " ", "enter", "p", "h", "a", "x", "v", "A", "t", "down"):
         _, actions = pc.handle_key(pc.UIState(tab="devices"), k, CUR, devices=None)
@@ -190,14 +184,6 @@ def click(st, target, event="click"):
     lines, hits = screen(st)
     row, c0, _ = hit_for(hits, target)
     return pc.handle_mouse(st, hits, row, c0, event, CUR, devices=dv())
-
-
-def test_restart_is_a_chip():
-    lines, hits = screen(pc.UIState(tab="devices"))
-    r, c0, c1 = hit_for(hits, ("key", "R"))
-    assert lines[r][0][c0:c1] == " R "
-    st, _ = click(pc.UIState(tab="devices"), ("key", "R"))
-    assert st.popup == ("restart",)
 
 
 def test_rows_show_connections():

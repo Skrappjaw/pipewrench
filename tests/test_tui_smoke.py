@@ -105,7 +105,8 @@ def test_save_keeps_the_clock_for_the_next_pipewire_start(app, tmp_path):
     app.expect("Playback")  # PipeWrench opens on the Mixer
     app.send(tab("settings"))
     app.expect("Force sample rate")
-    app.send("s")
+    # No s key any more (Skrappjaw, 2026-10-26): into the pane, down to the buttons, → to Save, Enter.
+    app.send("\x1bOC" + "\x1bOB" * pc.CLOCK_BUTTONS_ROW + "\x1bOC" * pc.CLOCK_BUTTONS.index("Save") + "\r")
     app.expect("next time PipeWire starts")
     app.quit()
     assert app.wait_exit() == 0
@@ -113,7 +114,7 @@ def test_save_keeps_the_clock_for_the_next_pipewire_start(app, tmp_path):
     assert saved["clock_rate"] == 48000 and saved["clock_quantum"] == 128
     dropin = (tmp_path / "pipewire" / "pipewire.conf.d" / "50-pipewrench-devices.conf").read_text()
     assert "default.clock.rate = 48000" in dropin and "default.clock.quantum = 128" in dropin
-    assert not (tmp_path / "wireplumber").exists()  # the label rules wait for Devices' A
+    assert not (tmp_path / "wireplumber").exists()  # no labels, so no label rules
 
 
 def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
@@ -256,17 +257,18 @@ def test_rebind_a_key_in_settings(app, tmp_path):
     app.expect("Playback")
     app.send(tab("settings"))
     app.expect("Force sample rate")
-    app.send("\x1bOB\r" + "\x1bOB" * (pc.KEYS_ROW + 1))  # Preferences, then Devices · show hidden, the second Keys row
-    app.expect("Devices · show hidden")
+    show_hidden = pc.KEYS_ROW + [x for _, x in pc.BINDING_ROWS].index(pc.pk.BY_ID["devices.show_hidden"])
+    app.send("\x1bOB\r" + "\x1bOB" * show_hidden)  # Preferences, then Devices → Show hidden in Key Bindings
+    app.expect("Key Bindings")
     app.send("\r")
-    app.expect("press a key")
+    app.expect("press a key for Devices · show hidden")
     app.send("q")                            # global: refused, and pwrench keeps running
     app.expect("global: quit")
     app.send("\r")
     app.expect("press a key")
     app.send("z")
     app.expect("show hidden: z")
-    app.send("\x1bOA\x7f")                   # Mixer · meters, Backspace unbinds
+    app.send("\x1bOA\x7f")                   # up to Mixer → Meters, Backspace unbinds
     app.expect("meters: no key")
     app.quit()
     assert app.wait_exit() == 0

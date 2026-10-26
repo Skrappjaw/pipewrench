@@ -36,7 +36,7 @@ def body(st):
 def test_display_has_meters_and_keys_box_rows():
     text = body(prefs())
     assert "Meters" in text and "Keys box" in text and "Shortcut keys" not in text
-    assert "the key list at the bottom of the screen" in text
+    assert "the key list at the bottom of the screen" in body(prefs(cursor=pc.KEY_BOX_ROW))   # on the status line
     assert pc.METERS_ROW == pc.BAR_ROW + 1 and pc.KEY_BOX_ROW == pc.MONITORS_ROW + 1
     assert pc.KEYS_ROW == pc.KEY_BOX_ROW + 1
 
@@ -80,7 +80,7 @@ def test_hidden_box_leaves_no_footer_and_no_chips():
 
 def test_the_body_gets_the_lines():
     st = prefs()                                                   # the Keys list runs past 30 lines
-    shown = lambda st: sum(1 for t, _ in screen(st, height=30)[0] if any(pk.label(a) in t for a in pk.ACTIONS))
+    shown = lambda st: sum(1 for t, _ in screen(st, height=30)[0] if any(pc.binding_label(a) in t for a in pk.ACTIONS))
     footer = sum(1 for t, _ in screen(st, height=30)[0] if t[:1] in "┌│└")
     assert footer >= 3 and shown(pc.dataclasses.replace(st, key_box=False)) > shown(st)
 
@@ -89,7 +89,7 @@ def test_the_keys_page_is_not_greyed():
     text = body(prefs(key_box=False))
     assert "are off" not in text
     rows = screen(prefs(key_box=False), height=70)[0]
-    first = next(s for t, s in rows if pk.label(pk.ACTIONS[0]) in t)
+    first = next(s for t, s in rows if pc.binding_label(pk.ACTIONS[0]) in t and "◀" not in t)
     assert (first[0] if isinstance(first, tuple) else first) == "normal"
 
 

@@ -103,12 +103,6 @@ def test_top_render_waiting_for_data():
     assert any("waiting for pw-top" in t for t, _ in lines)
 
 
-
-
-
-
-
-
 # --- 7. keys -----------------------------------------------------------------
 
 def test_up_down_moves_cursor_and_clamps():
@@ -173,8 +167,14 @@ def test_basic_tabs_come_first():
     assert "presets" not in pc.TABS
 
 
+def open_restart(st):
+    """The Restart clock button: the only way to restart WirePlumber now (Skrappjaw, 2026-10-26)."""
+    st = pc.dataclasses.replace(st, settings_cat="audio", cursor=pc.CLOCK_BUTTONS_ROW)
+    return key(st, *["right"] * pc.CLOCK_BUTTONS.index("Restart"), "enter")
+
+
 def test_restart_needs_confirmation():
-    st, actions = key(UIState(), "R")
+    st, actions = open_restart(UIState())
     assert actions == [] and st.popup == ("restart",)
     st2, actions = key(st, "esc")
     assert actions == [] and st2.popup is None
@@ -186,7 +186,7 @@ def test_a_question_stays_up_until_answered():
     # It used to sit on the status line, where a missed prompt looked like a frozen screen, so any key
     # cancelled it. Now it's a box over the screen (Skrappjaw, 2026-10-26): other keys leave it up.
     for k in ("q", "down", "A", "x", "y"):
-        st, _ = key(UIState(), "R")
+        st, _ = open_restart(UIState())
         st, actions = key(st, k)
         assert actions == [] and st.popup == ("restart",)
 
@@ -197,10 +197,6 @@ def test_q_asks_then_quits():
     assert actions == [] and st.popup == ("quit",) and pc.popup_cursor(st) == 1   # Cancel
     assert key(st, "enter")[0].popup is None and key(st, "enter")[1] == []
     assert key(st, "left", "enter")[1] == [("quit",)]
-
-
-
-
 
 
 # --- Settings: the category menu, and the clock's Apply · Save · Reset -------------------------
@@ -271,11 +267,6 @@ def test_clock_buttons_apply_save_reset():
     assert actions == [] and st.clock_button == 2
     st, actions = key(UIState(cursor=pc.CLOCK_BUTTONS_ROW), *["right"] * 5, "enter")  # Restart, clamped: asks
     assert actions == [] and st.clock_button == 3 and st.popup == ("restart",)
-
-
-def test_s_saves_from_anywhere_in_settings():
-    assert key(pc.UIState(tab="settings"), "s")[1] == [("save_clock",)]
-    assert key(UIState(settings_cat="prefs"), "s")[1] == [("save_clock",)]
 
 
 def test_reset_loads_pipewire_defaults_as_pending():
@@ -404,20 +395,11 @@ def test_double_click_row_applies():
     assert actions == [("set_many", [("clock.force-quantum", 256)])]
 
 
-def test_restart_chip_needs_confirmation():
-    st = UIState()
-    _, hits = screen(st)
-    st, actions = click(st, hits, ("key", "R"))
-    assert actions == [] and st.popup == ("restart",)
-
-
 def test_click_outside_targets_does_nothing():
     st = UIState(cursor=2)
     _, hits = screen(st)
     st2, actions = pc.handle_mouse(st, hits, 29, 79, "click", CUR)
     assert st2 == st and actions == []
-
-
 
 
 def test_wheel_scrolls_top():
@@ -430,7 +412,7 @@ def test_wheel_scrolls_top():
 
 
 def test_a_click_off_the_box_does_nothing():
-    st, _ = key(UIState(), "R")
+    st, _ = open_restart(UIState())
     _, hits = screen(st)
     assert not any(t == ("tab", "top") for *_, t in hits)  # only the box's buttons take clicks
     st2, actions = pc.handle_mouse(st, hits, 0, 0, "click", CUR)
@@ -588,7 +570,7 @@ def test_no_button_rows(tab):
 def test_multi_key_chips_have_no_hit():
     _, hits = screen(UIState())
     keys = {t[1] for *_, t in hits if t[0] == "key"}
-    assert keys == {"enter", "esc", "s", "R", "q"} | {"*", "<", ">", "-", "+"}  # not ↑↓, ←→ or Tab/1-n
+    assert keys == {"enter", "esc", "q"} | {"*", "<", ">", "-", "+"}  # not ↑↓, ←→ or Tab/1-n
 
 
 def test_meter_frame_rate_steps_and_saves():

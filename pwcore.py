@@ -453,8 +453,10 @@ METERS_ROW = BAR_ROW + 1
 SHOW_HIDDEN_ROW = METERS_ROW + 1
 MONITORS_ROW = SHOW_HIDDEN_ROW + 1
 KEY_BOX_ROW = MONITORS_ROW + 1
-KEYS_ROW = KEY_BOX_ROW + 1     # one row per pwkeys action
-RESET_KEYS_ROW = KEYS_ROW + len(pk.ACTIONS)
+KEYS_ROW = KEY_BOX_ROW + 1     # Key Bindings: one row per BINDING_ROWS entry
+# Global's fixed keys, then each view's actions in pwkeys order (headings are drawn, never cursor rows).
+BINDING_ROWS = [("fixed", f) for f in pk.FIXED] + [("action", a) for a in pk.ACTIONS]
+RESET_KEYS_ROW = KEYS_ROW + len(BINDING_ROWS)
 
 
 PREF_ROWS = {THEME_ROW: "theme", FPS_ROW: "meter_fps", FALL_ROW: "meter_fall", HOLD_ROW: "peak_hold",
@@ -523,11 +525,6 @@ def _capture_key(st, key):
 
 
 def _key_settings(st, key, current):
-    if key == "s":
-        return _save_clock(st)
-    if key == "R":
-        st.popup = ("restart",)
-        return st, []
     if st.settings_focus == "menu":
         return _key_settings_menu(st, key)
     if key == "esc" and not st.pending and not st.editing:
@@ -645,7 +642,10 @@ def _key_prefs(st, key, current):
     elif st.cursor in PREF_ROWS and key == "enter":
         _begin_edit(st)
     elif KEYS_ROW <= st.cursor < RESET_KEYS_ROW and key in ("enter", "backspace", "delete"):
-        a = pk.ACTIONS[st.cursor - KEYS_ROW]
+        kind, a = BINDING_ROWS[st.cursor - KEYS_ROW]
+        if kind == "fixed":
+            st.message = f"{a[1]} is a fixed key ({a[2]}); MIDI/CC binding comes later"
+            return st, []
         if key == "enter":
             st.key_capture = a.id
             st.message = f"press a key for {pk.label(a)} (Esc cancels, Backspace unbinds)"
@@ -739,9 +739,6 @@ def _key_devices(st, key, devices):
         return _key_menu(st, key, devices)
     if key == "a":
         return st, [("dev_prompt_bus",)]
-    if key == "R":
-        st.popup = ("restart",)
-        return st, []
     if key == "h":  # show hidden; nothing hides on a key (a stray h hid the GCS-8, Skrappjaw 2026-10-24)
         st.dev_show_hidden = not st.dev_show_hidden
         return st, [("save_ui",)]  # both survive a restart (Skrappjaw, 2026-10-26)
@@ -872,10 +869,8 @@ TAB_KEYS = [(f"Tab/⇧Tab/1-{len(TABS)}", "tabs"), ("q", "quit")]
 LEGENDS = {
     "mixer": [("Enter", "actions"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"),
               ("v", "meters")] + TAB_KEYS,
-    "settings": [("Enter", "edit"), ("↑↓", "select"), ("← Esc", "menu"), ("s", "save"),
-                 ("R", "restart WirePlumber")] + TAB_KEYS,
-    "settings buttons": [("Enter", "press"), ("←→", "pick"), ("↑↓", "select"), ("Esc", "menu"), ("s", "save"),
-                         ("R", "restart WirePlumber")] + TAB_KEYS,
+    "settings": [("Enter", "edit"), ("↑↓", "select"), ("← Esc", "menu")] + TAB_KEYS,
+    "settings buttons": [("Enter", "press"), ("←→", "pick"), ("↑↓", "select"), ("Esc", "menu")] + TAB_KEYS,
     "settings edit": [("←→", "change"), ("Enter", "apply"), ("Esc", "cancel"), ("↑↓", "keep and move")],
     "preferences edit": [("←→", "change"), ("Enter", "keep"), ("Esc", "cancel"), ("↑↓", "keep and move")],
     "settings menu": [("Enter", "open"), ("↑↓", "category"), ("s", "save clock"),
@@ -883,7 +878,7 @@ LEGENDS = {
     "preferences": [("Enter", "edit"), ("↑↓", "select"), ("← Esc", "menu")] + TAB_KEYS,
     "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
     "about": TAB_KEYS,
-    "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("h", "show hidden"), ("R", "restart WirePlumber")] + TAB_KEYS,
+    "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("h", "show hidden")] + TAB_KEYS,
     "keys": [("Enter", "rebind"), ("↑↓", "select"), ("Bksp", "unbind"), ("← Esc", "menu")] + TAB_KEYS,
     "keys capture": [("Esc", "cancel"), ("Bksp", "unbind")],
     "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
@@ -896,6 +891,22 @@ LEGENDS = {
     "patch ports": [("Enter", "link/unlink"), ("↑↓", "source port"), ("←→", "destination port"),
                     ("p Esc", "back")] + TAB_KEYS,
 }
+# What each Display row does, shown in the status line while it's selected (Skrappjaw, 2026-10-26).
+PREF_NOTES = {THEME_ROW: "applies at once", FPS_ROW: "how often Mixer meters redraw",
+              FALL_ROW: "how fast a meter drops after a peak",
+              HOLD_ROW: f"a peak marker hangs, then falls {PEAK_FALL} dB/s",
+              BAR_ROW: "the bar under each Mixer channel", METERS_ROW: "live levels on the Mixer",
+              SHOW_HIDDEN_ROW: "hidden cards and buses on Devices, greyed",
+              MONITORS_ROW: "each output's monitor on Devices, listed under it",
+              KEY_BOX_ROW: "the key list at the bottom of the screen"}
+
+
+def _pref_note(st):
+    if st.tab == "settings" and st.settings_cat == "prefs" and st.settings_focus == "pane":
+        return PREF_NOTES.get(st.cursor)
+    return None
+
+
 # The status line under the legend: messages, else a short hint (never keys).
 HINTS = {"mixer": "volume and mute act at once · ★ is the default playback or recording device",
          "devices": "cards and buses here · rename, default and test a channel on the Mixer (1)",
@@ -1157,7 +1168,7 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
         bad = st.message == st.failed
         cv.add(f" {'✖' if bad else '✓'} {st.message}".ljust(width), "band_alert" if bad else "band_ok")
     else:
-        cv.add(f" {HINTS.get(st.tab, '')}", "dim")
+        cv.add(f" {_pref_note(st) or HINTS.get(st.tab, '')}", "dim")
     if st.popup:
         _overlay_popup(cv, st, devices, width, height)
     return cv.lines, cv.hits
@@ -1326,35 +1337,48 @@ def _clock_buttons(cv, st):
 
 def _render_prefs(cv, st):
     cv.add("  Display", "title")
-    _display_row(cv, st, THEME_ROW, "Theme", theme_label(st.theme), "applies at once")
-    _display_row(cv, st, FPS_ROW, "Meter frame rate", f"{st.meter_fps} fps", "how often Mixer meters redraw")
-    _display_row(cv, st, FALL_ROW, "Meter fall", f"{st.meter_fall} dB/s", "how fast a meter drops after a peak")
-    _display_row(cv, st, HOLD_ROW, "Peak hold", f"{st.peak_hold:g} s" if st.peak_hold else "off",
-                 f"a peak marker hangs, then falls {PEAK_FALL} dB/s")
-    _display_row(cv, st, BAR_ROW, "Volume bar", "on" if st.volume_bar else "off", "the bar under each Mixer channel")
-    _display_row(cv, st, METERS_ROW, "Meters", "on" if st.meters else "off", "live levels on the Mixer")
-    _display_row(cv, st, SHOW_HIDDEN_ROW, "Show hidden devices", "on" if st.dev_show_hidden else "off",
-                 "hidden cards and buses, greyed")
-    _display_row(cv, st, MONITORS_ROW, "Monitors on Devices", "on" if st.dev_monitors else "off",
-                 "each output's monitor, under it")
-    _display_row(cv, st, KEY_BOX_ROW, "Keys box", "on" if st.key_box else "off",
-                 "the key list at the bottom of the screen")
+    _display_row(cv, st, THEME_ROW, "Theme", theme_label(st.theme))
+    _display_row(cv, st, FPS_ROW, "Meter frame rate", f"{st.meter_fps} fps")
+    _display_row(cv, st, FALL_ROW, "Meter fall", f"{st.meter_fall} dB/s")
+    _display_row(cv, st, HOLD_ROW, "Peak hold", f"{st.peak_hold:g} s" if st.peak_hold else "off")
+    _display_row(cv, st, BAR_ROW, "Volume bar", "on" if st.volume_bar else "off")
+    _display_row(cv, st, METERS_ROW, "Meters", "on" if st.meters else "off")
+    _display_row(cv, st, SHOW_HIDDEN_ROW, "Show hidden devices", "on" if st.dev_show_hidden else "off")
+    _display_row(cv, st, MONITORS_ROW, "Monitors on Devices", "on" if st.dev_monitors else "off")
+    _display_row(cv, st, KEY_BOX_ROW, "Keys box", "on" if st.key_box else "off")
     cv.add("")
     _render_keys(cv, st)
 
 
+def binding_label(a):
+    """An action's row label on Key Bindings: capitalised like the Global rows."""
+    return a.label[:1].upper() + a.label[1:]
+
+
 def _render_keys(cv, st):
-    """One row per shortcut: its key, * when changed, and why it can't fire when it clashes."""
-    cv.add("  Keys", "title")
+    """Key Bindings (Skrappjaw, 2026-10-26): Action · Key · MIDI/CC under a heading per view. Global keys are fixed;
+    an action shows its key, * when changed, and why it can't fire when it clashes. MIDI/CC is a placeholder."""
+    cv.add("  Key Bindings", "title")
+    cv.add(f"  {'Action':<32} {'Key':^6}   {'MIDI/CC':^7}", "dim")
     b = pk.bindings(st.keys)
     bad = pk.clashes(b)
-    for n, a in enumerate(pk.ACTIONS):
+    heading = None
+    for n, (kind, x) in enumerate(BINDING_ROWS):
+        group = "Global" if kind == "fixed" else pk.HEADINGS[x.screen]
+        if group != heading:
+            heading = group
+            cv.add(f"  {group}", "title")
         idx = KEYS_ROW + n
-        k = "…" if st.key_capture == a.id else (b[a.id] or "—")
-        mark = "*" if b[a.id] != a.default else " "
-        note = bad.get(a.id) or ("press a key" if st.key_capture == a.id else "")
-        line = f"{'> ' if st.cursor == idx else '  '}{pk.label(a):<34} {k:^5} {mark} {note}".rstrip()
-        row = cv.add(line, "selected" if st.cursor == idx else "alert" if a.id in bad else "normal")
+        if kind == "fixed":
+            label, k, mark, note, style = x[1], x[2], " ", "", "dim"
+        else:
+            label = binding_label(x)
+            k = "…" if st.key_capture == x.id else (b[x.id] or "—")
+            mark = "*" if b[x.id] != x.default else " "
+            note = bad.get(x.id) or ("press a key" if st.key_capture == x.id else "")
+            style = "alert" if x.id in bad else "normal"
+        line = f"{'> ' if st.cursor == idx else '  '}  {label:<30} {k:^6} {mark} {'—':^7}  {note}".rstrip()
+        row = cv.add(line, "selected" if st.cursor == idx else style)
         cv.hit(row, 0, len(line), ("setting", idx))
     line = f"{'> ' if st.cursor == RESET_KEYS_ROW else '  '}Reset all keys"
     row = cv.add(line, "selected" if st.cursor == RESET_KEYS_ROW else "normal")
@@ -1387,12 +1411,12 @@ def _arrow_spans(arrow_l, arrow_r, on_cursor, open_):
     return [(arrow_l, arrow_l + 1, role), (arrow_r, arrow_r + 1, role)]
 
 
-def _display_row(cv, st, idx, label, value, note):
+def _display_row(cv, st, idx, label, value):
     head = f"{'> ' if st.cursor == idx else '  '}{label:<20} "
     base = ("anchor" if st.editing else "selected") if st.cursor == idx else "normal"
     arrow_l, arrow_r = len(head), len(head) + 17
     spans = _arrow_spans(arrow_l, arrow_r, st.cursor == idx, st.cursor == idx and st.editing)
-    row = cv.add(f"{head}◀ {value:^14} ▶   {note}", (base, spans))
+    row = cv.add(f"{head}◀ {value:^14} ▶", (base, spans))
     cv.hit(row, 0, arrow_l, ("setting", idx))
     cv.hit(row, arrow_l, arrow_l + 1, ("arrow", idx, -1))
     cv.hit(row, arrow_l + 1, arrow_r, ("setting", idx))

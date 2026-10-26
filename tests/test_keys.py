@@ -80,8 +80,3 @@ def test_refuse_names_the_reason():
     assert pk.refuse(b, "devices.show_hidden", "z") is None
     assert pk.refuse(b, "devices.show_hidden", "enter") == "only single keys can be bound"
     assert pk.refuse(b, "devices.show_hidden", " ") == "only single keys can be bound"
-
-
-def test_settings_keys_share_a_screen():
-    b = pk.bindings({"settings.restart": "s"})
-    assert "settings.restart" in pk.clashes(b)

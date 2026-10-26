@@ -52,12 +52,6 @@ def test_global_keys_still_win():
     assert key(st, "q")[0].popup == ("quit",)  # q still asks to quit; the binding never fires
 
 
-def test_settings_keys_rebind_too():
-    st = pc.UIState(tab="settings", keys={"settings.save": "w"})
-    assert pc.handle_key(st, "w", CUR)[1] == [("save_clock",)]
-    assert pc.handle_key(st, "s", CUR)[1] == []
-
-
 def test_ui_json_keeps_overrides(tmp_path):
     p = tmp_path / "ui.json"
     st = pc.UIState(keys={"devices.show_hidden": "z", "mixer.meters": None})
@@ -79,7 +73,12 @@ def pane(t):
 
 
 def row_of(action_id):
-    return pc.KEYS_ROW + [a.id for a in pc.pk.ACTIONS].index(action_id)
+    return pc.KEYS_ROW + next(n for n, (k, a) in enumerate(pc.BINDING_ROWS) if k == "action" and a.id == action_id)
+
+
+def binding_line(lines, label):
+    """The Key Bindings row for an action label, not a Display row that starts the same way."""
+    return next((t, s) for t, s in lines if pane(t).strip().lstrip("> ").startswith(label) and "◀" not in t)
 
 
 def skey(st, *keys):
@@ -96,9 +95,10 @@ def text(st, height=80):
 
 def test_keys_section_follows_display_in_preferences():
     body = "\n".join(t for t, _ in text(prefs()))
-    assert body.index("Display") < body.index("  Keys") < body.index("Reset all keys")
-    assert "Devices · show hidden" in body
-    assert pc.RESET_KEYS_ROW == pc.KEYS_ROW + len(pc.pk.ACTIONS)
+    assert body.index("Display") < body.index("Key Bindings") < body.index("Reset all keys")
+    kb = body.index("Key Bindings")
+    assert body.index("│  Devices\n", kb) < body.index("Show hidden ", kb)   # under its view's heading
+    assert pc.RESET_KEYS_ROW == pc.KEYS_ROW + len(pc.BINDING_ROWS)
 
 
 def test_enter_then_a_key_rebinds_and_saves():
@@ -107,7 +107,7 @@ def test_enter_then_a_key_rebinds_and_saves():
     assert st.key_capture == "devices.show_hidden" and "press a key" in st.message and actions == []
     st, actions = skey(st, "z")
     assert st.keys == {"devices.show_hidden": "z"} and st.key_capture is None and actions == [("save_ui",)]
-    line = next(t for t, _ in text(st) if "Devices · show hidden" in t)
+    line = binding_line(text(st), "Show hidden")[0]
     assert " z " in line and "*" in line
 
 
@@ -127,7 +127,7 @@ def test_capture_esc_cancels_and_backspace_unbinds():
     assert st2.keys == {"mixer.meters": None} and actions == [("save_ui",)]
     st3, actions = skey(st, "delete")  # straight from the row too
     assert st3.keys == {"mixer.meters": None} and actions == [("save_ui",)]
-    line = next(t for t, _ in text(st2) if "Mixer · meters" in t)
+    line = binding_line(text(st2), "Meters")[0].split("Meters", 1)[1].split()[0]
     assert "—" in line
 
 
@@ -149,9 +149,9 @@ def test_reset_all_asks_first():
 def test_hand_edited_clash_is_flagged_red():
     st = prefs(keys={"devices.add_bus": "m", "mixer.meters": "q"})
     lines = text(st)
-    row = next((t, s) for t, s in lines if pane(t).strip().startswith("Devices · add bus"))
+    row = binding_line(lines, "Add bus")
     assert "also Devices · monitors" in row[0] and (pc.MENU_W, len(row[0]), "alert") in row[1][1]
-    assert "global: quit" in next(t for t, _ in lines if pane(t).strip().startswith("Mixer · meters"))
+    assert "global: quit" in binding_line(lines, "Meters")[0]
 
 
 def test_keys_rows_have_their_own_legend():

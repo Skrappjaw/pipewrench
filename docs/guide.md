@@ -110,7 +110,6 @@ levels) is on the Mixer.
 | a | add a bus | Enter on **+ Add bus…** |
 | x | delete a bus (asks first) | Enter on the bus → Delete bus |
 | t | test sound on a bus | Enter on the bus → Test noise |
-| R | restart WirePlumber (asks first) | Settings → Audio → Restart |
 
 **Everything here is saved as you go**, and survives closing PipeWrench, restarting WirePlumber and
 rebooting: hidden devices, each card's profile (on or off), names, buses, and whether Show hidden and
@@ -260,14 +259,14 @@ kernel, and only USB interfaces report one; other cards say `not reported`. When
 Under the clock rows are four buttons. ↓ to their row, ←→ picks one, and Enter or a click presses it:
 
 - **Apply** sets the changes live, now. Enter on an open clock row does the same, and Esc reverts.
-- **Save** keeps the live clock for the next time PipeWire starts (the `s` shortcut saves from
-  anywhere in Settings). It writes to PipeWrench's PipeWire file, `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf`,
+- **Save** keeps the live clock for the next time PipeWire starts. It writes to PipeWrench's PipeWire file, `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf`,
   and never restarts anything. A forced rate or buffer is saved as PipeWire's default, so apps can still
   ask for another size after a restart. Values that aren't forced, or match PipeWire's own defaults,
   aren't written. Apply any changes before saving.
 - **Reset** loads PipeWire's defaults (no forced rate or buffer, min 32, max 2048) as changes marked
   `*`. Apply sets them live, and Save after that clears the saved clock.
-- **Restart** restarts WirePlumber, after asking (what the `R` shortcut does). Apps like Discord may
+- **Restart** restarts WirePlumber, after asking. It's the one place to do it: no shortcut, so a stray key
+  can't drop your audio. Apps like Discord may
   lose their audio, so pick Cancel if you're on a call.
 
 #### Realtime
@@ -302,7 +301,8 @@ keeps it and Esc puts it back. They're kept in `~/.config/pipewrench/ui.json`.
 Theme (dark, light, crowbar orange, Pipe Boy in green, amber, cyan or white, Vaporware, Pipecraft, or
 pipeOS-lite and pipeOS-dark), the meters' frame rate, fall speed and peak hold, the
 Mixer's volume bar, **Meters** (the Mixer's live levels, what `v` toggles), **Show hidden devices** and
-**Monitors on Devices** (what `h` and `m` toggle on Devices) and **Keys box**. With the
+**Monitors on Devices** (what `h` and `m` toggle on Devices) and **Keys box**. The status line at
+the bottom says what the selected row does. With the
 Keys box off, the key list at the bottom of the screen is gone and the view gets those lines. Every key,
 letter shortcuts included, still works.
 
@@ -339,11 +339,17 @@ Every theme except dark and light needs a 256-colour terminal; on a basic one Pi
 pipeos-dark`, edit a line, then open the Theme row again to pick it. Opening the row re-reads the files, and the
 status band says how many it found or what's wrong with one. Everything is in **[the theme guide](themes.md)**.
 
-#### Keys
+#### Key Bindings
 
-Every letter shortcut, one row each, with the key it's on. Enter on a row, then press the new key.
-Backspace (or Delete) takes the key off, so the shortcut does nothing; Esc cancels. **Reset all keys**
-puts every shortcut back after asking.
+Every key, in columns **Action · Key · MIDI/CC**, under a heading for each view: **Global**, **Mixer**,
+**Devices** and **Patch Bay**.
+
+- **Global** keys are fixed: Tab and ⇧Tab for the next and previous view, `1`–`6` for each view. They're
+  listed so a MIDI/CC control can be set beside them later.
+- On a view's row, Enter, then press the new key. Backspace (or Delete) takes the key off, so the
+  shortcut does nothing; Esc cancels. `*` marks a changed key. **Reset all keys** puts every shortcut back
+  after asking.
+- The **MIDI/CC** column shows `—` for now: MIDI control is coming.
 
 - A key that's taken on the same screen, or one that works everywhere (`q`, `1`–`6`, the media keys
   `* - + < >`), is refused and the reason shows on the status line.
@@ -352,7 +358,7 @@ puts every shortcut back after asking.
 - Arrows, Enter, Esc, Space and Tab can't be rebound.
 - The key legend at the bottom of each tab shows your keys.
 
-![Settings → Keys](guide/settings-keys.png)
+![Settings → Key Bindings](guide/settings-keys.png)
 
 ## Top
 
@@ -377,7 +383,7 @@ have their own lettering.
 | Friends can't hear you | Mixer: is the right input ★ default, unmuted, with a moving meter? |
 | OBS isn't getting desktop audio | Patch → Monitors: is the output's monitor connected to OBS? |
 | A device is missing from the Mixer | Devices: is its card hidden (H) or on profile `off`? |
-| A new name doesn't show | It shows after a WirePlumber restart (Devices `R`, or Settings → Audio → Restart) or the next login |
+| A new name doesn't show | It shows after a WirePlumber restart (Settings → Audio → Restart) or the next login |
 | A red "PipeWire not answering" line under the tabs | PipeWire is up but hung. The screen keeps the last thing it saw and the keys still work; PipeWrench checks every 5 s and says "PipeWire is back" when it answers. It never restarts anything itself: `systemctl --user status pipewire wireplumber`, then restart them if you choose |
 
 ## Redrawing the pictures

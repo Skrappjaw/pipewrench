@@ -19,14 +19,19 @@ ACTIONS = [
     Action("devices", "devices.delete_bus", "x", "delete bus"),
     Action("devices", "devices.test", "t", "test noise"),
     Action("devices", "devices.profile", "p", "card profile"),
-    Action("devices", "devices.restart", "R", "restart WirePlumber"),
     Action("patch", "patch.grid", "g", "grid/column view"),
     Action("patch", "patch.monitors", "m", "monitors"),
     Action("patch", "patch.ports", "p", "ports"),
-    Action("settings", "settings.save", "s", "save clock settings"),
-    Action("settings", "settings.restart", "R", "restart WirePlumber"),
 ]
 BY_ID = {a.id: a for a in ACTIONS}
+
+# The Global rows of Key Bindings: fixed keys, listed so a MIDI/CC binding can sit beside them later
+# (Skrappjaw, 2026-10-26). (id, label, key as shown); never in bindings() or clean().
+FIXED = [("global.next", "Next View", "Tab"), ("global.prev", "Prev View", "⇧Tab")] + [
+    (f"global.tab{n}", label, str(n))
+    for n, label in enumerate(["Mixer", "Devices", "Patch Bay", "Settings", "Top", "About"], 1)]
+# Key Bindings headings, in order; Settings has no letter actions since save/restart went to its buttons.
+HEADINGS = {"mixer": "Mixer", "devices": "Devices", "patch": "Patch Bay"}
 
 # Keys that act on every tab; a binding to one of them never fires.
 GLOBAL = {"q": "quit", **{str(n): f"tab {n}" for n in range(1, 7)},
