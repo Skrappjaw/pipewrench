@@ -996,7 +996,7 @@ class Tui:
     _PLAIN = {"selected": "reverse bold", "anchor": "underline", "chip": "reverse", "title": "bold",
               "alert": "bold", "pending": "bold", "dim": "dim",
               "bar_ok": "reverse", "bar_alert": "reverse", "bar_dim": "reverse dim",
-              "band_ok": "reverse", "band_alert": "reverse bold"}
+              "band_ok": "reverse", "band_alert": "reverse bold", "popup": "reverse", "popup_sel": "bold"}
 
     def _apply_theme(self, scr):
         """Curses attributes for each colour role of the current theme (pc.THEMES)."""

@@ -78,10 +78,10 @@ def test_the_box_is_drawn_over_the_screen_with_its_buttons(width):
     assert all(len(t) <= width for t, _ in lines)
     body = [t for t, _ in lines]
     top = next(n for n, t in enumerate(body) if "┌─ Restart WirePlumber" in t)
-    assert any("└" in t for t in body[top:]) and any("[ Restart ]" in t and "[ Cancel ]" in t for t in body[top:])
+    assert any("└" in t for t in body[top:]) and any("[ Restart ]" in t and "> Cancel <" in t for t in body[top:])
     btn_row = next(n for n, t in enumerate(body) if "[ Restart ]" in t)
     roles = [r for _, _, r in lines[btn_row][1][1]]
-    assert roles[-2:] == ["chip", "selected"]           # Cancel, the default, is the selected button
+    assert roles[-2:] == ["popup", "popup_sel"]          # Cancel, the default, is the selected button
     assert {h[3] for h in hits} == {("popup_btn", 0), ("popup_btn", 1)}  # only the buttons take clicks
 
 
@@ -112,3 +112,13 @@ def test_a_narrow_screen_stacks_the_buttons():
     assert all(len(t) <= 40 for t, _ in lines)
     rows = {h[0] for h in hits}
     assert len(rows) == 3 and {h[3] for h in hits} == {("popup_btn", 0), ("popup_btn", 1), ("popup_btn", 2)}
+
+
+def test_the_selected_button_shows_in_every_theme():
+    # Skrappjaw on the Studio (pipeOS-dark), 2026-10-26: "no arrow nav on the popover". The arrows moved it, but that
+    # theme's chip and selected colours are the same, so nothing changed on screen.
+    for name, theme in pc.THEMES.items():
+        assert theme["popup_sel"] != theme["popup"], name
+    st, _ = key(restart(), "left")
+    body = [t for t, _ in screen(st)[0]]
+    assert any("> Restart <" in t and "[ Cancel ]" in t for t in body)

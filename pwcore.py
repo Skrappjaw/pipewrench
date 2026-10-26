@@ -152,8 +152,11 @@ for _t in THEMES.values():
     for _new, _old in (("head_play", "title"), ("head_rec", "title"), ("head_src", "title"), ("head_dst", "title"),
                        ("vol", "ok"), ("vol_over", "alert"), ("dir_out", "dim"), ("dir_in", "dim"),
                        ("meter_low", "ok"), ("meter_mid", "pending"), ("meter_high", "alert"),
-                       ("band_ok", "bar_ok"), ("band_alert", "bar_alert")):
+                       ("band_ok", "bar_ok"), ("band_alert", "bar_alert"), ("popup", "chip"), ("popup_sel", "selected")):
         _t.setdefault(_new, _t[_old])
+    if _t["popup_sel"] == _t["popup"]:  # pipeOS-dark: chip and selected match, so the choice was invisible
+        _fg, _bg, _attr = _t["popup"]
+        _t["popup_sel"] = (_bg, _fg, "bold")
 THEME_NAMES = list(THEMES)
 THEME_LABELS = {"pipeboy": "Pipe Boy", "pipeboy-amber": "Pipe Boy Amber", "pipeboy-cyan": "Pipe Boy Cyan",
                 "pipeboy-white": "Pipe Boy White", "vaporware": "Vaporware", "pipecraft": "Pipecraft",
@@ -1144,7 +1147,8 @@ def _overlay_popup(cv, st, devices, width, height):
     """Draw the open popover centred over the finished screen; only its buttons take clicks. Buttons sit on
     one row, or one per row when the screen is too narrow for that."""
     title, text, buttons = popup_view(st, devices)
-    labels = [f"[ {b} ]" for b, _ in buttons]
+    chosen = popup_cursor(st)
+    labels = [f"> {b} <" if i == chosen else f"[ {b} ]" for i, (b, _) in enumerate(buttons)]  # marked, not only coloured
     one_row = "  ".join(labels)
     bw = max(8, min(width - 4, max(48, len(title) + 8, len(one_row) + 6)))
     inner = bw - 4
@@ -1158,7 +1162,6 @@ def _overlay_popup(cv, st, devices, width, height):
         rows.append(f"│ {row.center(inner)[:inner]} │")
     rows += [blank, "└" + "─" * (bw - 2) + "┘"]
     y0, x0 = max(0, (height - len(rows)) // 2), (width - bw) // 2
-    chosen = popup_cursor(st)
     cv.hits = []
     i = 0
     for n, row in enumerate(rows):
@@ -1168,12 +1171,12 @@ def _overlay_popup(cv, st, devices, width, height):
         text0, style = cv.lines[y]
         base, spans = style if isinstance(style, tuple) else (style, [])
         line = text0.ljust(width)[:width]
-        spans = list(spans) + [(x0, x0 + bw, "chip")]
+        spans = list(spans) + [(x0, x0 + bw, "popup")]
         if first_btn <= n < first_btn + len(btn_rows):
             group = btn_rows[n - first_btn]
             c = x0 + 2 + (inner - len("  ".join(group))) // 2
             for label in group:
-                spans.append((c, c + len(label), "selected" if i == chosen else "chip"))
+                spans.append((c, c + len(label), "popup_sel" if i == chosen else "popup"))
                 cv.hit(y, c, c + len(label), ("popup_btn", i))
                 c, i = c + len(label) + 2, i + 1
         cv.lines[y] = (line[:x0] + row + line[x0 + bw:], (base, spans))
