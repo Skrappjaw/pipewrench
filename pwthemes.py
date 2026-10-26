@@ -125,6 +125,8 @@ def derive(general, specific):
     for dot in ("src", "dst", "dst_partial"):
         for bar in _BARS:
             t[f"{dot}@{bar}"] = (t[dot][0], t[bar][1], t[dot][2]) if own else t[bar]
+    for bar in ("selected", "anchor"):  # a closed value row's grey ◀ ▶ on the cursor bar
+        t[f"dim@{bar}"] = (t["dim"][0], t[bar][1], t["dim"][2])
     for role in SPECIFIC:
         t.setdefault(role, t[ROLES[role][2]])
     if t["popup_sel"] == t["popup"]:  # pipeOS-dark: chip and selected match, so the choice was invisible

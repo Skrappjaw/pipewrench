@@ -219,7 +219,7 @@ A menu on the left picks the category, and the category opens on the right. Sett
 menu: ↑↓ picks **Audio** or **Preferences**, and Enter or → goes into it. ← or Esc comes back to the
 menu, and coming back drops any unapplied change. A click on a category opens it.
 
-A value never changes on a stray arrow: **Enter opens a row**, then ←→ change it. Enter applies (or keeps)
+A value never changes on a stray arrow: **Enter opens a row**, then ←→ change it. A row's `◀ ▶` stay grey until it's open. Enter applies (or keeps)
 it, Esc puts the row back, and ↑↓ close it, keeping the change. A tap on a row's ◀ ▶ opens it and steps it
 in one go.
 

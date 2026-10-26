@@ -1220,12 +1220,13 @@ def _render_audio(cv, st, current, realtime=None, rates=None):
         lat = row_latency(s, value, merged)
         spans = [(len(line) - 1, len(line), "pending")] + ([(len(line), len(line) + len(lat) + 2, "dim")] if lat else [])
         line += f"  {lat}" if lat else ""
-        if i == st.cursor:  # an open row is drawn as the anchor, so editing reads differently from selecting
-            style = "anchor" if st.editing else "selected"
-        else:
-            style = ("normal", spans)
-        row = cv.add(line, style)
         arrow_l, arrow_r = len(head), len(head) + 17
+        arrows = _arrow_spans(arrow_l, arrow_r, i == st.cursor, i == st.cursor and st.editing)
+        if i == st.cursor:  # an open row is drawn as the anchor, so editing reads differently from selecting
+            style = ("anchor" if st.editing else "selected", arrows)
+        else:
+            style = ("normal", spans + arrows)
+        row = cv.add(line, style)
         cv.hit(row, 0, arrow_l, ("setting", i))
         cv.hit(row, arrow_l, arrow_l + 1, ("arrow", i, -1))
         cv.hit(row, arrow_l + 1, arrow_r, ("setting", i))
@@ -1327,11 +1328,20 @@ def _render_realtime(cv, status):
             cv.add((head if k == 0 else " " * len(head)) + part, "ok" if status.ok else "pending")
 
 
+def _arrow_spans(arrow_l, arrow_r, on_cursor, open_):
+    """◀ ▶ are grey until Enter opens the row (Skrappjaw, 2026-10-26); on the cursor bar they keep its background."""
+    if open_:
+        return []
+    role = "dim@selected" if on_cursor else "dim"
+    return [(arrow_l, arrow_l + 1, role), (arrow_r, arrow_r + 1, role)]
+
+
 def _display_row(cv, st, idx, label, value, note):
     head = f"{'> ' if st.cursor == idx else '  '}{label:<20} "
-    style = ("anchor" if st.editing else "selected") if st.cursor == idx else "normal"
-    row = cv.add(f"{head}◀ {value:^14} ▶   {note}", style)
+    base = ("anchor" if st.editing else "selected") if st.cursor == idx else "normal"
     arrow_l, arrow_r = len(head), len(head) + 17
+    spans = _arrow_spans(arrow_l, arrow_r, st.cursor == idx, st.cursor == idx and st.editing)
+    row = cv.add(f"{head}◀ {value:^14} ▶   {note}", (base, spans))
     cv.hit(row, 0, arrow_l, ("setting", idx))
     cv.hit(row, arrow_l, arrow_l + 1, ("arrow", idx, -1))
     cv.hit(row, arrow_l + 1, arrow_r, ("setting", idx))

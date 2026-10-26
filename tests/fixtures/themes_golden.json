@@ -265,6 +265,16 @@
     "black",
     "cyan",
     ""
+   ],
+   "dim@selected": [
+    null,
+    "cyan",
+    "dim"
+   ],
+   "dim@anchor": [
+    null,
+    "blue",
+    "dim"
    ]
   },
   "light": {
@@ -532,6 +542,16 @@
     "black",
     "cyan",
     ""
+   ],
+   "dim@selected": [
+    null,
+    "cyan",
+    "dim"
+   ],
+   "dim@anchor": [
+    null,
+    "blue",
+    "dim"
    ]
   },
   "crowbar": {
@@ -799,6 +819,16 @@
     "#000000",
     "#ff7139",
     ""
+   ],
+   "dim@selected": [
+    null,
+    "#ff7139",
+    "dim"
+   ],
+   "dim@anchor": [
+    null,
+    "#45454b",
+    "dim"
    ]
   },
   "pipeboy": {
@@ -1065,6 +1095,16 @@
    "popup_sel": [
     "#0b1a0d",
     "#3cff62",
+    ""
+   ],
+   "dim@selected": [
+    "#1f8a35",
+    "#3cff62",
+    ""
+   ],
+   "dim@anchor": [
+    "#1f8a35",
+    "#13401c",
     ""
    ]
   },
@@ -1333,6 +1373,16 @@
     "#1a1000",
     "#ffb000",
     ""
+   ],
+   "dim@selected": [
+    "#9a6a00",
+    "#ffb000",
+    ""
+   ],
+   "dim@anchor": [
+    "#9a6a00",
+    "#4a3300",
+    ""
    ]
   },
   "pipeboy-cyan": {
@@ -1599,6 +1649,16 @@
    "popup_sel": [
     "#071a1c",
     "#33f0ff",
+    ""
+   ],
+   "dim@selected": [
+    "#1a8a94",
+    "#33f0ff",
+    ""
+   ],
+   "dim@anchor": [
+    "#1a8a94",
+    "#0d3f45",
     ""
    ]
   },
@@ -1867,6 +1927,16 @@
     "#121212",
     "#e6e6e6",
     ""
+   ],
+   "dim@selected": [
+    "#8c8c8c",
+    "#e6e6e6",
+    ""
+   ],
+   "dim@anchor": [
+    "#8c8c8c",
+    "#3a3a3a",
+    ""
    ]
   },
   "vaporware": {
@@ -2133,6 +2203,16 @@
    "popup_sel": [
     "#1b0d33",
     "#01cdfe",
+    ""
+   ],
+   "dim@selected": [
+    "#8a6fb3",
+    "#01cdfe",
+    ""
+   ],
+   "dim@anchor": [
+    "#8a6fb3",
+    "#3a1d5c",
     ""
    ]
   },
@@ -2401,6 +2481,16 @@
     "#ffffa0",
     "#6f6f6f",
     "bold"
+   ],
+   "dim@selected": [
+    "#aaaaaa",
+    "#6f6f6f",
+    ""
+   ],
+   "dim@anchor": [
+    "#aaaaaa",
+    "#4a4a4a",
+    ""
    ]
   },
   "pipeos-lite": {
@@ -2667,6 +2757,16 @@
    "popup_sel": [
     "#0b2540",
     "#bcdcff",
+    ""
+   ],
+   "dim@selected": [
+    "#8a9399",
+    "#bcdcff",
+    ""
+   ],
+   "dim@anchor": [
+    "#8a9399",
+    "#e3efff",
     ""
    ]
   },
@@ -2935,6 +3035,16 @@
     "#0b4a80",
     "#ffffff",
     "bold"
+   ],
+   "dim@selected": [
+    "#5f6b73",
+    "#0b4a80",
+    ""
+   ],
+   "dim@anchor": [
+    "#5f6b73",
+    "#16283a",
+    ""
    ]
   }
  },
