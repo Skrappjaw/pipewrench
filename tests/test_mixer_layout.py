@@ -117,6 +117,7 @@ def test_every_theme_defines_the_bar_roles():
 
 def test_volume_bar_row_toggles_and_saves():
     st = pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane", cursor=pc.BAR_ROW)
+    st, _ = pc.handle_key(st, "enter", {})  # Enter opens the row first (Skrappjaw, 2026-10-25)
     st, actions = pc.handle_key(st, "right", {})
     assert st.volume_bar is False and actions == [("save_ui",)]
     st, _ = pc.handle_key(st, "left", {})

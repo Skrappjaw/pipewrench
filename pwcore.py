@@ -258,6 +258,28 @@ def setting(key):
     raise KeyError(key)
 
 
+def latency_ms(quantum, rate):
+    """One buffer's period, quantum ÷ rate, as '2.67 ms'; '' when either is unknown."""
+    if not isinstance(quantum, int) or not isinstance(rate, int) or quantum <= 0 or rate <= 0:
+        return ""
+    ms = quantum / rate * 1000
+    return f"{ms:.2f} ms" if ms < 10 else f"{ms:.1f} ms"
+
+
+def row_latency(s, value, merged):
+    """The latency a clock row stands for: a buffer row at the rate in use, the rate row with the buffer in use.
+    In use = the forced value (pending counts), else PipeWire's default (clock.rate, clock.quantum)."""
+    rate = merged.get("clock.force-rate") or merged.get("clock.rate")
+    quantum = merged.get("clock.force-quantum") or merged.get("clock.quantum")
+    if s.key == "clock.force-rate":
+        return latency_ms(quantum, value or merged.get("clock.rate"))
+    if s.key in ("clock.min-quantum", "clock.max-quantum"):
+        return latency_ms(value, rate)
+    if s.key == "clock.force-quantum":
+        return latency_ms(value or merged.get("clock.quantum"), rate)
+    return ""
+
+
 def display_value(s, value):
     if value is None:
         return "?"
@@ -455,6 +477,8 @@ class UIState:
     volume_bar: bool = True      # the bar under each Mixer channel; off leaves just the %
     keys: dict = field(default_factory=dict)  # key binding overrides {action id: key or None} (pwkeys)
     key_capture: str = None      # Settings → Keys: the action id waiting for its new key
+    editing: bool = False        # Settings: Enter opened the row's value; ←→ change it (Skrappjaw, 2026-10-25)
+    edit_from: tuple = None      # what Esc restores: (had pending, old pending) or (pref attr, old value)
 
 
 # The now-playing bar's keys work on every tab; no tab uses these characters. * - + sit on the numpad.
@@ -487,12 +511,14 @@ def handle_key(st, key, current, devices=None, patch=None, mixer=None):
         return st, []
     if key == "q":
         return st, [("quit",)]
-    if key == "tab":
-        st.tab = TABS[(TABS.index(st.tab) + 1) % len(TABS)]
-        return st, []
+    if key in ("tab", "btab"):
+        st, actions = _leave(st)
+        st.tab = TABS[(TABS.index(st.tab) + (1 if key == "tab" else -1)) % len(TABS)]
+        return st, actions
     if key.isdigit() and 1 <= int(key) <= len(TABS):
+        st, actions = _leave(st)
         st.tab = TABS[int(key) - 1]
-        return st, []
+        return st, actions
     if key in MEDIA_KEYS:
         return st, [MEDIA_KEYS[key]]
     if st.tab in pk.SCREENS and not (st.dev_menu or st.mix_menu or st.patch_menu):
@@ -524,6 +550,46 @@ HOLD_ROW = FALL_ROW + 1
 BAR_ROW = HOLD_ROW + 1
 KEYS_ROW = BAR_ROW + 1     # one row per pwkeys action
 RESET_KEYS_ROW = KEYS_ROW + len(pk.ACTIONS)
+
+
+PREF_ROWS = {THEME_ROW: "theme", FPS_ROW: "meter_fps", FALL_ROW: "meter_fall", HOLD_ROW: "peak_hold",
+             BAR_ROW: "volume_bar"}
+
+
+def _leave(st):
+    """Leaving a view or the Settings pane resets it (Skrappjaw, 2026-10-25): open menus close, an edit is
+    cancelled and unapplied clock changes are dropped. List positions and view choices stay."""
+    actions = _restore_pref(st) if st.editing and st.settings_cat == "prefs" else []
+    dropped = bool(st.pending)
+    st.pending, st.editing, st.edit_from, st.key_capture = {}, False, None, None
+    st.mix_menu = st.dev_menu = None
+    st.patch_menu = st.patch_ports = False
+    st.settings_focus, st.cursor = "menu", 0
+    if dropped:
+        st.message = "unapplied changes dropped"
+    return st, actions
+
+
+def _begin_edit(st):
+    """Open the cursor row's value for ←→. Only value rows open; buttons and Keys rows don't."""
+    if st.settings_cat == "audio" and st.cursor < CLOCK_BUTTONS_ROW:
+        k = SETTINGS[st.cursor].key
+        st.editing, st.edit_from = True, (k in st.pending, st.pending.get(k))
+    elif st.settings_cat == "prefs" and st.cursor in PREF_ROWS:
+        attr = PREF_ROWS[st.cursor]
+        st.editing, st.edit_from = True, (attr, getattr(st, attr))
+    return st
+
+
+def _end_edit(st):
+    st.editing, st.edit_from = False, None
+    return st
+
+
+def _restore_pref(st):
+    attr, old = st.edit_from
+    setattr(st, attr, old)
+    return [("set_theme", old)] if attr == "theme" else [("save_ui",)]
 
 
 def _bind(st, action_id, new):
@@ -558,9 +624,8 @@ def _key_settings(st, key, current):
         return st, []
     if st.settings_focus == "menu":
         return _key_settings_menu(st, key)
-    if key == "esc" and not st.pending:
-        st.settings_focus = "menu"
-        return st, []
+    if key == "esc" and not st.pending and not st.editing:
+        return _leave(st)
     return (_key_prefs if st.settings_cat == "prefs" else _key_audio)(st, key, current)
 
 
@@ -577,8 +642,12 @@ def _key_settings_menu(st, key):
 
 def _key_audio(st, key, current):
     st.cursor = max(0, min(CLOCK_BUTTONS_ROW, st.cursor))
+    if st.editing:
+        return _edit_clock(st, key, current)
     if key in ("up", "down"):
         st.cursor = max(0, min(CLOCK_BUTTONS_ROW, st.cursor + (1 if key == "down" else -1)))
+    elif st.cursor == CLOCK_BUTTONS_ROW and key == "left" and st.clock_button == 0:
+        return _leave(st)
     elif st.cursor == CLOCK_BUTTONS_ROW and key in ("left", "right"):
         st.clock_button = max(0, min(len(CLOCK_BUTTONS) - 1, st.clock_button + (1 if key == "right" else -1)))
     elif st.cursor == CLOCK_BUTTONS_ROW and key == "enter":
@@ -588,8 +657,19 @@ def _key_audio(st, key, current):
         if button == "Reset":
             return _reset_clock(st, current)
         return _apply_clock(st, current)
-    elif key in ("left", "right"):
-        s = SETTINGS[st.cursor]
+    elif key == "left":
+        return _leave(st)
+    elif key == "enter":
+        _begin_edit(st)
+    elif key == "esc":
+        st.pending, st.message = {}, "reverted"
+    return st, []
+
+
+def _edit_clock(st, key, current):
+    """An open clock row: ←→ step it (pending), Enter applies, Esc puts it back, ↑↓ keep it pending."""
+    s = SETTINGS[st.cursor]
+    if key in ("left", "right"):
         base = st.pending.get(s.key, current.get(s.key))
         new = cycle(s, base if isinstance(base, int) else s.choices[0], 1 if key == "right" else -1)
         if new == current.get(s.key):
@@ -598,9 +678,16 @@ def _key_audio(st, key, current):
             st.pending[s.key] = new
         st.message = ""
     elif key == "enter":
-        return _apply_clock(st, current)
+        return _apply_clock(_end_edit(st), current)
     elif key == "esc":
-        st.pending, st.message = {}, "reverted"
+        had, old = st.edit_from
+        if had:
+            st.pending[s.key] = old
+        else:
+            st.pending.pop(s.key, None)
+        _end_edit(st).message = "cancelled"
+    elif key in ("up", "down"):
+        _end_edit(st).cursor = max(0, min(CLOCK_BUTTONS_ROW, st.cursor + (1 if key == "down" else -1)))
     return st, []
 
 
@@ -638,8 +725,14 @@ def _reset_clock(st, current):
 
 def _key_prefs(st, key, current):
     st.cursor = max(0, min(RESET_KEYS_ROW, st.cursor))
+    if st.editing:
+        return _edit_pref(st, key)
     if key in ("up", "down"):
         st.cursor = max(0, min(RESET_KEYS_ROW, st.cursor + (1 if key == "down" else -1)))
+    elif key == "left":
+        return _leave(st)
+    elif st.cursor in PREF_ROWS and key == "enter":
+        _begin_edit(st)
     elif KEYS_ROW <= st.cursor < RESET_KEYS_ROW and key in ("enter", "backspace", "delete"):
         a = pk.ACTIONS[st.cursor - KEYS_ROW]
         if key == "enter":
@@ -649,19 +742,36 @@ def _key_prefs(st, key, current):
         return _bind(st, a.id, None)
     elif st.cursor == RESET_KEYS_ROW and key == "enter":
         st.confirm = ("reset_keys",)
-    elif key in ("left", "right") and st.cursor == BAR_ROW:
+    return st, []
+
+
+def _edit_pref(st, key):
+    """An open Display row: ←→ change it live, Enter keeps it, Esc puts it back, ↑↓ keep it."""
+    if key in ("left", "right"):
+        return _step_pref(st, key)
+    if key == "enter":
+        _end_edit(st)
+    elif key == "esc":
+        actions = _restore_pref(st)
+        _end_edit(st).message = "cancelled"
+        return st, actions
+    elif key in ("up", "down"):
+        _end_edit(st).cursor = max(0, min(RESET_KEYS_ROW, st.cursor + (1 if key == "down" else -1)))
+    return st, []
+
+
+def _step_pref(st, key):
+    if st.cursor == BAR_ROW:
         st.volume_bar = not st.volume_bar
         return st, [("save_ui",)]
-    elif key in ("left", "right") and st.cursor in (FPS_ROW, FALL_ROW, HOLD_ROW):
+    if st.cursor in (FPS_ROW, FALL_ROW, HOLD_ROW):
         name, choices = {FPS_ROW: ("meter_fps", METER_FPS), FALL_ROW: ("meter_fall", METER_FALL),
                          HOLD_ROW: ("peak_hold", PEAK_HOLD)}[st.cursor]
         n = max(0, min(len(choices) - 1, choices.index(getattr(st, name)) + (1 if key == "right" else -1)))
         setattr(st, name, choices[n])
         return st, [("save_ui",)]
-    elif key in ("left", "right") and st.cursor == THEME_ROW:
-        st.theme = THEME_NAMES[(THEME_NAMES.index(st.theme) + (1 if key == "right" else -1)) % len(THEME_NAMES)]
-        return st, [("set_theme", st.theme)]
-    return st, []
+    st.theme = THEME_NAMES[(THEME_NAMES.index(st.theme) + (1 if key == "right" else -1)) % len(THEME_NAMES)]
+    return st, [("set_theme", st.theme)]
 
 
 def _key_top(st, key, current):
@@ -782,16 +892,24 @@ def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer
     kind = target[0]
     keys = []
     if kind == "tab":
-        return dataclasses.replace(st, tab=target[1]), []
+        st, actions = _leave(dataclasses.replace(st))
+        st.tab = target[1]
+        return st, actions
     if kind == "settings_cat":
-        cursor = st.cursor if target[1] == st.settings_cat else 0
-        st = dataclasses.replace(st, settings_cat=target[1], cursor=cursor, settings_focus="menu")
-        keys = ["enter"] if event == "double" else []
+        st, actions = _leave(dataclasses.replace(st))
+        st.settings_cat = target[1]
+        for k in ["enter"] if event == "double" else []:
+            st, a = handle_key(st, k, current, devices, patch, mixer)
+            actions += a
+        return st, actions
     elif kind == "setting":
+        if st.editing and target[1] != st.cursor:
+            st = _end_edit(dataclasses.replace(st))
         st = dataclasses.replace(st, cursor=target[1], settings_focus="pane")
         keys = ["enter"] if event == "double" else []
-    elif kind == "arrow":
-        st = dataclasses.replace(st, cursor=target[1], settings_focus="pane")
+    elif kind == "arrow":  # a tap on ◀ ▶ is deliberate: it opens the row and steps it
+        if not (st.editing and target[1] == st.cursor):
+            st = _begin_edit(_end_edit(dataclasses.replace(st, cursor=target[1], settings_focus="pane")))
         keys = ["right" if target[2] > 0 else "left"] if event in ("click", "double") else []
     elif kind == "clock_button":  # a button: one click presses it
         st = dataclasses.replace(st, cursor=CLOCK_BUTTONS_ROW, clock_button=target[1], settings_focus="pane")
@@ -832,20 +950,24 @@ def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer
 
 # --- rendering (view model) --------------------------------------------------
 
-TAB_KEYS = [(f"Tab/1-{len(TABS)}", "tabs"), ("q", "quit")]
+TAB_KEYS = [(f"Tab/⇧Tab/1-{len(TABS)}", "tabs"), ("q", "quit")]
 # (key, slug) pairs; Enter first wherever it acts. Drawn as a box of chips by _key_box.
 LEGENDS = {
     "mixer": [("Enter", "actions"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"),
               ("v", "meters")] + TAB_KEYS,
-    "settings": [("Enter", "apply"), ("↑↓", "select"), ("←→", "change"), ("Esc", "revert/menu"),
-                 ("s", "save"), ("R", "restart WirePlumber")] + TAB_KEYS,
+    "settings": [("Enter", "edit"), ("↑↓", "select"), ("← Esc", "menu"), ("s", "save"),
+                 ("R", "restart WirePlumber")] + TAB_KEYS,
+    "settings buttons": [("Enter", "press"), ("←→", "pick"), ("↑↓", "select"), ("Esc", "menu"), ("s", "save"),
+                         ("R", "restart WirePlumber")] + TAB_KEYS,
+    "settings edit": [("←→", "change"), ("Enter", "apply"), ("Esc", "cancel"), ("↑↓", "keep and move")],
+    "preferences edit": [("←→", "change"), ("Enter", "keep"), ("Esc", "cancel"), ("↑↓", "keep and move")],
     "settings menu": [("Enter", "open"), ("↑↓", "category"), ("s", "save clock"),
                       ("R", "restart WirePlumber")] + TAB_KEYS,
-    "preferences": [("↑↓", "select"), ("←→", "change"), ("Esc", "menu")] + TAB_KEYS,
+    "preferences": [("Enter", "edit"), ("↑↓", "select"), ("← Esc", "menu")] + TAB_KEYS,
     "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
     "about": TAB_KEYS,
     "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("h", "show hidden"), ("A", "apply files"), ("R", "restart WirePlumber")] + TAB_KEYS,
-    "keys": [("Enter", "rebind"), ("↑↓", "select"), ("Bksp", "unbind"), ("Esc", "menu")] + TAB_KEYS,
+    "keys": [("Enter", "rebind"), ("↑↓", "select"), ("Bksp", "unbind"), ("← Esc", "menu")] + TAB_KEYS,
     "keys capture": [("Esc", "cancel"), ("Bksp", "unbind")],
     "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
     "mixer menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
@@ -888,6 +1010,8 @@ def _key_box(items, width):
 
 def _chip_key(label):
     """The key a click on a chip presses; None for chips that name several (↑↓, Tab/1-5)."""
+    if label.endswith(" Esc"):  # "← Esc", "p Esc": a tap is Esc, so the way back stays tappable
+        return "esc"
     return {"Enter": "enter", "Esc": "esc", "Space": " "}.get(label) or (label if len(label) == 1 else None)
 
 
@@ -918,8 +1042,12 @@ def _legend(st):
         return LEGENDS["keys capture"]
     if st.tab == "settings" and st.settings_focus == "menu":
         return LEGENDS["settings menu"]
+    if st.tab == "settings" and st.editing:
+        return LEGENDS["preferences edit" if st.settings_cat == "prefs" else "settings edit"]
     if st.tab == "settings" and st.settings_cat == "prefs":
         return LEGENDS["keys" if KEYS_ROW <= st.cursor < RESET_KEYS_ROW else "preferences"]
+    if st.tab == "settings" and st.cursor == CLOCK_BUTTONS_ROW:
+        return LEGENDS["settings buttons"]
     if st.tab == "patch" and st.patch_menu:
         return LEGENDS["patch menu"]
     if st.tab == "patch":
@@ -1089,13 +1217,21 @@ def _render_settings(cv, st, current, body_h, realtime=None, rates=None):
 
 def _render_audio(cv, st, current, realtime=None, rates=None):
     cv.add("  Clock", "title")
+    merged = {**current, **st.pending}
     for i, s in enumerate(SETTINGS):
         value = st.pending.get(s.key, current.get(s.key))
         mark = "*" if s.key in st.pending else " "
         prefix = "> " if i == st.cursor else "  "
         head = f"{prefix}{s.label:<20} "
         line = f"{head}◀ {display_value(s, value):^14} ▶ {mark}"
-        row = cv.add(line, "selected" if i == st.cursor else ("normal", [(len(line) - 1, len(line), "pending")]))
+        lat = row_latency(s, value, merged)
+        spans = [(len(line) - 1, len(line), "pending")] + ([(len(line), len(line) + len(lat) + 2, "dim")] if lat else [])
+        line += f"  {lat}" if lat else ""
+        if i == st.cursor:  # an open row is drawn as the anchor, so editing reads differently from selecting
+            style = "anchor" if st.editing else "selected"
+        else:
+            style = ("normal", spans)
+        row = cv.add(line, style)
         arrow_l, arrow_r = len(head), len(head) + 17
         cv.hit(row, 0, arrow_l, ("setting", i))
         cv.hit(row, arrow_l, arrow_l + 1, ("arrow", i, -1))
@@ -1200,7 +1336,8 @@ def _render_realtime(cv, status):
 
 def _display_row(cv, st, idx, label, value, note):
     head = f"{'> ' if st.cursor == idx else '  '}{label:<20} "
-    row = cv.add(f"{head}◀ {value:^14} ▶   {note}", "selected" if st.cursor == idx else "normal")
+    style = ("anchor" if st.editing else "selected") if st.cursor == idx else "normal"
+    row = cv.add(f"{head}◀ {value:^14} ▶   {note}", style)
     arrow_l, arrow_r = len(head), len(head) + 17
     cv.hit(row, 0, arrow_l, ("setting", idx))
     cv.hit(row, arrow_l, arrow_l + 1, ("arrow", idx, -1))

@@ -30,7 +30,7 @@ STATES = {
     "patch grid": pc.UIState(tab="patch", patch_view="grid"),
     "patch ports": pc.UIState(tab="patch", patch_ports=True, patch_side="dst"),
 }
-ENTER = {"mixer": "actions", "mixer menu": "pick", "settings": "apply", "settings menu": "open", "devices": "actions", "devices menu": "pick",
+ENTER = {"mixer": "actions", "mixer menu": "pick", "settings": "edit", "settings menu": "open", "devices": "actions", "devices menu": "pick",
          "patch columns": "connect/disconnect", "patch grid": "connect/disconnect", "patch ports": "link/unlink"}
 
 
@@ -85,7 +85,7 @@ def test_keys_are_chips_with_their_slug(name):
 @pytest.mark.parametrize("name", [n for n in STATES if not n.endswith(" menu")])
 def test_every_box_ends_with_tabs_and_quit(name):
     pairs = chips(render(STATES[name]))
-    assert pairs[-2:] == [(f"Tab/1-{len(pc.TABS)}", "tabs"), ("q", "quit")]
+    assert pairs[-2:] == [(f"Tab/⇧Tab/1-{len(pc.TABS)}", "tabs"), ("q", "quit")]
 
 
 def test_enter_comes_first_where_it_acts():
@@ -103,7 +103,7 @@ def test_one_box_and_a_status_line_for_messages(name):
 
 
 def test_legend_survives_a_message():
-    assert ("Enter", "apply") in chips(render(pc.UIState(tab="settings", settings_focus="pane", message="applied")))
+    assert ("Enter", "edit") in chips(render(pc.UIState(tab="settings", settings_focus="pane", message="applied")))
 
 
 def flat(lines):

@@ -56,14 +56,14 @@ def test_settings_render_shows_values_and_pending_marker():
     assert "Force sample rate" in body and "48000" in body
     assert "Force buffer size" in body and "128" in body
     assert not any("*" in t for t, _ in lines if "◀" in t)  # no pending marker on any setting row
-    st, _ = key(st, "down", "down", "down", "right")  # force-quantum 128 -> 256 pending
+    st, _ = key(st, "down", "down", "down", "enter", "right")  # force-quantum 128 -> 256 pending
     lines, _ = screen(st)
     row = [t for t, _ in lines if "Force buffer size" in t][0]
     assert "256" in row and "*" in row
 
 
 def test_settings_render_shows_allowed_rates_and_warning():
-    st, _ = key(UIState(), "right")  # force-rate 48000 -> 88200 pending
+    st, _ = key(UIState(), "enter", "right")  # force-rate 48000 -> 88200 pending
     lines, _ = screen(st)
     body = "\n".join(t for t, _ in lines)
     assert "allowed rates: 48000" in body
@@ -121,7 +121,7 @@ def test_up_down_moves_cursor_and_clamps():
 
 
 def test_left_right_sets_pending_without_action():
-    st, actions = key(UIState(), "down", "down", "down", "right", "right")
+    st, actions = key(UIState(), "down", "down", "down", "enter", "right", "right")
     assert st.pending == {"clock.force-quantum": 512}
     assert actions == []
 
@@ -132,8 +132,8 @@ def test_pending_back_to_current_clears():
 
 
 def test_enter_applies_all_pending_in_order():
-    st, actions = key(UIState(), "down", "down", "down", "right", "up", "up", "right", "enter")
-    # cursor 3 (force buffer) -> up, up -> cursor 1 (min buffer) 32 -> 64
+    st, actions = key(UIState(), "down", "down", "down", "enter", "right", "up", "up", "enter", "right", "enter")
+    # cursor 3 (force buffer) 128 -> 256; up ends the edit, up -> cursor 1 (min buffer) 32 -> 64; Enter applies both
     assert actions == [("set_many", [("clock.min-quantum", 64), ("clock.force-quantum", 256)])]
     assert st.pending == {}
 
@@ -145,7 +145,7 @@ def test_enter_with_nothing_pending_does_nothing():
 
 def test_enter_with_invalid_pending_blocks_and_reports():
     # min-quantum up to 4096 (> max 2048)
-    st, actions = key(UIState(), "down", *["right"] * 7, "enter")
+    st, actions = key(UIState(), "down", "enter", *["right"] * 7, "enter")
     assert st.pending == {"clock.min-quantum": 4096}
     assert actions == []
     assert "min" in st.message
@@ -219,8 +219,8 @@ def test_menu_keys_never_change_a_value():
 
 
 def test_esc_drops_pending_first_then_goes_back_to_the_menu():
-    st, _ = key(UIState(), "right")
-    assert st.pending
+    st, _ = key(UIState(), "enter", "right", "down")  # pending, edit closed
+    assert st.pending and not st.editing
     st, _ = key(st, "esc")
     assert st.pending == {} and st.settings_focus == "pane"
     st, _ = key(st, "esc")
@@ -357,7 +357,7 @@ def test_click_arrow_equals_keys():
     st = UIState()
     _, hits = screen(st)
     via_mouse, a1 = click(st, hits, ("arrow", 3, +1))
-    via_keys, a2 = key(st, "down", "down", "down", "right")
+    via_keys, a2 = key(st, "down", "down", "down", "enter", "right")
     assert via_mouse.pending == via_keys.pending and via_mouse.cursor == via_keys.cursor
     assert a1 == a2 == []
 
@@ -382,7 +382,7 @@ def test_wheel_works_anywhere_on_the_screen():
 
 
 def test_apply_and_revert_chips():
-    st, _ = key(UIState(), "down", "down", "down", "right")
+    st, _ = key(UIState(), "down", "down", "down", "enter", "right")
     _, hits = screen(st)
     _, actions = click(st, hits, ("key", "enter"))
     assert actions == key(st, "enter")[1]
@@ -391,7 +391,7 @@ def test_apply_and_revert_chips():
 
 
 def test_double_click_row_applies():
-    st, _ = key(UIState(), "down", "down", "down", "right")
+    st, _ = key(UIState(), "down", "down", "down", "enter", "right")
     _, hits = screen(st)
     _, actions = click(st, hits, ("setting", 3), event="double")
     assert actions == [("set_many", [("clock.force-quantum", 256)])]
@@ -433,7 +433,7 @@ def test_click_while_confirming_cancels_without_acting():
 
 def test_theme_row_switches_at_once_and_reports_it():
     st = UIState(settings_cat="prefs", cursor=pc.THEME_ROW)
-    st, actions = key(st, "right")
+    st, actions = key(st, "enter", "right")
     assert st.theme == "light" and actions == [("set_theme", "light")]
     assert "light" in "\n".join(t for t, _ in screen(st)[0])
     st, actions = key(st, *["right"] * (len(pc.THEME_NAMES) - 1))
@@ -582,7 +582,7 @@ def test_multi_key_chips_have_no_hit():
 
 def test_meter_frame_rate_steps_and_saves():
     st = UIState(settings_cat="prefs", cursor=pc.FPS_ROW)
-    st, actions = key(st, "right")
+    st, actions = key(st, "enter", "right")
     assert st.meter_fps == 15 and actions == [("save_ui",)]
     st, _ = key(st, *["right"] * 8)
     assert st.meter_fps == 60  # stops at the top
@@ -595,7 +595,7 @@ def test_meter_frame_rate_steps_and_saves():
 
 def test_meter_fall_steps_and_saves():
     st = UIState(settings_cat="prefs", cursor=pc.FALL_ROW)
-    st, actions = key(st, "right")
+    st, actions = key(st, "enter", "right")
     assert st.meter_fall == 40 and actions == [("save_ui",)]
     st, _ = key(st, *["left"] * 6)
     assert st.meter_fall == 10
@@ -607,7 +607,7 @@ def test_meter_fall_steps_and_saves():
 
 def test_peak_hold_steps_to_off_and_saves():
     st = UIState(settings_cat="prefs", cursor=pc.HOLD_ROW)
-    st, actions = key(st, "right")
+    st, actions = key(st, "enter", "right")
     assert st.peak_hold == 2 and actions == [("save_ui",)]
     st, _ = key(st, *["left"] * 8)
     assert st.peak_hold == 0
