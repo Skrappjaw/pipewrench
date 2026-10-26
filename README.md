@@ -37,11 +37,15 @@ pwrench devices label DEV TEXT | hide NAME | bus add NAME | bus delete NAME
 pwrench devices preview | apply [--restart] | rollback | restart
 pwrench patch [list] | connect SRC DST | disconnect SRC DST
 pwrench realtime
+pwrench theme list | export ID [FILE] | check [FILE]
 ```
+
+Make your own colours: [the theme guide](docs/themes.md).
 
 ## Where it keeps things
 
 - Your settings: `~/.config/pipewrench/`
+- Your themes: `~/.config/pipewrench/themes/*.toml`
 - Buses and the clock: `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf`
 - Device names: `~/.config/wireplumber/…/51-pipewrench-labels.*`
 

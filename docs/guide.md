@@ -317,6 +317,10 @@ recording, inputs and destinations. Everything else uses blue.
 
 Every theme except dark and light needs a 256-colour terminal; on a basic one PipeWrench shows dark instead.
 
+**Your own themes.** Every theme is a small TOML file you can copy and change: `pwrench theme export
+pipeos-dark`, edit a line, then open the Theme row again to pick it. Opening the row re-reads the files, and the
+status band says how many it found or what's wrong with one. Everything is in **[the theme guide](themes.md)**.
+
 #### Keys
 
 Every letter shortcut, one row each, with the key it's on. Enter on a row, then press the new key.

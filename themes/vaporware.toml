@@ -1,0 +1,20 @@
+# Vaporware: vaporwave colours on dark purple.
+name = "Vaporware"
+order = 7
+extends = "dark"
+logo = "slant"
+
+[general]
+screen = { fg = "#e8d9ff", bg = "#1b0d33" }
+normal = { }
+dim = { fg = "#8a6fb3" }
+selected = { fg = "#1b0d33", bg = "#01cdfe" }
+anchor = { fg = "#01cdfe", bg = "#3a1d5c" }
+title = { fg = "#ff71ce", attr = "bold" }
+ok = { fg = "#05ffa1", attr = "bold" }
+pending = { fg = "#fffb96", attr = "bold" }
+alert = { fg = "#ff4f81", attr = "bold" }
+chip = { fg = "#1b0d33", bg = "#b967ff" }
+bar_ok = { fg = "#1b0d33", bg = "#05ffa1" }
+bar_alert = { fg = "#1b0d33", bg = "#ff4f81" }
+bar_dim = { fg = "#8a6fb3", bg = "#3a1d5c" }

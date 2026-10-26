@@ -1,0 +1,37 @@
+# pipeOS (Portal), dark: Portal 2's moody chambers, dark panels with the portals glowing. The cursor,
+# tabs, titles and key chips are portal blue (Skrappjaw, 2026-10-25); ok is white, not green.
+name = "pipeOS-dark"
+order = 10
+extends = "dark"
+logo = "ansi"
+
+[general]
+screen = { fg = "#c9d1d6", bg = "#14181b" }
+normal = { }
+dim = { fg = "#5f6b73" }
+selected = { fg = "#ffffff", bg = "#0b4a80" }
+anchor = { fg = "#c9d1d6", bg = "#16283a" }
+title = { fg = "#28a7ff", attr = "bold" }
+ok = { fg = "#e8eef2", attr = "bold" }
+pending = { fg = "#d8c35a", attr = "bold" }
+alert = { fg = "#e5484d", attr = "bold" }
+chip = { fg = "#ffffff", bg = "#0b4a80" }
+bar_ok = { fg = "#14181b", bg = "#b8c4cc" }
+bar_alert = { fg = "#14181b", bg = "#ff9a1f" }
+bar_dim = { fg = "#5f6b73", bg = "#1d2327" }
+src = { fg = "#28a7ff", attr = "bold" }
+dst = { fg = "#ff9a1f", attr = "bold" }
+
+[specific]
+dst_partial = { fg = "#ff9a1f" }
+bar_dst = { fg = "#ffffff", bg = "#7a3d00" }
+anchor_dst = { fg = "#c9d1d6", bg = "#3a2410" }
+head_rec = { fg = "#ff9a1f", attr = "bold" }
+head_dst = { fg = "#ff9a1f", attr = "bold" }
+vol = { fg = "#b8c4cc" }
+vol_over = { fg = "#ff9a1f" }
+dir_out = { fg = "#28a7ff" }
+dir_in = { fg = "#ff9a1f" }
+meter_low = { fg = "#28a7ff" }
+meter_mid = { fg = "#ff9a1f" }
+meter_high = { fg = "#e5484d" }

@@ -1,0 +1,20 @@
+# Linux Mint's Mint-Y-Dark-Orange (gtk-3.0 colours); exact hex where the terminal allows.
+name = "crowbar"
+order = 2
+extends = "dark"
+logo = "doom"
+
+[general]
+screen = { fg = "#dedee0", bg = "#2e2e33" }
+normal = { }
+dim = { attr = "dim" }
+selected = { fg = "#000000", bg = "#ff7139" }
+anchor = { fg = "#ff7139", bg = "#45454b" }
+title = { fg = "#ff7139", attr = "bold" }
+ok = { fg = "#73d216", attr = "bold" }
+pending = { fg = "#f6d32d", attr = "bold" }
+alert = { fg = "#fc4138", attr = "bold" }
+chip = { fg = "#2e2e33", bg = "#dedee0" }
+bar_ok = { fg = "#2e2e33", bg = "#73d216" }
+bar_alert = { fg = "#2e2e33", bg = "#fc4138" }
+bar_dim = { attr = "reverse dim" }

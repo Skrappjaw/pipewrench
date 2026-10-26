@@ -10,6 +10,7 @@ watch pw-top, and save the clock for the next PipeWire start.
     pwrench devices [list] | default | volume | mute | profile | label | hide | bus | apply …
     pwrench patch [list] | connect SRC DST | disconnect SRC DST
     pwrench realtime             is PipeWire's audio realtime? and the fix if not
+    pwrench theme list | export ID [FILE] | check [FILE]   themes as TOML files (docs/themes.md)
 """
 import array
 import os
@@ -30,6 +31,7 @@ import pwmedia as pm  # noqa: E402
 import pwpatch as pp  # noqa: E402
 import pwrates as prates  # noqa: E402
 import pwrealtime as prt  # noqa: E402
+import pwthemes as pt  # noqa: E402
 
 SETTERS = {"rate": "clock.force-rate", "buf": "clock.force-quantum", "min": "clock.min-quantum",
            "max": "clock.max-quantum", "log": "log.level"}
@@ -185,6 +187,45 @@ def _int(text):
         raise CliError(f"not a whole number: {text!r}", 2)
 
 
+THEME_USAGE = "usage: pwrench theme list | export ID [FILE] | check [FILE]"
+
+
+def _theme_cli(args, out):
+    """Themes as TOML files (docs/themes.md): list them, start one from another, or check them."""
+    user = pcfg.app_dir() / "themes"
+    sub, rest = (args[0], args[1:]) if args else ("list", [])
+    if sub == "list" and not rest:
+        problems = pc.install_themes(user)
+        for n in pc.THEME_NAMES:
+            where = "yours" if n in pc.THEME_USER else "built-in"
+            out.write(f"{n:<22} {pc.theme_label(n):<18} {where:<9} {pc.THEME_MIN_COLOURS[n]} colours\n")
+        for p in problems:
+            out.write(f"skipped: {p}\n")
+        return 0
+    if sub == "export" and len(rest) in (1, 2):
+        lib = pt.load([pt.BUILTIN_DIR, user])
+        if rest[0] not in lib.themes:
+            raise CliError(f"no theme {rest[0]!r}; see `pwrench theme list`", 2)
+        path = Path(rest[1]) if len(rest) == 2 else user / f"{rest[0]}-custom.toml"
+        if path.exists():
+            raise CliError(f"{path} already exists; pick another file name", 1)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(pt.export(lib, rest[0], path.stem))
+        out.write(f"wrote {path}\nEdit it, then open Settings → Display → Theme and pick {path.stem}.\n")
+        return 0
+    if sub == "check" and len(rest) <= 1:
+        if rest:
+            src = Path(rest[0])
+            with tempfile.TemporaryDirectory() as d:  # check one file as if it were in the themes folder
+                (Path(d) / src.name).write_text(src.read_text())
+                problems = pt.load([pt.BUILTIN_DIR, d]).problems
+        else:
+            problems = pt.load([pt.BUILTIN_DIR, user]).problems
+        out.write("".join(f"{p}\n" for p in problems) or "no problems\n")
+        return 1 if problems else 0
+    raise CliError(THEME_USAGE, 2)
+
+
 def _cli(argv, runner, out, err, execvp, ask):
     cmd, args = argv[0], argv[1:]
     if cmd in ("-h", "--help", "help"):
@@ -202,6 +243,8 @@ def _cli(argv, runner, out, err, execvp, ask):
             running = f" · running {prates.khz(r.running)}" if r.running else ""
             out.write(f"{'device rates':<14} {r.label}: {what}{running}\n")
         return 0
+    if cmd == "theme":
+        return _theme_cli(args, out)
     if cmd in SETTERS:
         if len(args) != 1:
             raise CliError(f"usage: pwrench {cmd} N", 2)
@@ -786,7 +829,10 @@ class Meters:
 class Tui:
     def __init__(self, runner, message=""):
         self.runner = runner
+        problems = pc.install_themes(pcfg.app_dir() / "themes")  # before load_ui, which checks the saved name
         self.st = pc.UIState(**pc.load_ui(pc.ui_path()), message=message)
+        if problems and not message:
+            self.st.message, self.st.failed = pc.themes_message(problems)
         self.current = {}
         self.block = None
         self.devices = None
@@ -973,14 +1019,20 @@ class Tui:
                 event = self._mouse_event(b)
                 if not event:
                     continue
+                before = self.st
                 self.st, actions = pc.handle_mouse(self.st, self.hits, y, x, event, self.current,
                                                    self.devices, self.patch, self.mixer)
+                if pc.opened_theme_row(before, self.st):
+                    self._reload_themes(scr)
             else:
                 key = self._key(ch)
                 if not key:
                     continue
+                before = self.st
                 self.st, actions = pc.handle_key(self.st, key, self.current, self.devices, self.patch,
                                                  self.mixer)
+                if pc.opened_theme_row(before, self.st):
+                    self._reload_themes(scr)
             for action in actions:
                 if action == ("quit",):
                     return
@@ -997,6 +1049,13 @@ class Tui:
               "alert": "bold", "pending": "bold", "dim": "dim",
               "bar_ok": "reverse", "bar_alert": "reverse", "bar_dim": "reverse dim",
               "band_ok": "reverse", "band_alert": "reverse bold", "popup": "reverse", "popup_sel": "bold"}
+
+    def _reload_themes(self, scr):
+        """Re-read the theme files, so an edited or new theme shows without a restart."""
+        self.st.message, self.st.failed = pc.themes_message(pc.install_themes(pcfg.app_dir() / "themes"))
+        if self.st.theme not in pc.THEMES:
+            self.st.theme = "dark"
+        self._apply_theme(scr)
 
     def _apply_theme(self, scr):
         """Curses attributes for each colour role of the current theme (pc.THEMES)."""

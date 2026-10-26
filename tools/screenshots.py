@@ -13,6 +13,8 @@ Needs Pillow (python3-pil); pwrench itself doesn't.
 import copy
 import json
 import sys
+import shutil
+import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -25,6 +27,7 @@ import pwinventory as pi  # noqa: E402
 import pwmedia as pm  # noqa: E402
 import pwpatch as pp  # noqa: E402
 import pwrealtime as prt  # noqa: E402
+import pwthemes as pt  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "tests"))
 from test_patch import with_reaper  # noqa: E402  (REAPER as pipewire-jack shows it)
@@ -91,7 +94,7 @@ def png(lines, title="pwrench", theme="dark"):
     draw.text((img.width / 2, 12), title, fill=_hex("#9aa0a6"), font=FONT, anchor="mm")
     for y, (text, style) in enumerate(lines):
         text = text[:W]
-        cells = _cells(text.rstrip(), style, W, theme)
+        cells = _cells(text if style in ("band_ok", "band_alert") else text.rstrip(), style, W, theme)  # the band is full width
         by = top + y * CELL_H
         for x, ch in enumerate(text.ljust(W)):
             fg, bg, bold, dim, under = cells[x]
@@ -264,6 +267,8 @@ def shots():
     yield "mixer-menu", frame(st, mixer=m, media=MEDIA)
     st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH 2", "recording")), "right", CUR, mixer=m)
     yield "mixer-boost", frame(st, mixer=m, media=MEDIA)  # → at 100%: the volume popover
+    st.message = "volume"  # the theme map: popover, ✓ band, tabs, cursor, bars and meters in one frame
+    yield "theme-map", frame(st, mixer=m, media=MEDIA)
     st.mix_menu = None
     yield "mixer-rename", prompt(frame(st, mixer=m, media=MEDIA), "new name for GCS-8 CH 2 (empty restores the default): Mic")
 
@@ -311,10 +316,20 @@ def shots():
 
 
 SHOT_THEMES = {"mixer-pipeboy": "pipeboy", "mixer-vaporware": "vaporware", "about-pipecraft": "pipecraft",
-               "patch-portal": "pipeos-dark"}  # the rest are drawn in the dark theme
+               "patch-portal": "pipeos-dark", "theme-map": "theme-map"}  # the rest are drawn in the dark theme
+
+
+def _install_map():
+    """tools/theme-map.toml, every general role in its own colour, for docs/themes.md."""
+    with tempfile.TemporaryDirectory() as d:
+        shutil.copy(Path(__file__).parent / "theme-map.toml", d)
+        lib = pt.load([pt.BUILTIN_DIR, d])
+    assert not lib.problems, lib.problems
+    pc.THEMES["theme-map"] = lib.themes["theme-map"]
 
 
 def main(out=OUT):
+    _install_map()
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     names = []

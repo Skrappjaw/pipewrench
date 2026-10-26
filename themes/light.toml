@@ -1,0 +1,20 @@
+# For light terminals.
+name = "light"
+order = 1
+extends = "dark"
+logo = "wrench"
+
+[general]
+screen = { fg = "black", bg = "brightwhite" }
+normal = { }
+dim = { attr = "dim" }
+selected = { fg = "black", bg = "cyan" }
+anchor = { fg = "white", bg = "blue" }
+title = { fg = "blue", attr = "bold" }
+ok = { fg = "green", attr = "bold" }
+pending = { fg = "magenta", attr = "bold" }
+alert = { fg = "red", attr = "bold" }
+chip = { fg = "white", bg = "black", attr = "bold" }
+bar_ok = { fg = "white", bg = "green" }
+bar_alert = { fg = "white", bg = "red" }
+bar_dim = { attr = "reverse dim" }

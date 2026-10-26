@@ -19,158 +19,52 @@ import pwrates
 import pwmedia as pm
 import pwpatch as pp
 import pwrealtime as prt
+import pwthemes as pt
 
 READ_CMD = ["pw-metadata", "-n", "settings", "0"]
 RESTART_CMD = ["systemctl", "--user", "restart", "wireplumber"]
 
-# Colour roles (notes/ui-conventions.md) as (fg, bg, attr) per theme; None is the screen's own colour.
-# One bar on screen is ever "selected": that's where the keys go. "anchor" is selected but not active.
-# Never bold on black text: terminals draw bold black as grey.
-THEMES = {
-    "dark": {"screen": (None, None, ""),
-             "normal": (None, None, ""), "dim": (None, None, "dim"),
-             "selected": ("black", "cyan", ""), "anchor": ("white", "blue", ""),
-             "title": ("cyan", None, "bold"),
-             "ok": ("green", None, "bold"), "pending": ("yellow", None, "bold"), "alert": ("red", None, "bold"),
-             "chip": ("black", "white", ""),
-             "bar_ok": ("black", "green", ""), "bar_alert": ("black", "red", ""), "bar_dim": (None, None, "reverse dim")},
-    "light": {"screen": ("black", "brightwhite", ""),
-              "normal": (None, None, ""), "dim": (None, None, "dim"),
-              "selected": ("black", "cyan", ""), "anchor": ("white", "blue", ""),
-              "title": ("blue", None, "bold"),
-              "ok": ("green", None, "bold"), "pending": ("magenta", None, "bold"), "alert": ("red", None, "bold"),
-              "chip": ("white", "black", "bold"),
-              "bar_ok": ("white", "green", ""), "bar_alert": ("white", "red", ""), "bar_dim": (None, None, "reverse dim")},
-    # Crowbar: Linux Mint's Mint-Y-Dark-Orange (gtk-3.0 colours); exact hex where the terminal allows.
-    "crowbar": {"screen": ("#dedee0", "#2e2e33", ""),
-               "normal": (None, None, ""), "dim": (None, None, "dim"),
-               "selected": ("#000000", "#ff7139", ""), "anchor": ("#ff7139", "#45454b", ""),
-               "title": ("#ff7139", None, "bold"),
-               "ok": ("#73d216", None, "bold"), "pending": ("#f6d32d", None, "bold"), "alert": ("#fc4138", None, "bold"),
-               "chip": ("#2e2e33", "#dedee0", ""),
-               "bar_ok": ("#2e2e33", "#73d216", ""), "bar_alert": ("#2e2e33", "#fc4138", ""),
-               "bar_dim": (None, None, "reverse dim")},
-    # Vaporware: vaporwave colours on dark purple.
-    "vaporware": {"screen": ("#e8d9ff", "#1b0d33", ""),
-                  "normal": (None, None, ""), "dim": ("#8a6fb3", None, ""),
-                  "selected": ("#1b0d33", "#01cdfe", ""), "anchor": ("#01cdfe", "#3a1d5c", ""),
-                  "title": ("#ff71ce", None, "bold"),
-                  "ok": ("#05ffa1", None, "bold"), "pending": ("#fffb96", None, "bold"), "alert": ("#ff4f81", None, "bold"),
-                  "chip": ("#1b0d33", "#b967ff", ""),
-                  "bar_ok": ("#1b0d33", "#05ffa1", ""), "bar_alert": ("#1b0d33", "#ff4f81", ""),
-                  "bar_dim": ("#8a6fb3", "#3a1d5c", "")},
-    # Pipecraft: Minecraft's text-colour codes (yellow, green, gold, red, grey) on dark dirt, grey buttons.
-    "pipecraft": {"screen": ("#ffffff", "#2b1d12", ""),
-                  "normal": (None, None, ""), "dim": ("#aaaaaa", None, ""),
-                  "selected": ("#ffffa0", "#6f6f6f", "bold"), "anchor": ("#ffffff", "#4a4a4a", ""),
-                  "title": ("#ffff55", None, "bold"),
-                  "ok": ("#55ff55", None, "bold"), "pending": ("#ffaa00", None, "bold"), "alert": ("#ff5555", None, "bold"),
-                  "chip": ("#ffffff", "#555555", ""),
-                  "bar_ok": ("#ffffff", "#5d9632", ""), "bar_alert": ("#ffffff", "#aa0000", ""),
-                  "bar_dim": ("#aaaaaa", "#4a3624", "")},
-    # pipeOS (Portal): Patch's source dots are the blue portal, destination dots the orange one.
-    # Light: a clean test chamber, white panels and grey trim.
-    "pipeos-lite": {"screen": ("#2b2f33", "#f2f4f5", ""),
-                     "normal": (None, None, ""), "dim": ("#8a9399", None, ""),
-                     # the cursor, tabs, titles and key chips are portal blue (Skrappjaw, 2026-10-25); ok is ink, not green
-                     "selected": ("#0b2540", "#bcdcff", ""), "anchor": ("#2b2f33", "#e3efff", ""),
-                     "title": ("#0a84ff", None, "bold"),
-                     "ok": ("#1b1e21", None, "bold"), "pending": ("#8a6d00", None, "bold"),
-                     "alert": ("#d62828", None, "bold"),
-                     "chip": ("#ffffff", "#0a84ff", ""),
-                     "bar_ok": ("#ffffff", "#5b6770", ""), "bar_alert": ("#ffffff", "#ff7a00", ""),
-                     "bar_dim": ("#8a9399", "#e1e5e8", ""),
-                     "src": ("#0a84ff", None, "bold"), "dst": ("#ff7a00", None, "bold"),
-                     "dst_partial": ("#ff7a00", None, ""),
-                     "dir_out": ("#0a84ff", None, ""), "dir_in": ("#ff7a00", None, ""),
-                     "bar_src": ("#0b2540", "#bcdcff", ""), "anchor_src": ("#2b2f33", "#e3efff", ""),
-                     "bar_dst": ("#3a1f00", "#ffd9b3", ""), "anchor_dst": ("#2b2f33", "#fff0e0", ""),
-                     "head_play": ("#0a84ff", None, "bold"), "head_rec": ("#ff7a00", None, "bold"),
-                     "head_src": ("#0a84ff", None, "bold"), "head_dst": ("#ff7a00", None, "bold"),
-                     "vol": ("#5b6770", None, ""), "vol_over": ("#ff7a00", None, ""),
-                     "meter_low": ("#0a84ff", None, ""), "meter_mid": ("#ff7a00", None, ""),
-                     "meter_high": ("#d62828", None, "")},
-    # Dark: Portal 2's moody chambers, dark panels with the portals glowing.
-    "pipeos-dark": {"screen": ("#c9d1d6", "#14181b", ""),
-                    "normal": (None, None, ""), "dim": ("#5f6b73", None, ""),
-                    # the cursor, tabs, titles and key chips are portal blue (Skrappjaw, 2026-10-25); ok is white, not green
-                    "selected": ("#ffffff", "#0b4a80", ""), "anchor": ("#c9d1d6", "#16283a", ""),
-                    "title": ("#28a7ff", None, "bold"),
-                    "ok": ("#e8eef2", None, "bold"), "pending": ("#d8c35a", None, "bold"),
-                    "alert": ("#e5484d", None, "bold"),
-                    "chip": ("#ffffff", "#0b4a80", ""),
-                    "bar_ok": ("#14181b", "#b8c4cc", ""), "bar_alert": ("#14181b", "#ff9a1f", ""),
-                    "bar_dim": ("#5f6b73", "#1d2327", ""),
-                    "src": ("#28a7ff", None, "bold"), "dst": ("#ff9a1f", None, "bold"),
-                    "dst_partial": ("#ff9a1f", None, ""),
-                    "dir_out": ("#28a7ff", None, ""), "dir_in": ("#ff9a1f", None, ""),
-                    "bar_src": ("#ffffff", "#0b4a80", ""), "anchor_src": ("#c9d1d6", "#16283a", ""),
-                    "bar_dst": ("#ffffff", "#7a3d00", ""), "anchor_dst": ("#c9d1d6", "#3a2410", ""),
-                    "head_play": ("#28a7ff", None, "bold"), "head_rec": ("#ff9a1f", None, "bold"),
-                    "head_src": ("#28a7ff", None, "bold"), "head_dst": ("#ff9a1f", None, "bold"),
-                    "vol": ("#b8c4cc", None, ""), "vol_over": ("#ff9a1f", None, ""),
-                    "meter_low": ("#28a7ff", None, ""), "meter_mid": ("#ff9a1f", None, ""),
-                    "meter_high": ("#e5484d", None, "")},
-}
+# Colour roles as (fg, bg, attr) per theme, loaded from TOML: built-ins in themes/, the user's in
+# ~/.config/pipewrench/themes/ (pwthemes; guide docs/themes.md). install_themes refills these names.
+THEMES, THEME_NAMES, THEME_LABELS, THEME_MIN_COLOURS, THEME_LOGOS, THEME_USER = {}, [], {}, {}, {}, []
 
 
-def _pipe_boy(text, pale, mid, deep, back):
-    """Pipe Boy, after Fallout's Pip-Boy: one phosphor colour at five brightnesses. Without hue, status reads by
-    style: ok bold, pending underlined, alert a pale block."""
-    return {"screen": (text, back, ""),
-            "normal": (None, None, ""), "dim": (mid, None, ""),
-            "selected": (back, text, ""), "anchor": (text, deep, ""),
-            "title": (pale, None, "bold"),
-            "ok": (text, None, "bold"), "pending": (text, None, "underline"), "alert": (back, pale, ""),
-            "chip": (pale, deep, "bold"),
-            "bar_ok": (back, mid, ""), "bar_alert": (back, pale, ""), "bar_dim": (mid, deep, "")}
+def install_themes(user_dir=None):
+    """Load the built-in themes, plus the user's when given; returns the problems found."""
+    global THEMES, THEME_NAMES, THEME_LABELS, THEME_MIN_COLOURS, THEME_LOGOS, THEME_USER
+    lib = pt.load([pt.BUILTIN_DIR] + ([user_dir] if user_dir else []))
+    THEMES, THEME_NAMES, THEME_USER = lib.themes, lib.names, lib.user
+    THEME_LABELS = {n: lib.label(n) for n in lib.names}
+    THEME_MIN_COLOURS = {n: lib.min_colours(n) for n in lib.names}
+    THEME_LOGOS = {n: lib.logo(n) for n in lib.names}
+    return lib.problems
 
 
-# The Pipe Boys sit after crowbar and before vaporware in the cycle.
-_PIPE_BOYS = {"pipeboy": ("#3cff62", "#b6ffc2", "#1f8a35", "#13401c", "#0b1a0d"),        # green
-              "pipeboy-amber": ("#ffb000", "#ffe0a0", "#9a6a00", "#4a3300", "#1a1000"),
-              "pipeboy-cyan": ("#33f0ff", "#b8f9ff", "#1a8a94", "#0d3f45", "#071a1c"),
-              "pipeboy-white": ("#e6e6e6", "#ffffff", "#8c8c8c", "#3a3a3a", "#121212")}
-THEMES = {**{k: v for k, v in THEMES.items() if k not in ("vaporware", "pipecraft", "pipeos-lite", "pipeos-dark")},
-          **{name: _pipe_boy(*colours) for name, colours in _PIPE_BOYS.items()},
-          "vaporware": THEMES["vaporware"], "pipecraft": THEMES["pipecraft"],
-          "pipeos-lite": THEMES["pipeos-lite"], "pipeos-dark": THEMES["pipeos-dark"]}
-for _t in THEMES.values():
-    # Patch's dots and bars, and the Mixer's section headings: pipeOS sets its own (portal blue and orange);
-    # every other theme reuses ok/pending, selected/anchor and title, so it looks as it did.
-    _own = "src" in _t
-    _t.setdefault("src", _t["ok"])
-    _t.setdefault("dst", _t["ok"])
-    _t.setdefault("dst_partial", _t["pending"])
-    for _bar, _base in (("bar_src", "selected"), ("bar_dst", "selected"), ("anchor_src", "anchor"),
-                        ("anchor_dst", "anchor")):
-        _t.setdefault(_bar, _t[_base])
-    for _dot, _bar in ((d, b) for d in ("src", "dst", "dst_partial")
-                       for b in ("selected", "anchor", "bar_src", "anchor_src", "bar_dst", "anchor_dst")):
-        # a dot under a bar keeps its colour on the bar's background (pipeOS); elsewhere the bar covers it
-        _t[f"{_dot}@{_bar}"] = (_t[_dot][0], _t[_bar][1], _t[_dot][2]) if _own else _t[_bar]
-    for _new, _old in (("head_play", "title"), ("head_rec", "title"), ("head_src", "title"), ("head_dst", "title"),
-                       ("vol", "ok"), ("vol_over", "alert"), ("dir_out", "dim"), ("dir_in", "dim"),
-                       ("meter_low", "ok"), ("meter_mid", "pending"), ("meter_high", "alert"),
-                       ("band_ok", "bar_ok"), ("band_alert", "bar_alert"), ("popup", "chip"), ("popup_sel", "selected")):
-        _t.setdefault(_new, _t[_old])
-    if _t["popup_sel"] == _t["popup"]:  # pipeOS-dark: chip and selected match, so the choice was invisible
-        _fg, _bg, _attr = _t["popup"]
-        _t["popup_sel"] = (_bg, _fg, "bold")
-THEME_NAMES = list(THEMES)
-THEME_LABELS = {"pipeboy": "Pipe Boy", "pipeboy-amber": "Pipe Boy Amber", "pipeboy-cyan": "Pipe Boy Cyan",
-                "pipeboy-white": "Pipe Boy White", "vaporware": "Vaporware", "pipecraft": "Pipecraft",
-                "pipeos-lite": "pipeOS-lite", "pipeos-dark": "pipeOS-dark"}
+install_themes()
 
 
 def theme_label(name):
     return THEME_LABELS.get(name, name)
 
+
+def opened_theme_row(before, after):
+    """True when this key or click opened Settings → Display → Theme: the moment to re-read theme files."""
+    return (after.editing and not before.editing and after.settings_cat == "prefs" and after.cursor == THEME_ROW
+            and after.tab == "settings")
+
+
+def themes_message(problems):
+    """(message, failed) for the band after loading themes."""
+    if problems:
+        more = f" (+{len(problems) - 1} more: pwrench theme check)" if len(problems) > 1 else ""
+        return problems[0] + more, problems[0] + more
+    mine = len(THEME_USER)
+    return f"{len(THEME_NAMES)} themes, {mine} yours" if mine else f"{len(THEME_NAMES)} themes", ""
+
 METER_FALL = [10, 20, 40, 80]  # dB a second: slow, VU-like, through fast
 PEAK_HOLD = [0, 0.5, 1, 1.5, 2, 3]  # seconds a peak marker hangs before it falls; 0 is off
 PEAK_FALL = 20  # dB a second, once the hold is over
 METER_FPS = [5, 10, 15, 20, 30, 45, 60]  # new audio lands once per graph cycle (21 ms at 1024/48k); falls redraw every frame
-THEME_MIN_COLOURS = {name: 256 for name in THEME_NAMES if name not in ("dark", "light")}  # exact hex  # below this the theme falls back to dark
 
 
 def hex_rgb(colour):
@@ -1516,19 +1410,14 @@ LOGO_PIPECRAFT_SMALL = [
 ]
 
 
-def theme_logo(theme):
-    """The wordmark for a theme when it fits; dark and light have Skrappjaw's wrench, the rest ANSI Compact."""
-    if theme.startswith("pipeboy"):
-        return LOGO_COMPUTER
-    return {"dark": LOGO_WRENCH, "light": LOGO_WRENCH, "crowbar": LOGO_DOOM, "vaporware": LOGO_SLANT,
-            "pipecraft": LOGO_PIPECRAFT}.get(theme, LOGO_ANSI)
+_LOGO_CHAINS = {"wrench": [LOGO_WRENCH], "doom": [LOGO_DOOM], "slant": [LOGO_SLANT], "computer": [LOGO_COMPUTER],
+                "ansi": [LOGO_ANSI], "pipecraft": [LOGO_PIPECRAFT, LOGO_PIPECRAFT_SMALL, ["P I P E C R A F T"]]}
 
 
 def logo_chain(theme):
-    """Wordmarks to try, widest first; the last always fits."""
-    if theme == "pipecraft":
-        return [LOGO_PIPECRAFT, LOGO_PIPECRAFT_SMALL, ["P I P E C R A F T"]]
-    return [theme_logo(theme), LOGO_PAGGA, LOGO_PLAIN]
+    """Wordmarks to try, widest first; the last always fits. The theme file names its logo."""
+    chain = _LOGO_CHAINS[THEME_LOGOS.get(theme, "ansi")]
+    return chain if len(chain) > 1 else chain + [LOGO_PAGGA, LOGO_PLAIN]
 ABOUT_LINK = "github.com/Skrappjaw/pipewrench"
 ABOUT_CMDS = {"pipewire": ["pipewire", "--version"], "wireplumber": ["wireplumber", "--version"]}
 

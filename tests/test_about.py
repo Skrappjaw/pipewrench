@@ -139,7 +139,7 @@ def test_each_theme_has_its_wordmark(theme, logo):
 
 
 def test_every_theme_has_a_logo_entry():
-    assert all(pc.theme_logo(t) for t in pc.THEME_NAMES)
+    assert all(pc.THEME_LOGOS[t] in pc.pt.LOGOS and pc.logo_chain(t) for t in pc.THEME_NAMES)
 
 
 @pytest.mark.parametrize("theme", ["dark", "light", "crowbar", "pipeboy", "vaporware"])

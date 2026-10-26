@@ -1,0 +1,19 @@
+# The default: the terminal's own colours with cyan and blue accents.
+name = "dark"
+order = 0
+logo = "wrench"
+
+[general]
+screen = { }
+normal = { }
+dim = { attr = "dim" }
+selected = { fg = "black", bg = "cyan" }
+anchor = { fg = "white", bg = "blue" }
+title = { fg = "cyan", attr = "bold" }
+ok = { fg = "green", attr = "bold" }
+pending = { fg = "yellow", attr = "bold" }
+alert = { fg = "red", attr = "bold" }
+chip = { fg = "black", bg = "white" }
+bar_ok = { fg = "black", bg = "green" }
+bar_alert = { fg = "black", bg = "red" }
+bar_dim = { attr = "reverse dim" }

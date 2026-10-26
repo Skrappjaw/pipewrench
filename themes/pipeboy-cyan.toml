@@ -1,0 +1,28 @@
+# Pipe Boy, after Fallout's Pip-Boy: one phosphor colour at five brightnesses. Without hue, status
+# reads by style: ok bold, pending underlined, alert a pale block.
+name = "Pipe Boy Cyan"
+order = 5
+extends = "dark"
+logo = "computer"
+
+[palette]
+text = "#33f0ff"
+pale = "#b8f9ff"
+mid = "#1a8a94"
+deep = "#0d3f45"
+back = "#071a1c"
+
+[general]
+screen = { fg = "text", bg = "back" }
+normal = { }
+dim = { fg = "mid" }
+selected = { fg = "back", bg = "text" }
+anchor = { fg = "text", bg = "deep" }
+title = { fg = "pale", attr = "bold" }
+ok = { fg = "text", attr = "bold" }
+pending = { fg = "text", attr = "underline" }
+alert = { fg = "back", bg = "pale" }
+chip = { fg = "pale", bg = "deep", attr = "bold" }
+bar_ok = { fg = "back", bg = "mid" }
+bar_alert = { fg = "back", bg = "pale" }
+bar_dim = { fg = "mid", bg = "deep" }

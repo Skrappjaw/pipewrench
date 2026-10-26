@@ -1,0 +1,38 @@
+# pipeOS (Portal): sources are the blue portal, destinations the orange one.
+# Light: a clean test chamber, white panels and grey trim. The cursor, tabs, titles and key chips are
+# portal blue (Skrappjaw, 2026-10-25); ok is ink, not green.
+name = "pipeOS-lite"
+order = 9
+extends = "dark"
+logo = "ansi"
+
+[general]
+screen = { fg = "#2b2f33", bg = "#f2f4f5" }
+normal = { }
+dim = { fg = "#8a9399" }
+selected = { fg = "#0b2540", bg = "#bcdcff" }
+anchor = { fg = "#2b2f33", bg = "#e3efff" }
+title = { fg = "#0a84ff", attr = "bold" }
+ok = { fg = "#1b1e21", attr = "bold" }
+pending = { fg = "#8a6d00", attr = "bold" }
+alert = { fg = "#d62828", attr = "bold" }
+chip = { fg = "#ffffff", bg = "#0a84ff" }
+bar_ok = { fg = "#ffffff", bg = "#5b6770" }
+bar_alert = { fg = "#ffffff", bg = "#ff7a00" }
+bar_dim = { fg = "#8a9399", bg = "#e1e5e8" }
+src = { fg = "#0a84ff", attr = "bold" }
+dst = { fg = "#ff7a00", attr = "bold" }
+
+[specific]
+dst_partial = { fg = "#ff7a00" }
+bar_dst = { fg = "#3a1f00", bg = "#ffd9b3" }
+anchor_dst = { fg = "#2b2f33", bg = "#fff0e0" }
+head_rec = { fg = "#ff7a00", attr = "bold" }
+head_dst = { fg = "#ff7a00", attr = "bold" }
+vol = { fg = "#5b6770" }
+vol_over = { fg = "#ff7a00" }
+dir_out = { fg = "#0a84ff" }
+dir_in = { fg = "#ff7a00" }
+meter_low = { fg = "#0a84ff" }
+meter_mid = { fg = "#ff7a00" }
+meter_high = { fg = "#d62828" }

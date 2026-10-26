@@ -1,0 +1,34 @@
+# The theme map: every general role in its own colour, so docs/themes.md can show which role paints what.
+# tools/screenshots.py draws docs/guide/theme-map.png with it. It's also a complete example theme.
+name = "Theme map"
+logo = "ansi"
+
+[palette]
+ink = "#000000"
+paper = "#d0d0d0"
+night = "#202020"
+grey = "#707070"
+gold = "#ffd700"
+brown = "#8b4513"
+sky = "#00bfff"
+lime = "#7fff00"
+orchid = "#da70d6"
+red = "#ff3030"
+lavender = "#c0c0ff"
+green = "#00c060"
+slate = "#404040"
+
+[general]
+screen = { fg = "paper", bg = "night" }
+normal = { }
+dim = { fg = "grey" }
+selected = { fg = "ink", bg = "gold" }
+anchor = { fg = "#ffffff", bg = "brown" }
+title = { fg = "sky", attr = "bold" }
+ok = { fg = "lime", attr = "bold" }
+pending = { fg = "orchid", attr = "bold" }
+alert = { fg = "red", attr = "bold" }
+chip = { fg = "ink", bg = "lavender" }
+bar_ok = { fg = "ink", bg = "green" }
+bar_alert = { fg = "ink", bg = "red" }
+bar_dim = { fg = "grey", bg = "slate" }

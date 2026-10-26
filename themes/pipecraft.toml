@@ -1,0 +1,20 @@
+# Pipecraft: Minecraft's text-colour codes (yellow, green, gold, red, grey) on dark dirt, grey buttons.
+name = "Pipecraft"
+order = 8
+extends = "dark"
+logo = "pipecraft"
+
+[general]
+screen = { fg = "#ffffff", bg = "#2b1d12" }
+normal = { }
+dim = { fg = "#aaaaaa" }
+selected = { fg = "#ffffa0", bg = "#6f6f6f", attr = "bold" }
+anchor = { fg = "#ffffff", bg = "#4a4a4a" }
+title = { fg = "#ffff55", attr = "bold" }
+ok = { fg = "#55ff55", attr = "bold" }
+pending = { fg = "#ffaa00", attr = "bold" }
+alert = { fg = "#ff5555", attr = "bold" }
+chip = { fg = "#ffffff", bg = "#555555" }
+bar_ok = { fg = "#ffffff", bg = "#5d9632" }
+bar_alert = { fg = "#ffffff", bg = "#aa0000" }
+bar_dim = { fg = "#aaaaaa", bg = "#4a3624" }

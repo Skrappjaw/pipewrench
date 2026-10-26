@@ -1,0 +1,3184 @@
+{
+ "themes": {
+  "dark": {
+   "screen": [
+    null,
+    null,
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    null,
+    null,
+    "dim"
+   ],
+   "selected": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "anchor": [
+    "white",
+    "blue",
+    ""
+   ],
+   "title": [
+    "cyan",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "green",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "yellow",
+    null,
+    "bold"
+   ],
+   "alert": [
+    "red",
+    null,
+    "bold"
+   ],
+   "chip": [
+    "black",
+    "white",
+    ""
+   ],
+   "bar_ok": [
+    "black",
+    "green",
+    ""
+   ],
+   "bar_alert": [
+    "black",
+    "red",
+    ""
+   ],
+   "bar_dim": [
+    null,
+    null,
+    "reverse dim"
+   ],
+   "src": [
+    "green",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "green",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "yellow",
+    null,
+    "bold"
+   ],
+   "bar_src": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "bar_dst": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "anchor_src": [
+    "white",
+    "blue",
+    ""
+   ],
+   "anchor_dst": [
+    "white",
+    "blue",
+    ""
+   ],
+   "src@selected": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "src@anchor": [
+    "white",
+    "blue",
+    ""
+   ],
+   "src@bar_src": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "src@anchor_src": [
+    "white",
+    "blue",
+    ""
+   ],
+   "src@bar_dst": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "src@anchor_dst": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst@selected": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst@anchor": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst@bar_src": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst@anchor_src": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst@bar_dst": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst@anchor_dst": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst_partial@selected": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst_partial@anchor": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst_partial@anchor_src": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst_partial@anchor_dst": [
+    "white",
+    "blue",
+    ""
+   ],
+   "head_play": [
+    "cyan",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "cyan",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "cyan",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "cyan",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "green",
+    null,
+    "bold"
+   ],
+   "vol_over": [
+    "red",
+    null,
+    "bold"
+   ],
+   "dir_out": [
+    null,
+    null,
+    "dim"
+   ],
+   "dir_in": [
+    null,
+    null,
+    "dim"
+   ],
+   "meter_low": [
+    "green",
+    null,
+    "bold"
+   ],
+   "meter_mid": [
+    "yellow",
+    null,
+    "bold"
+   ],
+   "meter_high": [
+    "red",
+    null,
+    "bold"
+   ],
+   "band_ok": [
+    "black",
+    "green",
+    ""
+   ],
+   "band_alert": [
+    "black",
+    "red",
+    ""
+   ],
+   "popup": [
+    "black",
+    "white",
+    ""
+   ],
+   "popup_sel": [
+    "black",
+    "cyan",
+    ""
+   ]
+  },
+  "light": {
+   "screen": [
+    "black",
+    "brightwhite",
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    null,
+    null,
+    "dim"
+   ],
+   "selected": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "anchor": [
+    "white",
+    "blue",
+    ""
+   ],
+   "title": [
+    "blue",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "green",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "magenta",
+    null,
+    "bold"
+   ],
+   "alert": [
+    "red",
+    null,
+    "bold"
+   ],
+   "chip": [
+    "white",
+    "black",
+    "bold"
+   ],
+   "bar_ok": [
+    "white",
+    "green",
+    ""
+   ],
+   "bar_alert": [
+    "white",
+    "red",
+    ""
+   ],
+   "bar_dim": [
+    null,
+    null,
+    "reverse dim"
+   ],
+   "src": [
+    "green",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "green",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "magenta",
+    null,
+    "bold"
+   ],
+   "bar_src": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "bar_dst": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "anchor_src": [
+    "white",
+    "blue",
+    ""
+   ],
+   "anchor_dst": [
+    "white",
+    "blue",
+    ""
+   ],
+   "src@selected": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "src@anchor": [
+    "white",
+    "blue",
+    ""
+   ],
+   "src@bar_src": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "src@anchor_src": [
+    "white",
+    "blue",
+    ""
+   ],
+   "src@bar_dst": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "src@anchor_dst": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst@selected": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst@anchor": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst@bar_src": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst@anchor_src": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst@bar_dst": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst@anchor_dst": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst_partial@selected": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst_partial@anchor": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst_partial@anchor_src": [
+    "white",
+    "blue",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "black",
+    "cyan",
+    ""
+   ],
+   "dst_partial@anchor_dst": [
+    "white",
+    "blue",
+    ""
+   ],
+   "head_play": [
+    "blue",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "blue",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "blue",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "blue",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "green",
+    null,
+    "bold"
+   ],
+   "vol_over": [
+    "red",
+    null,
+    "bold"
+   ],
+   "dir_out": [
+    null,
+    null,
+    "dim"
+   ],
+   "dir_in": [
+    null,
+    null,
+    "dim"
+   ],
+   "meter_low": [
+    "green",
+    null,
+    "bold"
+   ],
+   "meter_mid": [
+    "magenta",
+    null,
+    "bold"
+   ],
+   "meter_high": [
+    "red",
+    null,
+    "bold"
+   ],
+   "band_ok": [
+    "white",
+    "green",
+    ""
+   ],
+   "band_alert": [
+    "white",
+    "red",
+    ""
+   ],
+   "popup": [
+    "white",
+    "black",
+    "bold"
+   ],
+   "popup_sel": [
+    "black",
+    "cyan",
+    ""
+   ]
+  },
+  "crowbar": {
+   "screen": [
+    "#dedee0",
+    "#2e2e33",
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    null,
+    null,
+    "dim"
+   ],
+   "selected": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "anchor": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "title": [
+    "#ff7139",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "#73d216",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "#f6d32d",
+    null,
+    "bold"
+   ],
+   "alert": [
+    "#fc4138",
+    null,
+    "bold"
+   ],
+   "chip": [
+    "#2e2e33",
+    "#dedee0",
+    ""
+   ],
+   "bar_ok": [
+    "#2e2e33",
+    "#73d216",
+    ""
+   ],
+   "bar_alert": [
+    "#2e2e33",
+    "#fc4138",
+    ""
+   ],
+   "bar_dim": [
+    null,
+    null,
+    "reverse dim"
+   ],
+   "src": [
+    "#73d216",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "#73d216",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "#f6d32d",
+    null,
+    "bold"
+   ],
+   "bar_src": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "bar_dst": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "anchor_src": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "anchor_dst": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "src@selected": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "src@anchor": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "src@bar_src": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "src@anchor_src": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "src@bar_dst": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "src@anchor_dst": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "dst@selected": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "dst@anchor": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "dst@bar_src": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "dst@anchor_src": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "dst@bar_dst": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "dst@anchor_dst": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "dst_partial@selected": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "dst_partial@anchor": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "dst_partial@anchor_src": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "#000000",
+    "#ff7139",
+    ""
+   ],
+   "dst_partial@anchor_dst": [
+    "#ff7139",
+    "#45454b",
+    ""
+   ],
+   "head_play": [
+    "#ff7139",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "#ff7139",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "#ff7139",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "#ff7139",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "#73d216",
+    null,
+    "bold"
+   ],
+   "vol_over": [
+    "#fc4138",
+    null,
+    "bold"
+   ],
+   "dir_out": [
+    null,
+    null,
+    "dim"
+   ],
+   "dir_in": [
+    null,
+    null,
+    "dim"
+   ],
+   "meter_low": [
+    "#73d216",
+    null,
+    "bold"
+   ],
+   "meter_mid": [
+    "#f6d32d",
+    null,
+    "bold"
+   ],
+   "meter_high": [
+    "#fc4138",
+    null,
+    "bold"
+   ],
+   "band_ok": [
+    "#2e2e33",
+    "#73d216",
+    ""
+   ],
+   "band_alert": [
+    "#2e2e33",
+    "#fc4138",
+    ""
+   ],
+   "popup": [
+    "#2e2e33",
+    "#dedee0",
+    ""
+   ],
+   "popup_sel": [
+    "#000000",
+    "#ff7139",
+    ""
+   ]
+  },
+  "pipeboy": {
+   "screen": [
+    "#3cff62",
+    "#0b1a0d",
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    "#1f8a35",
+    null,
+    ""
+   ],
+   "selected": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "anchor": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "title": [
+    "#b6ffc2",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "#3cff62",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "#3cff62",
+    null,
+    "underline"
+   ],
+   "alert": [
+    "#0b1a0d",
+    "#b6ffc2",
+    ""
+   ],
+   "chip": [
+    "#b6ffc2",
+    "#13401c",
+    "bold"
+   ],
+   "bar_ok": [
+    "#0b1a0d",
+    "#1f8a35",
+    ""
+   ],
+   "bar_alert": [
+    "#0b1a0d",
+    "#b6ffc2",
+    ""
+   ],
+   "bar_dim": [
+    "#1f8a35",
+    "#13401c",
+    ""
+   ],
+   "src": [
+    "#3cff62",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "#3cff62",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "#3cff62",
+    null,
+    "underline"
+   ],
+   "bar_src": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "bar_dst": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "anchor_src": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "anchor_dst": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "src@selected": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "src@anchor": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "src@bar_src": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "src@anchor_src": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "src@bar_dst": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "src@anchor_dst": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "dst@selected": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "dst@anchor": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "dst@bar_src": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "dst@anchor_src": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "dst@bar_dst": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "dst@anchor_dst": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "dst_partial@selected": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "dst_partial@anchor": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "dst_partial@anchor_src": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ],
+   "dst_partial@anchor_dst": [
+    "#3cff62",
+    "#13401c",
+    ""
+   ],
+   "head_play": [
+    "#b6ffc2",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "#b6ffc2",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "#b6ffc2",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "#b6ffc2",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "#3cff62",
+    null,
+    "bold"
+   ],
+   "vol_over": [
+    "#0b1a0d",
+    "#b6ffc2",
+    ""
+   ],
+   "dir_out": [
+    "#1f8a35",
+    null,
+    ""
+   ],
+   "dir_in": [
+    "#1f8a35",
+    null,
+    ""
+   ],
+   "meter_low": [
+    "#3cff62",
+    null,
+    "bold"
+   ],
+   "meter_mid": [
+    "#3cff62",
+    null,
+    "underline"
+   ],
+   "meter_high": [
+    "#0b1a0d",
+    "#b6ffc2",
+    ""
+   ],
+   "band_ok": [
+    "#0b1a0d",
+    "#1f8a35",
+    ""
+   ],
+   "band_alert": [
+    "#0b1a0d",
+    "#b6ffc2",
+    ""
+   ],
+   "popup": [
+    "#b6ffc2",
+    "#13401c",
+    "bold"
+   ],
+   "popup_sel": [
+    "#0b1a0d",
+    "#3cff62",
+    ""
+   ]
+  },
+  "pipeboy-amber": {
+   "screen": [
+    "#ffb000",
+    "#1a1000",
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    "#9a6a00",
+    null,
+    ""
+   ],
+   "selected": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "anchor": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "title": [
+    "#ffe0a0",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "#ffb000",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "#ffb000",
+    null,
+    "underline"
+   ],
+   "alert": [
+    "#1a1000",
+    "#ffe0a0",
+    ""
+   ],
+   "chip": [
+    "#ffe0a0",
+    "#4a3300",
+    "bold"
+   ],
+   "bar_ok": [
+    "#1a1000",
+    "#9a6a00",
+    ""
+   ],
+   "bar_alert": [
+    "#1a1000",
+    "#ffe0a0",
+    ""
+   ],
+   "bar_dim": [
+    "#9a6a00",
+    "#4a3300",
+    ""
+   ],
+   "src": [
+    "#ffb000",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "#ffb000",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "#ffb000",
+    null,
+    "underline"
+   ],
+   "bar_src": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "bar_dst": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "anchor_src": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "anchor_dst": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "src@selected": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "src@anchor": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "src@bar_src": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "src@anchor_src": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "src@bar_dst": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "src@anchor_dst": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "dst@selected": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "dst@anchor": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "dst@bar_src": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "dst@anchor_src": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "dst@bar_dst": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "dst@anchor_dst": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "dst_partial@selected": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "dst_partial@anchor": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "dst_partial@anchor_src": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ],
+   "dst_partial@anchor_dst": [
+    "#ffb000",
+    "#4a3300",
+    ""
+   ],
+   "head_play": [
+    "#ffe0a0",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "#ffe0a0",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "#ffe0a0",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "#ffe0a0",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "#ffb000",
+    null,
+    "bold"
+   ],
+   "vol_over": [
+    "#1a1000",
+    "#ffe0a0",
+    ""
+   ],
+   "dir_out": [
+    "#9a6a00",
+    null,
+    ""
+   ],
+   "dir_in": [
+    "#9a6a00",
+    null,
+    ""
+   ],
+   "meter_low": [
+    "#ffb000",
+    null,
+    "bold"
+   ],
+   "meter_mid": [
+    "#ffb000",
+    null,
+    "underline"
+   ],
+   "meter_high": [
+    "#1a1000",
+    "#ffe0a0",
+    ""
+   ],
+   "band_ok": [
+    "#1a1000",
+    "#9a6a00",
+    ""
+   ],
+   "band_alert": [
+    "#1a1000",
+    "#ffe0a0",
+    ""
+   ],
+   "popup": [
+    "#ffe0a0",
+    "#4a3300",
+    "bold"
+   ],
+   "popup_sel": [
+    "#1a1000",
+    "#ffb000",
+    ""
+   ]
+  },
+  "pipeboy-cyan": {
+   "screen": [
+    "#33f0ff",
+    "#071a1c",
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    "#1a8a94",
+    null,
+    ""
+   ],
+   "selected": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "anchor": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "title": [
+    "#b8f9ff",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "#33f0ff",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "#33f0ff",
+    null,
+    "underline"
+   ],
+   "alert": [
+    "#071a1c",
+    "#b8f9ff",
+    ""
+   ],
+   "chip": [
+    "#b8f9ff",
+    "#0d3f45",
+    "bold"
+   ],
+   "bar_ok": [
+    "#071a1c",
+    "#1a8a94",
+    ""
+   ],
+   "bar_alert": [
+    "#071a1c",
+    "#b8f9ff",
+    ""
+   ],
+   "bar_dim": [
+    "#1a8a94",
+    "#0d3f45",
+    ""
+   ],
+   "src": [
+    "#33f0ff",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "#33f0ff",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "#33f0ff",
+    null,
+    "underline"
+   ],
+   "bar_src": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "bar_dst": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "anchor_src": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "anchor_dst": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "src@selected": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "src@anchor": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "src@bar_src": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "src@anchor_src": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "src@bar_dst": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "src@anchor_dst": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "dst@selected": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "dst@anchor": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "dst@bar_src": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "dst@anchor_src": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "dst@bar_dst": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "dst@anchor_dst": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "dst_partial@selected": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "dst_partial@anchor": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "dst_partial@anchor_src": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ],
+   "dst_partial@anchor_dst": [
+    "#33f0ff",
+    "#0d3f45",
+    ""
+   ],
+   "head_play": [
+    "#b8f9ff",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "#b8f9ff",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "#b8f9ff",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "#b8f9ff",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "#33f0ff",
+    null,
+    "bold"
+   ],
+   "vol_over": [
+    "#071a1c",
+    "#b8f9ff",
+    ""
+   ],
+   "dir_out": [
+    "#1a8a94",
+    null,
+    ""
+   ],
+   "dir_in": [
+    "#1a8a94",
+    null,
+    ""
+   ],
+   "meter_low": [
+    "#33f0ff",
+    null,
+    "bold"
+   ],
+   "meter_mid": [
+    "#33f0ff",
+    null,
+    "underline"
+   ],
+   "meter_high": [
+    "#071a1c",
+    "#b8f9ff",
+    ""
+   ],
+   "band_ok": [
+    "#071a1c",
+    "#1a8a94",
+    ""
+   ],
+   "band_alert": [
+    "#071a1c",
+    "#b8f9ff",
+    ""
+   ],
+   "popup": [
+    "#b8f9ff",
+    "#0d3f45",
+    "bold"
+   ],
+   "popup_sel": [
+    "#071a1c",
+    "#33f0ff",
+    ""
+   ]
+  },
+  "pipeboy-white": {
+   "screen": [
+    "#e6e6e6",
+    "#121212",
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    "#8c8c8c",
+    null,
+    ""
+   ],
+   "selected": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "anchor": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "title": [
+    "#ffffff",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "#e6e6e6",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "#e6e6e6",
+    null,
+    "underline"
+   ],
+   "alert": [
+    "#121212",
+    "#ffffff",
+    ""
+   ],
+   "chip": [
+    "#ffffff",
+    "#3a3a3a",
+    "bold"
+   ],
+   "bar_ok": [
+    "#121212",
+    "#8c8c8c",
+    ""
+   ],
+   "bar_alert": [
+    "#121212",
+    "#ffffff",
+    ""
+   ],
+   "bar_dim": [
+    "#8c8c8c",
+    "#3a3a3a",
+    ""
+   ],
+   "src": [
+    "#e6e6e6",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "#e6e6e6",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "#e6e6e6",
+    null,
+    "underline"
+   ],
+   "bar_src": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "bar_dst": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "anchor_src": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "anchor_dst": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "src@selected": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "src@anchor": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "src@bar_src": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "src@anchor_src": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "src@bar_dst": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "src@anchor_dst": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "dst@selected": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "dst@anchor": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "dst@bar_src": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "dst@anchor_src": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "dst@bar_dst": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "dst@anchor_dst": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "dst_partial@selected": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "dst_partial@anchor": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "dst_partial@anchor_src": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ],
+   "dst_partial@anchor_dst": [
+    "#e6e6e6",
+    "#3a3a3a",
+    ""
+   ],
+   "head_play": [
+    "#ffffff",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "#ffffff",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "#ffffff",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "#ffffff",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "#e6e6e6",
+    null,
+    "bold"
+   ],
+   "vol_over": [
+    "#121212",
+    "#ffffff",
+    ""
+   ],
+   "dir_out": [
+    "#8c8c8c",
+    null,
+    ""
+   ],
+   "dir_in": [
+    "#8c8c8c",
+    null,
+    ""
+   ],
+   "meter_low": [
+    "#e6e6e6",
+    null,
+    "bold"
+   ],
+   "meter_mid": [
+    "#e6e6e6",
+    null,
+    "underline"
+   ],
+   "meter_high": [
+    "#121212",
+    "#ffffff",
+    ""
+   ],
+   "band_ok": [
+    "#121212",
+    "#8c8c8c",
+    ""
+   ],
+   "band_alert": [
+    "#121212",
+    "#ffffff",
+    ""
+   ],
+   "popup": [
+    "#ffffff",
+    "#3a3a3a",
+    "bold"
+   ],
+   "popup_sel": [
+    "#121212",
+    "#e6e6e6",
+    ""
+   ]
+  },
+  "vaporware": {
+   "screen": [
+    "#e8d9ff",
+    "#1b0d33",
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    "#8a6fb3",
+    null,
+    ""
+   ],
+   "selected": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "anchor": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "title": [
+    "#ff71ce",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "#05ffa1",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "#fffb96",
+    null,
+    "bold"
+   ],
+   "alert": [
+    "#ff4f81",
+    null,
+    "bold"
+   ],
+   "chip": [
+    "#1b0d33",
+    "#b967ff",
+    ""
+   ],
+   "bar_ok": [
+    "#1b0d33",
+    "#05ffa1",
+    ""
+   ],
+   "bar_alert": [
+    "#1b0d33",
+    "#ff4f81",
+    ""
+   ],
+   "bar_dim": [
+    "#8a6fb3",
+    "#3a1d5c",
+    ""
+   ],
+   "src": [
+    "#05ffa1",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "#05ffa1",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "#fffb96",
+    null,
+    "bold"
+   ],
+   "bar_src": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "bar_dst": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "anchor_src": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "anchor_dst": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "src@selected": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "src@anchor": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "src@bar_src": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "src@anchor_src": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "src@bar_dst": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "src@anchor_dst": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "dst@selected": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "dst@anchor": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "dst@bar_src": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "dst@anchor_src": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "dst@bar_dst": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "dst@anchor_dst": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "dst_partial@selected": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "dst_partial@anchor": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "dst_partial@anchor_src": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ],
+   "dst_partial@anchor_dst": [
+    "#01cdfe",
+    "#3a1d5c",
+    ""
+   ],
+   "head_play": [
+    "#ff71ce",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "#ff71ce",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "#ff71ce",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "#ff71ce",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "#05ffa1",
+    null,
+    "bold"
+   ],
+   "vol_over": [
+    "#ff4f81",
+    null,
+    "bold"
+   ],
+   "dir_out": [
+    "#8a6fb3",
+    null,
+    ""
+   ],
+   "dir_in": [
+    "#8a6fb3",
+    null,
+    ""
+   ],
+   "meter_low": [
+    "#05ffa1",
+    null,
+    "bold"
+   ],
+   "meter_mid": [
+    "#fffb96",
+    null,
+    "bold"
+   ],
+   "meter_high": [
+    "#ff4f81",
+    null,
+    "bold"
+   ],
+   "band_ok": [
+    "#1b0d33",
+    "#05ffa1",
+    ""
+   ],
+   "band_alert": [
+    "#1b0d33",
+    "#ff4f81",
+    ""
+   ],
+   "popup": [
+    "#1b0d33",
+    "#b967ff",
+    ""
+   ],
+   "popup_sel": [
+    "#1b0d33",
+    "#01cdfe",
+    ""
+   ]
+  },
+  "pipecraft": {
+   "screen": [
+    "#ffffff",
+    "#2b1d12",
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    "#aaaaaa",
+    null,
+    ""
+   ],
+   "selected": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "anchor": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "title": [
+    "#ffff55",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "#55ff55",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "#ffaa00",
+    null,
+    "bold"
+   ],
+   "alert": [
+    "#ff5555",
+    null,
+    "bold"
+   ],
+   "chip": [
+    "#ffffff",
+    "#555555",
+    ""
+   ],
+   "bar_ok": [
+    "#ffffff",
+    "#5d9632",
+    ""
+   ],
+   "bar_alert": [
+    "#ffffff",
+    "#aa0000",
+    ""
+   ],
+   "bar_dim": [
+    "#aaaaaa",
+    "#4a3624",
+    ""
+   ],
+   "src": [
+    "#55ff55",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "#55ff55",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "#ffaa00",
+    null,
+    "bold"
+   ],
+   "bar_src": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "bar_dst": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "anchor_src": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "anchor_dst": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "src@selected": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "src@anchor": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "src@bar_src": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "src@anchor_src": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "src@bar_dst": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "src@anchor_dst": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "dst@selected": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "dst@anchor": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "dst@bar_src": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "dst@anchor_src": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "dst@bar_dst": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "dst@anchor_dst": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "dst_partial@selected": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "dst_partial@anchor": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "dst_partial@anchor_src": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ],
+   "dst_partial@anchor_dst": [
+    "#ffffff",
+    "#4a4a4a",
+    ""
+   ],
+   "head_play": [
+    "#ffff55",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "#ffff55",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "#ffff55",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "#ffff55",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "#55ff55",
+    null,
+    "bold"
+   ],
+   "vol_over": [
+    "#ff5555",
+    null,
+    "bold"
+   ],
+   "dir_out": [
+    "#aaaaaa",
+    null,
+    ""
+   ],
+   "dir_in": [
+    "#aaaaaa",
+    null,
+    ""
+   ],
+   "meter_low": [
+    "#55ff55",
+    null,
+    "bold"
+   ],
+   "meter_mid": [
+    "#ffaa00",
+    null,
+    "bold"
+   ],
+   "meter_high": [
+    "#ff5555",
+    null,
+    "bold"
+   ],
+   "band_ok": [
+    "#ffffff",
+    "#5d9632",
+    ""
+   ],
+   "band_alert": [
+    "#ffffff",
+    "#aa0000",
+    ""
+   ],
+   "popup": [
+    "#ffffff",
+    "#555555",
+    ""
+   ],
+   "popup_sel": [
+    "#ffffa0",
+    "#6f6f6f",
+    "bold"
+   ]
+  },
+  "pipeos-lite": {
+   "screen": [
+    "#2b2f33",
+    "#f2f4f5",
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    "#8a9399",
+    null,
+    ""
+   ],
+   "selected": [
+    "#0b2540",
+    "#bcdcff",
+    ""
+   ],
+   "anchor": [
+    "#2b2f33",
+    "#e3efff",
+    ""
+   ],
+   "title": [
+    "#0a84ff",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "#1b1e21",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "#8a6d00",
+    null,
+    "bold"
+   ],
+   "alert": [
+    "#d62828",
+    null,
+    "bold"
+   ],
+   "chip": [
+    "#ffffff",
+    "#0a84ff",
+    ""
+   ],
+   "bar_ok": [
+    "#ffffff",
+    "#5b6770",
+    ""
+   ],
+   "bar_alert": [
+    "#ffffff",
+    "#ff7a00",
+    ""
+   ],
+   "bar_dim": [
+    "#8a9399",
+    "#e1e5e8",
+    ""
+   ],
+   "src": [
+    "#0a84ff",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "#ff7a00",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "#ff7a00",
+    null,
+    ""
+   ],
+   "dir_out": [
+    "#0a84ff",
+    null,
+    ""
+   ],
+   "dir_in": [
+    "#ff7a00",
+    null,
+    ""
+   ],
+   "bar_src": [
+    "#0b2540",
+    "#bcdcff",
+    ""
+   ],
+   "anchor_src": [
+    "#2b2f33",
+    "#e3efff",
+    ""
+   ],
+   "bar_dst": [
+    "#3a1f00",
+    "#ffd9b3",
+    ""
+   ],
+   "anchor_dst": [
+    "#2b2f33",
+    "#fff0e0",
+    ""
+   ],
+   "head_play": [
+    "#0a84ff",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "#ff7a00",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "#0a84ff",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "#ff7a00",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "#5b6770",
+    null,
+    ""
+   ],
+   "vol_over": [
+    "#ff7a00",
+    null,
+    ""
+   ],
+   "meter_low": [
+    "#0a84ff",
+    null,
+    ""
+   ],
+   "meter_mid": [
+    "#ff7a00",
+    null,
+    ""
+   ],
+   "meter_high": [
+    "#d62828",
+    null,
+    ""
+   ],
+   "src@selected": [
+    "#0a84ff",
+    "#bcdcff",
+    "bold"
+   ],
+   "src@anchor": [
+    "#0a84ff",
+    "#e3efff",
+    "bold"
+   ],
+   "src@bar_src": [
+    "#0a84ff",
+    "#bcdcff",
+    "bold"
+   ],
+   "src@anchor_src": [
+    "#0a84ff",
+    "#e3efff",
+    "bold"
+   ],
+   "src@bar_dst": [
+    "#0a84ff",
+    "#ffd9b3",
+    "bold"
+   ],
+   "src@anchor_dst": [
+    "#0a84ff",
+    "#fff0e0",
+    "bold"
+   ],
+   "dst@selected": [
+    "#ff7a00",
+    "#bcdcff",
+    "bold"
+   ],
+   "dst@anchor": [
+    "#ff7a00",
+    "#e3efff",
+    "bold"
+   ],
+   "dst@bar_src": [
+    "#ff7a00",
+    "#bcdcff",
+    "bold"
+   ],
+   "dst@anchor_src": [
+    "#ff7a00",
+    "#e3efff",
+    "bold"
+   ],
+   "dst@bar_dst": [
+    "#ff7a00",
+    "#ffd9b3",
+    "bold"
+   ],
+   "dst@anchor_dst": [
+    "#ff7a00",
+    "#fff0e0",
+    "bold"
+   ],
+   "dst_partial@selected": [
+    "#ff7a00",
+    "#bcdcff",
+    ""
+   ],
+   "dst_partial@anchor": [
+    "#ff7a00",
+    "#e3efff",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "#ff7a00",
+    "#bcdcff",
+    ""
+   ],
+   "dst_partial@anchor_src": [
+    "#ff7a00",
+    "#e3efff",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "#ff7a00",
+    "#ffd9b3",
+    ""
+   ],
+   "dst_partial@anchor_dst": [
+    "#ff7a00",
+    "#fff0e0",
+    ""
+   ],
+   "band_ok": [
+    "#ffffff",
+    "#5b6770",
+    ""
+   ],
+   "band_alert": [
+    "#ffffff",
+    "#ff7a00",
+    ""
+   ],
+   "popup": [
+    "#ffffff",
+    "#0a84ff",
+    ""
+   ],
+   "popup_sel": [
+    "#0b2540",
+    "#bcdcff",
+    ""
+   ]
+  },
+  "pipeos-dark": {
+   "screen": [
+    "#c9d1d6",
+    "#14181b",
+    ""
+   ],
+   "normal": [
+    null,
+    null,
+    ""
+   ],
+   "dim": [
+    "#5f6b73",
+    null,
+    ""
+   ],
+   "selected": [
+    "#ffffff",
+    "#0b4a80",
+    ""
+   ],
+   "anchor": [
+    "#c9d1d6",
+    "#16283a",
+    ""
+   ],
+   "title": [
+    "#28a7ff",
+    null,
+    "bold"
+   ],
+   "ok": [
+    "#e8eef2",
+    null,
+    "bold"
+   ],
+   "pending": [
+    "#d8c35a",
+    null,
+    "bold"
+   ],
+   "alert": [
+    "#e5484d",
+    null,
+    "bold"
+   ],
+   "chip": [
+    "#ffffff",
+    "#0b4a80",
+    ""
+   ],
+   "bar_ok": [
+    "#14181b",
+    "#b8c4cc",
+    ""
+   ],
+   "bar_alert": [
+    "#14181b",
+    "#ff9a1f",
+    ""
+   ],
+   "bar_dim": [
+    "#5f6b73",
+    "#1d2327",
+    ""
+   ],
+   "src": [
+    "#28a7ff",
+    null,
+    "bold"
+   ],
+   "dst": [
+    "#ff9a1f",
+    null,
+    "bold"
+   ],
+   "dst_partial": [
+    "#ff9a1f",
+    null,
+    ""
+   ],
+   "dir_out": [
+    "#28a7ff",
+    null,
+    ""
+   ],
+   "dir_in": [
+    "#ff9a1f",
+    null,
+    ""
+   ],
+   "bar_src": [
+    "#ffffff",
+    "#0b4a80",
+    ""
+   ],
+   "anchor_src": [
+    "#c9d1d6",
+    "#16283a",
+    ""
+   ],
+   "bar_dst": [
+    "#ffffff",
+    "#7a3d00",
+    ""
+   ],
+   "anchor_dst": [
+    "#c9d1d6",
+    "#3a2410",
+    ""
+   ],
+   "head_play": [
+    "#28a7ff",
+    null,
+    "bold"
+   ],
+   "head_rec": [
+    "#ff9a1f",
+    null,
+    "bold"
+   ],
+   "head_src": [
+    "#28a7ff",
+    null,
+    "bold"
+   ],
+   "head_dst": [
+    "#ff9a1f",
+    null,
+    "bold"
+   ],
+   "vol": [
+    "#b8c4cc",
+    null,
+    ""
+   ],
+   "vol_over": [
+    "#ff9a1f",
+    null,
+    ""
+   ],
+   "meter_low": [
+    "#28a7ff",
+    null,
+    ""
+   ],
+   "meter_mid": [
+    "#ff9a1f",
+    null,
+    ""
+   ],
+   "meter_high": [
+    "#e5484d",
+    null,
+    ""
+   ],
+   "src@selected": [
+    "#28a7ff",
+    "#0b4a80",
+    "bold"
+   ],
+   "src@anchor": [
+    "#28a7ff",
+    "#16283a",
+    "bold"
+   ],
+   "src@bar_src": [
+    "#28a7ff",
+    "#0b4a80",
+    "bold"
+   ],
+   "src@anchor_src": [
+    "#28a7ff",
+    "#16283a",
+    "bold"
+   ],
+   "src@bar_dst": [
+    "#28a7ff",
+    "#7a3d00",
+    "bold"
+   ],
+   "src@anchor_dst": [
+    "#28a7ff",
+    "#3a2410",
+    "bold"
+   ],
+   "dst@selected": [
+    "#ff9a1f",
+    "#0b4a80",
+    "bold"
+   ],
+   "dst@anchor": [
+    "#ff9a1f",
+    "#16283a",
+    "bold"
+   ],
+   "dst@bar_src": [
+    "#ff9a1f",
+    "#0b4a80",
+    "bold"
+   ],
+   "dst@anchor_src": [
+    "#ff9a1f",
+    "#16283a",
+    "bold"
+   ],
+   "dst@bar_dst": [
+    "#ff9a1f",
+    "#7a3d00",
+    "bold"
+   ],
+   "dst@anchor_dst": [
+    "#ff9a1f",
+    "#3a2410",
+    "bold"
+   ],
+   "dst_partial@selected": [
+    "#ff9a1f",
+    "#0b4a80",
+    ""
+   ],
+   "dst_partial@anchor": [
+    "#ff9a1f",
+    "#16283a",
+    ""
+   ],
+   "dst_partial@bar_src": [
+    "#ff9a1f",
+    "#0b4a80",
+    ""
+   ],
+   "dst_partial@anchor_src": [
+    "#ff9a1f",
+    "#16283a",
+    ""
+   ],
+   "dst_partial@bar_dst": [
+    "#ff9a1f",
+    "#7a3d00",
+    ""
+   ],
+   "dst_partial@anchor_dst": [
+    "#ff9a1f",
+    "#3a2410",
+    ""
+   ],
+   "band_ok": [
+    "#14181b",
+    "#b8c4cc",
+    ""
+   ],
+   "band_alert": [
+    "#14181b",
+    "#ff9a1f",
+    ""
+   ],
+   "popup": [
+    "#ffffff",
+    "#0b4a80",
+    ""
+   ],
+   "popup_sel": [
+    "#0b4a80",
+    "#ffffff",
+    "bold"
+   ]
+  }
+ },
+ "names": [
+  "dark",
+  "light",
+  "crowbar",
+  "pipeboy",
+  "pipeboy-amber",
+  "pipeboy-cyan",
+  "pipeboy-white",
+  "vaporware",
+  "pipecraft",
+  "pipeos-lite",
+  "pipeos-dark"
+ ],
+ "labels": {
+  "dark": "dark",
+  "light": "light",
+  "crowbar": "crowbar",
+  "pipeboy": "Pipe Boy",
+  "pipeboy-amber": "Pipe Boy Amber",
+  "pipeboy-cyan": "Pipe Boy Cyan",
+  "pipeboy-white": "Pipe Boy White",
+  "vaporware": "Vaporware",
+  "pipecraft": "Pipecraft",
+  "pipeos-lite": "pipeOS-lite",
+  "pipeos-dark": "pipeOS-dark"
+ },
+ "min_colours": {
+  "dark": 8,
+  "light": 8,
+  "crowbar": 256,
+  "pipeboy": 256,
+  "pipeboy-amber": 256,
+  "pipeboy-cyan": 256,
+  "pipeboy-white": 256,
+  "vaporware": 256,
+  "pipecraft": 256,
+  "pipeos-lite": 256,
+  "pipeos-dark": 256
+ },
+ "logos": {
+  "dark": [
+   [
+    "▒██████ ▒██▒████  ▒████▒██  ▒█▒█████ ▒████▒████  ▒███▒██ ▒█",
+    "     ░██      ▒██▒██   ▒██  ▒█▒██ ▒█▒██   ▒██▒██▒██  ▒██ ▒█",
+    "▒███████▒██▒█████▒████ ▒██  ▒█▒█████▒████ ▒██ ▒█▒██  ▒█████",
+    "  ▒██░█ ▒██▒██   ▒██   ▒██▒█▒█▒██ █ ▒██   ▒██ ▒█▒██  ▒██ ▒█",
+    "  ▒██   ▒██▒██    ▒████▒███▒██▒██ ██ ▒████▒██ ▒█ ▒███▒██ ▒█",
+    "  ▒██                                                      ",
+    "  ▒██                                                      ",
+    "  ▒█                                                       ",
+    "  ▒█                                                       ",
+    "  ▒                                                        "
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀"
+   ],
+   [
+    "P I P E W R E N C H"
+   ]
+  ],
+  "light": [
+   [
+    "▒██████ ▒██▒████  ▒████▒██  ▒█▒█████ ▒████▒████  ▒███▒██ ▒█",
+    "     ░██      ▒██▒██   ▒██  ▒█▒██ ▒█▒██   ▒██▒██▒██  ▒██ ▒█",
+    "▒███████▒██▒█████▒████ ▒██  ▒█▒█████▒████ ▒██ ▒█▒██  ▒█████",
+    "  ▒██░█ ▒██▒██   ▒██   ▒██▒█▒█▒██ █ ▒██   ▒██ ▒█▒██  ▒██ ▒█",
+    "  ▒██   ▒██▒██    ▒████▒███▒██▒██ ██ ▒████▒██ ▒█ ▒███▒██ ▒█",
+    "  ▒██                                                      ",
+    "  ▒██                                                      ",
+    "  ▒█                                                       ",
+    "  ▒█                                                       ",
+    "  ▒                                                        "
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀"
+   ],
+   [
+    "P I P E W R E N C H"
+   ]
+  ],
+  "crowbar": [
+   [
+    "______ _             _    _                     _     ",
+    "| ___ (_)           | |  | |                   | |    ",
+    "| |_/ /_ _ __   ___ | |  | |_ __ ___ _ __   ___| |__  ",
+    "|  __/| | '_ \\ / _ \\| |/\\| | '__/ _ \\ '_ \\ / __| '_ \\ ",
+    "| |   | | |_) |  __/\\  /\\  / | |  __/ | | | (__| | | |",
+    "\\_|   |_| .__/ \\___| \\/  \\/|_|  \\___|_| |_|\\___|_| |_|",
+    "        | |                                           ",
+    "        |_|                                           "
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀"
+   ],
+   [
+    "P I P E W R E N C H"
+   ]
+  ],
+  "pipeboy": [
+   [
+    "8\"\"\"\"8               8   8  8                             ",
+    "8    8 e  eeeee eeee 8   8  8 eeeee  eeee eeeee eeee e   e",
+    "8eeee8 8  8   8 8    8e  8  8 8   8  8    8   8 8  8 8   8",
+    "88     8e 8eee8 8eee 88  8  8 8eee8e 8eee 8e  8 8e   8eee8",
+    "88     88 88    88   88  8  8 88   8 88   88  8 88   88  8",
+    "88     88 88    88ee 88ee8ee8 88   8 88ee 88  8 88e8 88  8"
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀"
+   ],
+   [
+    "P I P E W R E N C H"
+   ]
+  ],
+  "pipeboy-amber": [
+   [
+    "8\"\"\"\"8               8   8  8                             ",
+    "8    8 e  eeeee eeee 8   8  8 eeeee  eeee eeeee eeee e   e",
+    "8eeee8 8  8   8 8    8e  8  8 8   8  8    8   8 8  8 8   8",
+    "88     8e 8eee8 8eee 88  8  8 8eee8e 8eee 8e  8 8e   8eee8",
+    "88     88 88    88   88  8  8 88   8 88   88  8 88   88  8",
+    "88     88 88    88ee 88ee8ee8 88   8 88ee 88  8 88e8 88  8"
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀"
+   ],
+   [
+    "P I P E W R E N C H"
+   ]
+  ],
+  "pipeboy-cyan": [
+   [
+    "8\"\"\"\"8               8   8  8                             ",
+    "8    8 e  eeeee eeee 8   8  8 eeeee  eeee eeeee eeee e   e",
+    "8eeee8 8  8   8 8    8e  8  8 8   8  8    8   8 8  8 8   8",
+    "88     8e 8eee8 8eee 88  8  8 8eee8e 8eee 8e  8 8e   8eee8",
+    "88     88 88    88   88  8  8 88   8 88   88  8 88   88  8",
+    "88     88 88    88ee 88ee8ee8 88   8 88ee 88  8 88e8 88  8"
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀"
+   ],
+   [
+    "P I P E W R E N C H"
+   ]
+  ],
+  "pipeboy-white": [
+   [
+    "8\"\"\"\"8               8   8  8                             ",
+    "8    8 e  eeeee eeee 8   8  8 eeeee  eeee eeeee eeee e   e",
+    "8eeee8 8  8   8 8    8e  8  8 8   8  8    8   8 8  8 8   8",
+    "88     8e 8eee8 8eee 88  8  8 8eee8e 8eee 8e  8 8e   8eee8",
+    "88     88 88    88   88  8  8 88   8 88   88  8 88   88  8",
+    "88     88 88    88ee 88ee8ee8 88   8 88ee 88  8 88e8 88  8"
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀"
+   ],
+   [
+    "P I P E W R E N C H"
+   ]
+  ],
+  "vaporware": [
+   [
+    "    ____  _          _       __                     __  ",
+    "   / __ \\(_)___  ___| |     / /_______  ____  _____/ /_ ",
+    "  / /_/ / / __ \\/ _ \\ | /| / / ___/ _ \\/ __ \\/ ___/ __ \\",
+    " / ____/ / /_/ /  __/ |/ |/ / /  /  __/ / / / /__/ / / /",
+    "/_/   /_/ .___/\\___/|__/|__/_/   \\___/_/ /_/\\___/_/ /_/ ",
+    "       /_/                                              "
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀"
+   ],
+   [
+    "P I P E W R E N C H"
+   ]
+  ],
+  "pipecraft": [
+   [
+    "██████╗ ██╗██████╗ ███████╗ ██████╗██████╗  █████╗ ███████╗████████╗",
+    "██╔══██╗██║██╔══██╗██╔════╝██╔════╝██╔══██╗██╔══██╗██╔════╝╚══██╔══╝",
+    "██████╔╝██║██████╔╝█████╗  ██║     ██████╔╝███████║█████╗     ██║   ",
+    "██╔═══╝ ██║██╔═══╝ ██╔══╝  ██║     ██╔══██╗██╔══██║██╔══╝     ██║   ",
+    "██║     ██║██║     ███████╗╚██████╗██║  ██║██║  ██║██║        ██║   ",
+    "╚═╝     ╚═╝╚═╝     ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝        ╚═╝   "
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█▀▀░█▀▄░█▀█░█▀▀░▀█▀",
+    "░█▀▀░░█░░█▀▀░█▀▀░█░░░█▀▄░█▀█░█▀▀░░█░",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀▀▀░▀░▀░▀░▀░▀░░░░▀░"
+   ],
+   [
+    "P I P E C R A F T"
+   ]
+  ],
+  "pipeos-lite": [
+   [
+    "█████▄ ▄▄ ▄▄▄▄  ▄▄▄▄▄ ██     ██ ▄▄▄▄  ▄▄▄▄▄ ▄▄  ▄▄  ▄▄▄▄ ▄▄ ▄▄",
+    "██▄▄█▀ ██ ██▄█▀ ██▄▄  ██ ▄█▄ ██ ██▄█▄ ██▄▄  ███▄██ ██▀▀▀ ██▄██",
+    "██     ██ ██    ██▄▄▄  ▀██▀██▀  ██ ██ ██▄▄▄ ██ ▀██ ▀████ ██ ██"
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀"
+   ],
+   [
+    "P I P E W R E N C H"
+   ]
+  ],
+  "pipeos-dark": [
+   [
+    "█████▄ ▄▄ ▄▄▄▄  ▄▄▄▄▄ ██     ██ ▄▄▄▄  ▄▄▄▄▄ ▄▄  ▄▄  ▄▄▄▄ ▄▄ ▄▄",
+    "██▄▄█▀ ██ ██▄█▀ ██▄▄  ██ ▄█▄ ██ ██▄█▄ ██▄▄  ███▄██ ██▀▀▀ ██▄██",
+    "██     ██ ██    ██▄▄▄  ▀██▀██▀  ██ ██ ██▄▄▄ ██ ▀██ ▀████ ██ ██"
+   ],
+   [
+    "░█▀█░▀█▀░█▀█░█▀▀░█░█░█▀▄░█▀▀░█▀█░█▀▀░█░█",
+    "░█▀▀░░█░░█▀▀░█▀▀░█▄█░█▀▄░█▀▀░█░█░█░░░█▀█",
+    "░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀"
+   ],
+   [
+    "P I P E W R E N C H"
+   ]
+  ]
+ }
+}
