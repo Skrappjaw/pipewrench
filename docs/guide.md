@@ -19,8 +19,8 @@ guide is about using the screen.
   unapplied Settings changes are dropped, so a tab always opens clean.
 - **The keys box** at the bottom lists every key the current view takes. Each key is a chip, and
   clicking a single-key chip presses it.
-- **The status line** under it shows what just happened, or a y/n question. Any key other than `y`
-  cancels a question.
+- **The status band** under it shows what just happened: `✓` on green when it worked, `✖` on red when it
+  didn't. It stays until the next message. A y/n question shows there too; any key other than `y` cancels it.
 - **The now-playing bar** above the keys shows the media player that's playing: `*` play/pause,
   `-` `+` its volume, `<` `>` previous and next. There's no stop on purpose (Brave can't restart a
   stopped tab from outside).

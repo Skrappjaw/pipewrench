@@ -98,7 +98,7 @@ def test_one_box_and_a_status_line_for_messages(name):
     st = STATES[name]
     lines = render(st, height=60)
     assert sum(t.startswith("┌─ Keys") for t, _ in lines) == 1
-    assert render(pc.dataclasses.replace(st, message="saved"))[-1][0].strip() == "saved"
+    assert render(pc.dataclasses.replace(st, message="saved"))[-1][0].strip() == "✓ saved"
     assert "quit" not in render(st)[-1][0]
 
 

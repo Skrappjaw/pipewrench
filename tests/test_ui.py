@@ -530,13 +530,16 @@ def test_ui_file_round_trips_and_tolerates_junk(tmp_path):
     assert pc.load_ui(p) == {"theme": "dark", "meter_fps": 10, "meter_fall": 20, "peak_hold": 1.5, "volume_bar": True, "keys": {}}
 
 
-def test_failed_messages_are_red_and_others_green():
-    st = UIState(message="linked")
-    assert screen(st)[0][-1][1] == "ok"
+def test_messages_are_a_full_width_band_green_with_a_tick_or_red_with_a_cross():
+    # Skrappjaw, 2026-10-26: make the status bar more obvious. The symbol carries it on one-colour themes.
+    lines = screen(UIState(message="linked"))[0]
+    assert lines[-1][1] == "band_ok" and lines[-1][0].startswith(" ✓ linked") and len(lines[-1][0]) == 80
     st = UIState(message="boom", failed="boom")
-    assert screen(st)[0][-1][1] == "alert"
+    assert screen(st)[0][-1][1] == "band_alert" and screen(st)[0][-1][0].startswith(" ✖ boom")
     st.message = "linked"  # a later message is not tarred by the old failure
-    assert screen(st)[0][-1][1] == "ok"
+    assert screen(st)[0][-1][1] == "band_ok"
+    assert screen(UIState())[0][-1][1] == "dim"  # no message: the dim tab hint
+    assert all({"band_ok", "band_alert"} <= set(theme) for theme in pc.THEMES.values())
 
 
 def test_black_text_is_never_bold():

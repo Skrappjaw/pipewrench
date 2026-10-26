@@ -151,7 +151,8 @@ for _t in THEMES.values():
         _t[f"{_dot}@{_bar}"] = (_t[_dot][0], _t[_bar][1], _t[_dot][2]) if _own else _t[_bar]
     for _new, _old in (("head_play", "title"), ("head_rec", "title"), ("head_src", "title"), ("head_dst", "title"),
                        ("vol", "ok"), ("vol_over", "alert"), ("dir_out", "dim"), ("dir_in", "dim"),
-                       ("meter_low", "ok"), ("meter_mid", "pending"), ("meter_high", "alert")):
+                       ("meter_low", "ok"), ("meter_mid", "pending"), ("meter_high", "alert"),
+                       ("band_ok", "bar_ok"), ("band_alert", "bar_alert")):
         _t.setdefault(_new, _t[_old])
 THEME_NAMES = list(THEMES)
 THEME_LABELS = {"pipeboy": "Pipe Boy", "pipeboy-amber": "Pipe Boy Amber", "pipeboy-cyan": "Pipe Boy Cyan",
@@ -1144,8 +1145,11 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
     if st.confirm:
         cv.add(f" {_confirm_question(st.confirm, devices)} y/n", "alert")
     else:
-        style = ("alert" if st.message == st.failed else "ok") if st.message else "dim"
-        cv.add(f" {st.message}" if st.message else f" {HINTS.get(st.tab, '')}", style)
+        if st.message:  # a full-width band; the symbol carries it on one-colour themes (Skrappjaw, 2026-10-26)
+            bad = st.message == st.failed
+            cv.add(f" {'✖' if bad else '✓'} {st.message}".ljust(width), "band_alert" if bad else "band_ok")
+        else:
+            cv.add(f" {HINTS.get(st.tab, '')}", "dim")
     return cv.lines, cv.hits
 
 
