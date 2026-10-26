@@ -1160,6 +1160,10 @@ class Tui:
                 if row is None:
                     raise LookupError(f"{action[1]} has gone away")
                 self.st.message = _play_noise(self.runner, row)
+            elif kind == "boost":
+                _, name, on, label = action
+                self._save_config(pcfg.set_boost(pcfg.load_config(pcfg.config_path()), name, on),
+                                  f"{label}: boost unlocked; its menu locks it" if on else f"{label}: boost locked at 100%")
             elif kind == "mix_cmd":
                 _run(self.runner, action[1])
                 verb = {"set-default": "default set", "set-volume": "volume", "set-mute": "mute toggled"}

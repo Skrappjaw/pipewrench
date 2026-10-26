@@ -25,7 +25,7 @@ def cfg(**changes):
 # --- 2. model v2 ---------------------------------------------------------------
 
 def test_default_config_is_empty_and_generic():
-    assert pc.default_config() == {"version": 2, "clock_rate": None, "buses": [], "labels": {}, "hidden": []}
+    assert pc.default_config() == {"version": 2, "clock_rate": None, "buses": [], "labels": {}, "hidden": [], "boost": []}
     pc.validate_config(pc.default_config())
 
 
@@ -38,7 +38,7 @@ def test_v1_file_migrates_keeping_buses_and_clock(xdg):
     path.write_text(json.dumps(v1))
     c = pc.load_config(path)
     assert c == {"version": 2, "clock_rate": 48000, "buses": [{"name": "SYSTEM", "label": "SYSTEM"}],
-                 "labels": {}, "hidden": []}
+                 "labels": {}, "hidden": [], "boost": []}
 
 
 def test_missing_file_gives_default(xdg):
@@ -220,3 +220,14 @@ def test_check_applied_reports_missing_buses_and_unshown_labels():
     c = cfg(buses=[{"name": "OBS", "label": "OBS"}], labels={CH2_IN: "Mic", "alsa_gone": "Gone"})
     assert pc.check_applied(c, {"OBS": "OBS", CH2_IN: "Mic"}) == []
     assert pc.check_applied(c, {CH2_IN: "GCS-8 CH 2"}) == ["OBS: bus missing", f"{CH2_IN}: shows 'GCS-8 CH 2', expected 'Mic'"]
+
+
+def test_boost_is_a_saved_list_of_node_names():
+    # "Don't ask again" on the 100% volume popover (Skrappjaw, 2026-10-26); the channel menu locks it again.
+    c = pc.set_boost(pc.default_config(), "alsa_output.x", True)
+    assert c["boost"] == ["alsa_output.x"] and pc.set_boost(c, "alsa_output.x", True)["boost"] == ["alsa_output.x"]
+    assert pc.set_boost(c, "alsa_output.x", False)["boost"] == []
+    assert pc.migrate({"version": 2, "hidden": []})["boost"] == []          # older files gain an empty list
+    assert pc.migrate({"version": 2, "boost": ["a"]})["boost"] == ["a"]
+    with pytest.raises(ValueError, match="boost"):
+        pc.validate_config({**pc.default_config(), "boost": "a"})

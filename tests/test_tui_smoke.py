@@ -267,3 +267,21 @@ def test_rebind_a_key_in_settings(app, tmp_path):
     assert app.wait_exit() == 0
     keys = json.loads((tmp_path / "pipewrench" / "ui.json").read_text())["keys"]
     assert keys == {"devices.show_hidden": "z", "mixer.meters": None}
+
+
+def test_volume_at_100_asks_and_dont_ask_again_saves_the_boost(app, tmp_path):
+    # Discord's stream sits at exactly 100% in the fixture.
+    import pwconfig as pcfg
+    import pwinventory as pi
+    dump = json.loads((HERE / "fixtures" / "pwdump_patch.json").read_text())
+    rows = pc.mixer_selectable(pc.mixer_view(pi.inventory(dump), pcfg.default_config(), pi.streams(dump)))
+    i = next(n for n, (_, sec, r) in enumerate(rows) if r.label == "Discord" and sec == "playback")
+    app.expect("Playback")
+    app.send("\x1bOB" * i + "\x1bOC")     # down to Discord, then →
+    app.expect("Volume past 100%")
+    app.send("\x1bOD\r")                   # ← onto Don't ask again, Enter
+    app.expect("boost unlocked")
+    app.send("q")
+    assert app.wait_exit() == 0
+    saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
+    assert saved["boost"] == [rows[i][2].name]

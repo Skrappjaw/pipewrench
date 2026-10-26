@@ -41,14 +41,16 @@ Every output and input, then the apps playing or recording under each. ★ marks
 | Key | Does |
 |---|---|
 | ↑ ↓ | select a channel |
-| ← → | volume −5% / +5%. → stops at 100%; press it again there to unlock that channel up to 150% |
+| ← → | volume −5% / +5%. → stops at 100% and asks before going louder (up to 150%) |
 | mouse wheel | scroll the list (it never changes volume) |
 | Space | mute or unmute |
 | Enter (double-click) | the channel's menu |
 | v | live meters on or off |
 
 The volume % sits inside the bar. Green is up to 100%, red past it, grey when muted. Past 100% can clip, so
-at 100% the first → only warns; the second unlocks that channel. It locks again once it's back under 100%.
+at 100% → opens a box: **Go louder** unlocks that channel until it's back under 100%, **Don't ask again**
+unlocks it for good, and **Cancel** (where the cursor starts) leaves it. The channel menu's **Volume boost**
+row locks or unlocks it any time.
 The media bar's `+` stops at 100%. On the command line, `pwrench devices volume DEV +5%` goes up to 150%. The meter to the
 right shows the live level of running channels (yellow past −18 dB, red past −6 dB) with a short peak
 hold.
@@ -73,13 +75,15 @@ beside it:
 - **Rename…** gives the channel your own name, say "Mic" for GCS-8 CH 2. An empty name puts the
   original back.
 - **Card profile…** jumps to the channel's sound card on Devices with its profiles open.
+- **Volume boost: locked / unlocked** decides whether → can go past 100% without asking. Unlocked is
+  remembered for that channel (apps too). Locked is the default.
 
 Renaming asks one more question:
 
 ![Renaming a channel](guide/mixer-rename.png)
 
 WirePlumber reads names when it starts, so a new name shows after a WirePlumber restart.
-PipeWrench asks "Restart WirePlumber now to show it?" Say `n` if you're on a call: a restart drops
+PipeWrench asks "Restart WirePlumber now to show it?" Pick Cancel if you're on a call: a restart drops
 apps like Discord, and some don't reconnect on their own. The name is saved either way and appears at
 the next restart or login.
 

@@ -34,7 +34,7 @@ class ConfigError(Exception):
 # --- devices.json --------------------------------------------------------------
 
 def default_config():
-    return {"version": 2, "clock_rate": None, "buses": [], "labels": {}, "hidden": []}
+    return {"version": 2, "clock_rate": None, "buses": [], "labels": {}, "hidden": [], "boost": []}
 
 
 def config_path():
@@ -91,12 +91,15 @@ def validate_config(c):
     hidden = c.get("hidden", [])
     if not isinstance(hidden, list) or not all(isinstance(h, str) for h in hidden):
         raise ValueError("hidden must be a list of node or card names")
+    boost = c.get("boost", [])
+    if not isinstance(boost, list) or not all(isinstance(b, str) for b in boost):
+        raise ValueError("boost must be a list of node names")
 
 
 def migrate(c):
     """v1 (GCS-8 loopback pairs) → v2. The pairs went to the gcs-8-linux UCM profile."""
     out = {"version": 2, "clock_rate": c.get("clock_rate"), "buses": c.get("buses", []),
-           "labels": c.get("labels", {}), "hidden": c.get("hidden", [])}
+           "labels": c.get("labels", {}), "hidden": c.get("hidden", []), "boost": c.get("boost", [])}
     out.update({key: c[key] for key, *_ in CLOCK[1:] if key in c})  # saved buffers; absent until first saved
     return out
 
@@ -165,6 +168,13 @@ def delete_bus(c, name):
     if not bus:
         raise KeyError(name)
     c["buses"].remove(bus)
+    return c
+
+
+def set_boost(c, name, on):
+    """A node allowed past 100% without asking (the Mixer's Don't ask again), or locked again."""
+    c = _copy(c)
+    c["boost"] = [b for b in c.get("boost", []) if b != name] + ([name] if on else [])
     return c
 
 

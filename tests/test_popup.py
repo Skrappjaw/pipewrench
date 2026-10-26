@@ -104,3 +104,11 @@ def test_long_text_wraps_inside_the_box():
     lines, _ = screen(st, width=80)
     inside = [t for t, _ in lines if "│" in t and "Keys" not in t]
     assert len(inside) >= 4 and all(len(t) <= 80 for t, _ in lines)
+
+
+def test_a_narrow_screen_stacks_the_buttons():
+    st = pc.UIState(tab="about", popup=("vol_boost", 1, "n", "Discord", ("wpctl",)))
+    lines, hits = screen(st, width=40)
+    assert all(len(t) <= 40 for t, _ in lines)
+    rows = {h[0] for h in hits}
+    assert len(rows) == 3 and {h[3] for h in hits} == {("popup_btn", 0), ("popup_btn", 1), ("popup_btn", 2)}

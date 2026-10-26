@@ -139,7 +139,7 @@ def row_at(st, m=MX):
 def test_enter_opens_a_menu_and_enter_again_sets_the_system_default():
     st, actions = key(at("GCS-8 CH 3-AUX"), "enter")
     assert actions == [] and st.mix_menu == ("playback", row_at(st).id)
-    assert labels(st) == ["Set as system default", "Mute", "Test sound", "Rename…", "Card profile…", "Back"]
+    assert labels(st) == ["Set as system default", "Mute", "Test sound", "Rename…", "Card profile…", "Volume boost: locked", "Back"]
     st, actions = key(st, "enter")
     assert actions == [("mix_cmd", ["wpctl", "set-default", str(row_at(st).id)])] and st.mix_menu is None
 
@@ -153,12 +153,12 @@ def test_the_current_default_says_so_and_picking_it_just_closes():
 
 def test_inputs_have_no_test_sound():
     st, _ = key(at("GCS-8 CH 3", "recording"), "enter")
-    assert labels(st) == ["Set as system default", "Mute", "Rename…", "Card profile…", "Back"]
+    assert labels(st) == ["Set as system default", "Mute", "Rename…", "Card profile…", "Volume boost: locked", "Back"]
 
 
 def test_an_app_menu_mutes_and_d_is_no_longer_a_shortcut():
     st, _ = key(at("Discord"), "enter")
-    assert labels(st) == ["Mute", "Back"]
+    assert labels(st) == ["Mute", "Volume boost: locked", "Back"]
     _, actions = key(st, "enter")
     assert actions == [("mix_cmd", ["wpctl", "set-mute", str(row_at(st).id), "toggle"])]
     for target in ("Discord", "GCS-8 CH 3-AUX"):
@@ -252,38 +252,86 @@ def discord_at(level):
     return at("Discord", m=m), m, play.id
 
 
-def test_volume_stops_at_100_percent_then_warns():
-    # Skrappjaw, 2026-10-26: "vol past 100 is ok btw. just needs a warning/unlock."
-    st, m, nid = discord_at(1.0)
+def boosted(level, saved=()):
+    play = next(r for r in pi.streams(DUMP) if r.direction == "out" and r.label == "Discord")
+    m = mx(with_volume(DUMP, play.id, level), {**pcfg.default_config(), "boost": list(saved)})
+    return at("Discord", m=m), m, play
+
+
+def up(nid, limit):
+    return [("mix_cmd", ["wpctl", "set-volume", "--limit", limit, str(nid), "5%+"])]
+
+
+def test_volume_stops_at_100_percent_and_asks_in_a_popover():
+    # Skrappjaw, 2026-10-26: "vol past 100 is ok btw. just needs a warning/unlock." Then: a popover with
+    # Don't ask again, and arrows + Enter only.
+    st, m, play = boosted(1.0)
     st, actions = key(st, "right", m=m)
-    assert actions == [] and "100%" in st.message and "again" in st.message
-    st, actions = key(st, "right", m=m)  # the second → unlocks this row, up to 150%
-    assert actions == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1.5", str(nid), "5%+"])]
-    st, actions = key(st, "right", m=m)  # stays unlocked
-    assert actions == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1.5", str(nid), "5%+"])]
+    assert actions == [] and st.popup[0] == "vol_boost"
+    title, text, buttons = pc.popup_view(st)
+    assert "Discord" in text and "100%" in text
+    assert [b for b, _ in buttons] == ["Go louder", "Don't ask again", "Cancel"] and pc.popup_cursor(st) == 2
 
 
-def test_moving_away_disarms_the_warning():
-    st, m, nid = discord_at(1.0)
-    st, _ = key(st, "right", "down", "up", m=m)
-    st, actions = key(st, "right", m=m)
-    assert actions == [] and "again" in st.message
+def test_go_louder_unlocks_for_this_session():
+    st, m, play = boosted(1.0)
+    st, actions = key(st, "right", "left", "left", "enter", m=m)
+    assert actions == up(play.id, "1.5") and st.popup is None
+    assert key(st, "right", m=m)[1] == up(play.id, "1.5")      # no second popover
 
 
-def test_back_to_100_locks_the_row_again():
-    st, m, nid = discord_at(1.0)
-    st, _ = key(st, "right", "right", m=m)
-    _, m_low, _ = discord_at(0.9)                     # the refresh after stepping down
-    st, actions = key(st, "right", m=m_low)
-    assert actions == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1", str(nid), "5%+"])]
-    st, actions = key(st, "right", m=m)               # at 100% again: warn again
-    assert actions == []
+def test_dont_ask_again_saves_it():
+    st, m, play = boosted(1.0)
+    st, actions = key(st, "right", "left", "enter", m=m)
+    assert actions == up(play.id, "1.5") + [("boost", play.name, True, "Discord")]
+
+
+def test_cancel_changes_nothing():
+    st, m, play = boosted(1.0)
+    st, actions = key(st, "right", "enter", m=m)
+    assert actions == [] and st.popup is None and play.id not in st.vol_unlocked
+
+
+def test_a_saved_boost_never_asks_and_never_stops_at_100():
+    st, m, play = boosted(1.0, saved=[play_name := next(r.name for r in pi.streams(DUMP) if r.label == "Discord")])
+    assert key(st, "right", m=m)[1] == up(play.id, "1.5")
+    st, m, play = boosted(0.5, saved=[play_name])
+    assert key(st, "right", m=m)[1] == up(play.id, "1.5")
+
+
+def test_back_under_100_locks_a_session_unlock_again():
+    st, m, play = boosted(1.0)
+    st, _ = key(st, "right", "left", "left", "enter", m=m)
+    _, m_low, _ = boosted(0.9)                       # the refresh after stepping down
+    assert key(st, "right", m=m_low)[1] == up(play.id, "1")
+    st, _ = key(st, "right", m=m_low)
+    st, actions = key(st, "right", m=m)              # at 100% again: asks again
+    assert actions == [] and st.popup[0] == "vol_boost"
 
 
 def test_a_row_already_past_100_is_not_trapped():
-    st, m, nid = discord_at(1.2)
-    assert key(st, "right", m=m)[1] == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1.5", str(nid), "5%+"])]
-    assert key(st, "left", m=m)[1] == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1.5", str(nid), "5%-"])]
+    st, m, play = boosted(1.2)
+    assert key(st, "right", m=m)[1] == up(play.id, "1.5")
+    assert key(st, "left", m=m)[1] == [("mix_cmd", ["wpctl", "set-volume", "--limit", "1.5", str(play.id), "5%-"])]
+
+
+def test_the_channel_menu_locks_and_unlocks_boost():
+    st, m, play = boosted(0.5)
+    st, _ = key(st, "enter", m=m)
+    assert labels(st, m) == ["Mute", "Volume boost: locked", "Back"]
+    st2, actions = key(st, "down", "enter", m=m)
+    assert actions == [("boost", play.name, True, "Discord")]
+    st, m, play = boosted(0.5, saved=[play.name])
+    st, _ = key(st, "enter", m=m)
+    assert labels(st, m)[1] == "Volume boost: unlocked"
+    st = dataclasses.replace(st, vol_unlocked=frozenset({play.id}))
+    st, actions = key(st, "down", "enter", m=m)
+    assert actions == [("boost", play.name, False, "Discord")] and play.id not in st.vol_unlocked
+
+
+def test_devices_get_the_boost_row_before_back():
+    st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
+    assert labels(st)[-2:] == ["Volume boost: locked", "Back"]
 
 
 def test_no_volume_control_is_refused():

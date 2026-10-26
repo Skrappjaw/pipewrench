@@ -445,8 +445,7 @@ class UIState:
     mix_cursor: int = 0
     mix_menu: tuple = None       # (section, node id) of the row whose menu is open
     mix_menu_cursor: int = 0
-    vol_armed: int = None        # node id warned at 100%: → again unlocks it (Skrappjaw, 2026-10-26)
-    vol_unlocked: frozenset = frozenset()  # node ids allowed past 100%, up to 150%
+    vol_unlocked: frozenset = frozenset()  # node ids let past 100% this session (Go louder)
     meters: bool = True          # live levels on the Mixer (v toggles)
     cursor: int = 0              # Settings: the row in the open category
     pending: dict = field(default_factory=dict)
@@ -1096,6 +1095,7 @@ POPUPS = {
     "dev_profile": ("Switch profile", [("Switch", "ok"), ("Cancel", "cancel")], 1),
     "reset_keys": ("Reset keys", [("Reset", "ok"), ("Cancel", "cancel")], 1),
     "pw_down": ("PipeWire not answering", [("OK", "close")], 0),
+    "vol_boost": ("Volume past 100%", [("Go louder", "go"), ("Don't ask again", "always"), ("Cancel", "cancel")], 2),
 }
 PW_DOWN_TEXT = "PipeWire stopped answering. PipeWrench keeps the last screen and checks again every 5 s."
 
@@ -1103,7 +1103,9 @@ PW_DOWN_TEXT = "PipeWire stopped answering. PipeWrench keeps the last screen and
 def popup_view(st, devices=None):
     """(title, text, [(button, op)]) for the open popover."""
     title, buttons, _ = POPUPS[st.popup[0]]
-    text = PW_DOWN_TEXT if st.popup[0] == "pw_down" else _confirm_question(st.popup, devices)
+    kind = st.popup[0]
+    text = (PW_DOWN_TEXT if kind == "pw_down" else f"{st.popup[3]} is at 100%. Louder can clip." if kind == "vol_boost"
+            else _confirm_question(st.popup, devices))
     return title, text, buttons
 
 
@@ -1127,6 +1129,10 @@ def _key_popup(st, key):
         return st, []
     if op == "close":
         return st, []
+    if kind[0] == "vol_boost":  # ("vol_boost", node id, node name, label, the +5% command)
+        _, nid, name, label, cmd = kind
+        st.vol_unlocked = st.vol_unlocked | {nid}
+        return st, [("mix_cmd", list(cmd))] + ([("boost", name, True, label)] if op == "always" else [])
     if kind == ("reset_keys",):
         st.keys, st.message = {}, "keys reset to the defaults"
         return st, [("save_ui",)]
@@ -1135,21 +1141,26 @@ def _key_popup(st, key):
 
 
 def _overlay_popup(cv, st, devices, width, height):
-    """Draw the open popover centred over the finished screen; only its buttons take clicks."""
+    """Draw the open popover centred over the finished screen; only its buttons take clicks. Buttons sit on
+    one row, or one per row when the screen is too narrow for that."""
     title, text, buttons = popup_view(st, devices)
     labels = [f"[ {b} ]" for b, _ in buttons]
-    row_btn = "  ".join(labels)
-    bw = min(width - 4, max(48, len(title) + 8, len(row_btn) + 6))
+    one_row = "  ".join(labels)
+    bw = max(8, min(width - 4, max(48, len(title) + 8, len(one_row) + 6)))
     inner = bw - 4
-    body = textwrap.wrap(text, inner) or [""]
-    pad = (inner - len(row_btn)) // 2
-    rows = ([f"┌─ {title} ".ljust(bw - 1, "─") + "┐", "│" + " " * (bw - 2) + "│"]
-            + [f"│ {line.ljust(inner)} │" for line in body]
-            + ["│" + " " * (bw - 2) + "│", f"│ {(' ' * pad + row_btn).ljust(inner)} │",
-               "│" + " " * (bw - 2) + "│", "└" + "─" * (bw - 2) + "┘"])
+    btn_rows = [labels] if len(one_row) <= inner else [[label] for label in labels]
+    blank = "│" + " " * (bw - 2) + "│"
+    rows = ([f"┌─ {title[:bw - 6]} ".ljust(bw - 1, "─") + "┐", blank]
+            + [f"│ {line.ljust(inner)} │" for line in textwrap.wrap(text, inner) or [""]] + [blank])
+    first_btn = len(rows)
+    for group in btn_rows:
+        row = "  ".join(group)
+        rows.append(f"│ {row.center(inner)[:inner]} │")
+    rows += [blank, "└" + "─" * (bw - 2) + "┘"]
     y0, x0 = max(0, (height - len(rows)) // 2), (width - bw) // 2
-    btn_y, chosen = y0 + len(rows) - 3, popup_cursor(st)
+    chosen = popup_cursor(st)
     cv.hits = []
+    i = 0
     for n, row in enumerate(rows):
         y = y0 + n
         if y >= len(cv.lines):
@@ -1158,12 +1169,13 @@ def _overlay_popup(cv, st, devices, width, height):
         base, spans = style if isinstance(style, tuple) else (style, [])
         line = text0.ljust(width)[:width]
         spans = list(spans) + [(x0, x0 + bw, "chip")]
-        if y == btn_y:
-            c = x0 + 2 + pad
-            for i, label in enumerate(labels):
+        if first_btn <= n < first_btn + len(btn_rows):
+            group = btn_rows[n - first_btn]
+            c = x0 + 2 + (inner - len("  ".join(group))) // 2
+            for label in group:
                 spans.append((c, c + len(label), "selected" if i == chosen else "chip"))
                 cv.hit(y, c, c + len(label), ("popup_btn", i))
-                c += len(label) + 2
+                c, i = c + len(label) + 2, i + 1
         cv.lines[y] = (line[:x0] + row + line[x0 + bw:], (base, spans))
 
 
@@ -1666,7 +1678,7 @@ def mixer_view(inv, config, streams):
     hidden = set(config["hidden"])
     hidden_cards = {c.id for c in inv.cards if c.name in hidden}
     devs = [r for r in inv.rows() if r.kind != "monitor" and r.name not in hidden and r.card_id not in hidden_cards]
-    return {"defaults": inv.defaults,
+    return {"defaults": inv.defaults, "boost": frozenset(config.get("boost", [])),
             "playback": ([r for r in devs if r.direction in ("out", "duplex")], [a for a in streams if a.direction == "out"]),
             "recording": ([r for r in devs if r.direction in ("in", "duplex")], [a for a in streams if a.direction == "in"])}
 
@@ -1692,21 +1704,18 @@ def _is_default(mx, section, row):
     return row.name == mx["defaults"]["sink" if section == "playback" else "source"]
 
 
-VOLUME_WARNING = "Past 100% can clip. → again to go louder (up to 150%)"
-
-
-def _volume_up(st, row):
-    """→ stops at 100%. There, the first → only warns and the second unlocks the row up to 150%. A row seen
-    below 100% locks again; one already past 100% (set elsewhere) is never trapped."""
+def _volume_up(st, row, mx):
+    """→ stops at 100% unless the channel's boost is unlocked: saved (Don't ask again, or the channel menu)
+    or for this session (Go louder). At 100% and locked it asks in a popover. A session unlock ends when the
+    channel is seen under 100%; a channel already past 100% (set elsewhere) is never trapped."""
+    saved = row.name in mx.get("boost", ())
+    if saved or row.volume > pi.UNITY + 0.005 or (row.id in st.vol_unlocked and row.volume >= pi.UNITY - 0.005):
+        return st, [("mix_cmd", pi.volume_cmd(row, "+5%"))]
+    st.vol_unlocked = st.vol_unlocked - {row.id}
     if row.volume < pi.UNITY - 0.005:
-        st.vol_unlocked, st.vol_armed = st.vol_unlocked - {row.id}, None
         return st, [("mix_cmd", pi.volume_cmd(row, "+5%", limit=pi.UNITY))]
-    if row.id not in st.vol_unlocked and row.volume <= pi.UNITY + 0.005 and st.vol_armed != row.id:
-        st.vol_armed = row.id
-        st.message = st.failed = VOLUME_WARNING
-        return st, []
-    st.vol_unlocked, st.vol_armed = st.vol_unlocked | {row.id}, None
-    return st, [("mix_cmd", pi.volume_cmd(row, "+5%"))]
+    st.popup, st.popup_button = ("vol_boost", row.id, row.name, row.label, tuple(pi.volume_cmd(row, "+5%"))), None
+    return st, []
 
 
 def _key_mixer(st, key, mx):
@@ -1722,14 +1731,13 @@ def _key_mixer(st, key, mx):
     try:
         if key in ("up", "down"):
             st.mix_cursor = max(0, min(len(items) - 1, st.mix_cursor + (1 if key == "down" else -1)))
-            st.vol_armed = None
         elif key in ("left", "right"):
             if row.volume is None:
                 st.message = st.failed = f"{row.label} has no volume control here"
                 return st, []
             if key == "left":
                 return st, [("mix_cmd", pi.volume_cmd(row, "-5%"))]
-            return _volume_up(st, row)
+            return _volume_up(st, row, mx)
         elif key == " ":
             if row.mute is None:
                 st.message = st.failed = f"{row.label} can't be muted here"
@@ -1760,8 +1768,10 @@ def _mix_items(mx, kind, section, row):
     """[(label, op)] for a row's menu. Setting the default moves every app that follows it, so it's never
     on a single key; it leads the menu so Enter, Enter still reaches it."""
     mute = [("Unmute" if row.mute else "Mute", ("mute",))] if row.mute is not None else []
+    boost = ([(f"Volume boost: {'unlocked' if row.name in mx.get('boost', ()) else 'locked'}", ("boost",))]
+             if row.volume is not None else [])
     if kind == "app":
-        return mute + [("Back", ("back",))] if mute else []
+        return mute + boost + [("Back", ("back",))] if mute or boost else []
     items = [("★ System default", ("back",)) if _is_default(mx, section, row)
              else ("Set as system default", ("default",))] + mute
     if section == "playback" and row.direction in ("out", "duplex"):
@@ -1769,7 +1779,7 @@ def _mix_items(mx, kind, section, row):
     items.append(("Rename…", ("rename",)))
     if row.card_id is not None:  # buses have no card
         items.append(("Card profile…", ("profile",)))
-    return items + [("Back", ("back",))]
+    return items + boost + [("Back", ("back",))]
 
 
 def mix_menu_items(mx, st):
@@ -1800,6 +1810,11 @@ def _key_mix_menu(st, key, mx):
     except ValueError as e:
         st.message = st.failed = str(e)
         return st, []
+    if op == "boost":
+        on = row.name not in mx.get("boost", ())
+        if not on:
+            st.vol_unlocked = st.vol_unlocked - {row.id}
+        return st, [("boost", row.name, on, row.label)]
     if op == "test":
         return st, [("mix_test", row.name)]
     if op == "rename":

@@ -60,12 +60,12 @@ def pick(st, label, m=None):
 
 def test_mixer_device_menu_has_rename_and_card_profile():
     st, _ = mkey(mix_at("GCS-8 CH USB"), "enter")
-    assert mix_labels(st) == ["Set as system default", "Mute", "Test sound", "Rename…", "Card profile…", "Back"]
+    assert mix_labels(st) == ["Set as system default", "Mute", "Test sound", "Rename…", "Card profile…", "Volume boost: locked", "Back"]
 
 
 def test_mixer_recording_menu():
     st, _ = mkey(mix_at("GCS-8 CH 2", "recording"), "enter")
-    assert mix_labels(st) == ["★ System default", "Mute", "Rename…", "Card profile…", "Back"]
+    assert mix_labels(st) == ["★ System default", "Mute", "Rename…", "Card profile…", "Volume boost: locked", "Back"]
 
 
 def test_mixer_bus_has_rename_but_no_card_profile():
