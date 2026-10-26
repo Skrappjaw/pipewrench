@@ -56,7 +56,7 @@ def test_settings_render_shows_values_and_pending_marker():
     assert "Force sample rate" in body and "48000" in body
     assert "Force buffer size" in body and "128" in body
     assert not any("*" in t for t, _ in lines if "◀" in t)  # no pending marker on any setting row
-    st, _ = key(st, "down", "down", "down", "enter", "right")  # force-quantum 128 -> 256 pending
+    st, _ = key(st, "down", "enter", "right")  # force-quantum (row 1) 128 -> 256 pending
     lines, _ = screen(st)
     row = [t for t, _ in lines if "Force buffer size" in t][0]
     assert "256" in row and "*" in row
@@ -66,7 +66,7 @@ def test_settings_render_shows_allowed_rates_and_warning():
     st, _ = key(UIState(), "enter", "right")  # force-rate 48000 -> 88200 pending
     lines, _ = screen(st)
     body = "\n".join(t for t, _ in lines)
-    assert "allowed rates: 48000" in body
+    assert "allowed rates: 48 kHz" in body
     assert "isn't in allowed" in body
 
 
@@ -109,13 +109,13 @@ def test_up_down_moves_cursor_and_clamps():
     st, _ = key(UIState(), "up")
     assert st.cursor == 0
     st, _ = key(st, *["down"] * 60)
-    assert st.cursor == pc.CLOCK_BUTTONS_ROW  # Audio: the clock rows, then Apply · Save · Reset
+    assert st.cursor == pc.LOG_ROW  # Audio: the clock rows, the buttons, then Log level (Advanced)
     st, _ = key(UIState(settings_cat="prefs"), *["down"] * 60)
     assert st.cursor == pc.RESET_KEYS_ROW  # Preferences: Display, then Keys
 
 
 def test_left_right_sets_pending_without_action():
-    st, actions = key(UIState(), "down", "down", "down", "enter", "right", "right")
+    st, actions = key(UIState(), "down", "enter", "right", "right")
     assert st.pending == {"clock.force-quantum": 512}
     assert actions == []
 
@@ -126,8 +126,8 @@ def test_pending_back_to_current_clears():
 
 
 def test_enter_applies_all_pending_in_order():
-    st, actions = key(UIState(), "down", "down", "down", "enter", "right", "up", "up", "enter", "right", "enter")
-    # cursor 3 (force buffer) 128 -> 256; up ends the edit, up -> cursor 1 (min buffer) 32 -> 64; Enter applies both
+    st, actions = key(UIState(), "down", "enter", "right", "down", "enter", "right", "enter")
+    # cursor 1 (force buffer) 128 -> 256; down ends the edit on cursor 2 (min buffer) 32 -> 64; Enter applies both
     assert actions == [("set_many", [("clock.min-quantum", 64), ("clock.force-quantum", 256)])]
     assert st.pending == {}
 
@@ -139,7 +139,7 @@ def test_enter_with_nothing_pending_does_nothing():
 
 def test_enter_with_invalid_pending_blocks_and_reports():
     # min-quantum up to 4096 (> max 2048)
-    st, actions = key(UIState(), "down", "enter", *["right"] * 7, "enter")
+    st, actions = key(UIState(), "down", "down", "enter", *["right"] * 7, "enter")
     assert st.pending == {"clock.min-quantum": 4096}
     assert actions == []
     assert "min" in st.message
@@ -230,7 +230,7 @@ def test_esc_drops_pending_first_then_goes_back_to_the_menu():
 
 def test_the_pane_shows_only_the_open_category():
     audio = "\n".join(t for t, _ in screen(UIState(), height=40)[0])
-    assert "Clock" in audio and "Realtime" in audio and "Display" not in audio and "Keys  " not in audio
+    assert "PipeWire" in audio and "Realtime" in audio and "Display" not in audio and "Keys  " not in audio
     prefs = "\n".join(t for t, _ in screen(UIState(settings_cat="prefs"), height=40)[0])
     assert "Display" in prefs and "Theme" in prefs and "Force sample rate" not in prefs
     assert "Audio" in prefs and "Preferences" in prefs  # the menu stays on the left
@@ -326,7 +326,7 @@ def click(st, hits, target, event="click", offset=0):
 @pytest.mark.parametrize("width", [80, 120])
 def test_hitmap_lands_on_drawn_glyphs(width):
     lines, hits = screen(UIState(), width=width)
-    for i in range(len(pc.SETTINGS)):
+    for i in range(pc.CLOCK_BUTTONS_ROW):                   # the clock rows (Log level is below the fold)
         r, c0, _ = hit_for(hits, ("arrow", i, -1))
         assert text_at(lines, r, c0) == "◀"
         r, c0, _ = hit_for(hits, ("arrow", i, +1))
@@ -373,8 +373,7 @@ def test_wheel_scrolls_settings_and_never_changes_a_value():
 def test_wheel_works_anywhere_on_the_screen():
     st = UIState(cursor=1)
     lines, hits = screen(st)
-    blank = next(n for n, (t, _) in enumerate(lines) if not t.strip())
-    for y in (0, blank):                                    # the tab bar, an empty line
+    for y in (0, 1):                                        # the tab bar, the rule under it
         st2, _ = pc.handle_mouse(st, hits, y, 2, "wheel_down", CUR)
         assert st2.cursor == 2 and st2.tab == "settings"
 
@@ -389,9 +388,9 @@ def test_apply_and_revert_chips():
 
 
 def test_double_click_row_applies():
-    st, _ = key(UIState(), "down", "down", "down", "enter", "right")
+    st, _ = key(UIState(), "down", "enter", "right")
     _, hits = screen(st)
-    _, actions = click(st, hits, ("setting", 3), event="double")
+    _, actions = click(st, hits, ("setting", 1), event="double")
     assert actions == [("set_many", [("clock.force-quantum", 256)])]
 
 

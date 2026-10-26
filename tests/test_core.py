@@ -61,8 +61,8 @@ def test_read_settings_uses_runner():
 
 def test_settings_table_matches_pipecontrol():
     keys = [s.key for s in pc.SETTINGS]
-    assert keys == ["clock.force-rate", "clock.min-quantum", "clock.max-quantum",
-                    "clock.force-quantum", "log.level"]
+    assert keys == ["clock.force-rate", "clock.force-quantum", "clock.min-quantum",   # screen order (2026-10-26)
+                    "clock.max-quantum", "log.level"]
     rate = pc.setting("clock.force-rate")
     assert rate.choices == [0, 44100, 48000, 88200, 96000, 176400, 192000]
     assert pc.setting("clock.min-quantum").choices == [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]
@@ -86,7 +86,7 @@ def test_cycle_custom_value_snaps_in_direction():
 
 
 def test_display_value():
-    assert pc.display_value(pc.setting("clock.force-rate"), 0) == "do not force"
+    assert pc.display_value(pc.setting("clock.force-rate"), 0) == "off"
     assert pc.display_value(pc.setting("clock.force-rate"), 48000) == "48000"
     assert pc.display_value(pc.setting("clock.force-quantum"), 1000) == "custom:1000"
     assert pc.display_value(pc.setting("log.level"), 2) == "Warning"

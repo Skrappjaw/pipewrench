@@ -235,30 +235,48 @@ A value never changes on a stray arrow: **Enter opens a row**, then ←→ chang
 it, Esc puts the row back, and ↑↓ close it, keeping the change. A tap on a row's ◀ ▶ opens it and steps it
 in one go.
 
-![Settings, with a realtime problem](guide/settings.png)
+![Settings → Audio: PipeWire, Devices, Realtime and Advanced](guide/settings.png)
 
 ### Audio
 
-#### Clock
+The page is in four boxes: **PipeWire**, **Devices**, **Realtime** and **Advanced**. The status line at
+the bottom says what the selected row does.
 
-PipeWire's sample rate and buffer sizes. An open row's change is marked `*` until applied. Smaller
-buffers mean less latency and more risk of dropouts. Each buffer row shows its latency at the rate in
-use, and the rate row the latency of the buffer in use: one buffer's period, buffer ÷ rate (128 at 48k
-is 2.67 ms; 128 at 192k is 0.67 ms). It's not the round trip, which adds the interface's own buffers. **Force buffer size** is the one to change for
-tracking (128 or lower) versus mixing (1024).
+**How it fits together.** PipeWire is the mix: every app and every device meets in one clock, with one
+sample rate and one buffer size. Each device then runs at its own hardware rate. When a device's rate
+matches PipeWire's, audio passes straight through. When it doesn't, PipeWire resamples between them, which
+costs a little CPU and is usually inaudible.
 
-Below the rows, each sound card that's on lists the rates it supports and the rate it's running at,
-for example `UMC404HD 192k  44.1 48 88.2 96 176.4 192k · running 48k`. The list comes from the
-kernel, and only USB interfaces report one; other cards say `not reported`. When you change the rate:
+#### PipeWire
+
+**Running now** is what PipeWire is doing this moment, read live: for example `48 kHz · 256 samples ·
+5.33 ms`. Under it, where each value comes from:
+
+- **buffer:** *forced*, or *the smallest an app asks for* (Discord, the browser and REAPER each ask),
+  kept between Minimum and Max buffer;
+- **rate:** *forced*, *PipeWire's default*, or *an app asked for it* (only rates in **allowed rates**).
+
+With nothing playing it says **idle**, and what applies when something starts. If two devices run on
+separate clocks at different settings, each gets its own line, named.
+
+**Overrides.** Force sample rate and Force buffer size. **off** lets PipeWire and the apps decide, and
+the row shows what's running instead (`off → 256 now (5.33 ms)`). Set one to make it win over every app:
+128 or lower for tracking, 1024 for mixing.
+
+**Limits.** Minimum and Max buffer: the range apps may ask for. Each row shows its latency at the rate in
+use: one buffer's period, buffer ÷ rate (128 at 48k is 2.67 ms; at 192k, 0.67 ms). It's not the round
+trip, which adds each device's own buffers.
+
+An open row's change is marked `*` until applied. When you change the rate:
 
 - a card that can't run it is named (`GCS-8 can't run at 192k (it supports 48k)`);
-- a rate outside **allowed rates** runs the graph at that rate while your devices stay at the default
+- a rate outside **allowed rates** runs PipeWire at that rate while your devices stay at the default
   rate and PipeWire resamples, and the warning says so;
-- if any card doesn't report its rates: "Make sure your device(s) support the rate selected."
+- if any card that's on doesn't report its rates: "Make sure your device(s) support the rate selected."
 
-Under the clock rows are four buttons. ↓ to their row, ←→ picks one, and Enter or a click presses it:
+Four buttons sit under the rows. ↓ to their row, ←→ picks one, and Enter or a click presses it:
 
-- **Apply** sets the changes live, now. Enter on an open clock row does the same, and Esc reverts.
+- **Apply** sets the changes live, now. Enter on an open row does the same, and Esc reverts.
 - **Save** keeps the live clock for the next time PipeWire starts. It writes to PipeWrench's PipeWire file, `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf`,
   and never restarts anything. A forced rate or buffer is saved as PipeWire's default, so apps can still
   ask for another size after a restart. Values that aren't forced, or match PipeWire's own defaults,
@@ -268,6 +286,16 @@ Under the clock rows are four buttons. ↓ to their row, ←→ picks one, and E
 - **Restart** restarts WirePlumber, after asking. It's the one place to do it: no shortcut, so a stray key
   can't drop your audio. Apps like Discord may
   lose their audio, so pick Cancel if you're on a call.
+
+#### Devices
+
+Every sound card, on or off, one line each:
+
+- **Status:** running, idle, suspended (asleep until something uses it), or off (its profile is off).
+- **Rate:** the rate it's running at.
+- **vs PipeWire:** `✓ same as PipeWire`, or `⇄ resampled` when its rate differs from PipeWire's.
+- **Can run:** the rates the kernel lists for it. Only USB interfaces report one; others say `not
+  reported`. A device that plays and records at different rates shows each (`out 32k · in 16k`).
 
 #### Realtime
 
@@ -288,6 +316,13 @@ green:
 ![Settings, realtime working](guide/settings-realtime-ok.png)
 
 `pwrench realtime` prints the same check in a terminal and exits 0 when all is well.
+
+#### Advanced
+
+**Log level**: how much PipeWire writes to its log (the system journal), from No log through Error,
+Warning, Info and Debug to Trace. It never changes the sound. Raise it only to chase a bug, then put it
+back to Warning: the high levels cost CPU and fill the journal fast. Enter opens it, ←→ picks, Enter
+applies.
 
 ### Preferences
 

@@ -136,7 +136,8 @@ def settings(width=100, height=50, realtime=None):
 
 def test_section_follows_the_clock_in_audio(tmp_path):
     lines = [t[pc.MENU_W:].strip() for t, _ in settings(realtime=check(tmp_path))]
-    assert lines.index("Clock") < lines.index("Realtime") and "Display" not in lines
+    tops = [t for t in lines if t.startswith("┌─ ")]
+    assert [t.split()[1] for t in tops] == ["PipeWire", "Devices", "Realtime", "Advanced"] and "Display" not in lines
 
 
 def test_section_shows_rows_and_fix(tmp_path):
@@ -155,7 +156,7 @@ def test_section_fits_width(tmp_path, width):
 
 
 def test_realtime_has_no_cursor_rows():
-    assert pc.CLOCK_BUTTONS_ROW == len(pc.SETTINGS)  # the last Audio row: Realtime is read-only
+    assert pc.LOG_ROW == pc.CLOCK_BUTTONS_ROW + 1 == len(pc.SETTINGS)  # the last Audio row: Realtime is read-only
 
 
 # --- CLI ------------------------------------------------------------------------

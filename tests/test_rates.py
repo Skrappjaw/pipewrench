@@ -43,10 +43,11 @@ def test_continuous_ranges():
     assert s.supports(44100) and s.supports(96000) and not s.supports(192000)
 
 
-def test_cards_are_matched_by_alsa_card_number_and_off_cards_skipped(tmp_path):
+def test_cards_are_matched_by_alsa_card_number_and_off_cards_kept_as_off(tmp_path):
     root = proc_tree(tmp_path, {1: "umc404hd-stream0.txt", 0: None, 5: "gcs8-stream0.txt"})
     got = pr.read([card("UMC404HD", 1), card("Built-in Audio", 0), card("GCS-8", 5, active="off")], root)
-    assert [(c.label, c.known) for c in got] == [("UMC404HD", True), ("Built-in Audio", False)]
+    assert [(c.label, c.known) for c in got] == [("UMC404HD", True), ("Built-in Audio", False), ("GCS-8", False)]
+    assert got[2].status == "off"                                  # listed as off, its rates never read
     assert got[0].supports(192000) and got[0].running == 48000
     assert got[1].supports(192000) is None
 
@@ -105,7 +106,8 @@ def test_settings_lists_device_rates_and_names_the_one_that_cannot(tmp_path):
     cur = {**CUR, "clock.allowed-rates": [48000, 192000]}
     lines, _ = pc.render_screen(st, cur, None, 100, 50, rates=rates)
     body = "\n".join(t for t, _ in lines)
-    assert "UMC404HD" in body and "44.1 48 88.2 96 176.4 192k" in body and "running 48k" in body
+    umc = next(t for t in body.splitlines() if "UMC404HD" in t)
+    assert "48 kHz" in umc and "44.1 48 88.2 96 176.4 192k" in body   # a long list may take its own line
     assert "Built-in Audio" in body and "not reported" in body
     assert "GCS-8 can't run at 192k" in body
     assert "Make sure your device(s) support the rate selected." in body

@@ -19,6 +19,7 @@ class Stream:
     rates: frozenset = frozenset()
     ranges: tuple = ()        # (lo, hi) continuous ranges every direction accepts
     running: int = None       # "Momentary freq" of a running direction, if any
+    dirs: tuple = ()          # (("out"|"in", rates, ranges), ...): each direction's own list, for display only
 
     def supports(self, rate):
         return rate in self.rates or any(lo <= rate <= hi for lo, hi in self.ranges)
@@ -27,7 +28,10 @@ class Stream:
 @dataclass(frozen=True)
 class CardRates:
     label: str
-    stream: Stream = None     # None: the kernel doesn't report this card's rates
+    stream: Stream = None     # None: the kernel doesn't report this card's rates (or the card is off)
+    status: str = None        # off | running | idle | suspended (Settings → Audio → Devices, Skrappjaw 2026-10-26)
+    live: int = None          # the rate a running device of the card is at, from PipeWire
+    nodes: tuple = ()         # ((node name, label), ...): its devices, so a driver shows by label
 
     @property
     def known(self):
@@ -67,15 +71,23 @@ def parse_stream(text):
 
     rates = frozenset(r for d in per_dir for r in d[0] if all(in_dir(r, o) for o in per_dir))
     ranges = tuple(per_dir[0][1]) if all(d[1] for d in per_dir) else ()  # ranges: kept when every direction has one
-    return Stream(rates=rates, ranges=ranges, running=running)
+    named = tuple(("out" if k == "Playback:" else "in", frozenset(v[0]), tuple(v[1])) for k, v in dirs.items())
+    return Stream(rates=rates, ranges=ranges, running=running, dirs=named)
+
+
+def _status(card):
+    states = {r.state for r in card.rows}
+    return next((s for s in ("running", "idle", "suspended") if s in states), "suspended" if card.rows else "idle")
 
 
 def read(cards, root=PROC):
-    """CardRates for every card that's on (active profile not "off"), in the order given."""
+    """CardRates for every card, in the order given, each with its status ("off" for profile off: no rates)."""
     out = []
     for c in cards:
         if c.active == "off":
+            out.append(CardRates(c.label, None, status="off"))
             continue
+        live = max((r.rate for r in c.rows if r.state == "running" and r.rate), default=None)
         files = sorted(Path(root, f"card{c.alsa_card}").glob("stream*")) if c.alsa_card is not None else []
         texts = []
         for f in files:
@@ -83,7 +95,8 @@ def read(cards, root=PROC):
                 texts.append(f.read_text())
             except OSError:
                 pass
-        out.append(CardRates(c.label, parse_stream("\n".join(texts)) if texts else None))
+        out.append(CardRates(c.label, parse_stream("\n".join(texts)) if texts else None, _status(c), live,
+                             tuple((r.name, r.label) for r in c.rows)))
     return out
 
 
@@ -91,12 +104,19 @@ def khz(rate):
     return f"{rate / 1000:g}k"
 
 
+def _list(rates, ranges):
+    if rates:
+        return " ".join(f"{r / 1000:g}" for r in sorted(rates)) + "k"
+    return " ".join(f"{lo / 1000:g}–{hi / 1000:g}k" for lo, hi in ranges)
+
+
 def describe(stream):
-    """'44.1 48 88.2 96 176.4 192k' or '8–96k'."""
-    if stream.rates:
-        nums = [f"{r / 1000:g}" for r in sorted(stream.rates)]
-        return " ".join(nums) + "k"
-    return " ".join(f"{lo / 1000:g}–{hi / 1000:g}k" for lo, hi in stream.ranges) or "none listed"
+    """'44.1 48 88.2 96 176.4 192k' or '8–96k'; with no rate common to both ways, each way's own list
+    ('out 32k · in 16k': the DualShock 4, found on Skrappjaw's machine 2026-10-26)."""
+    common = _list(stream.rates, stream.ranges)
+    if common:
+        return common
+    return " · ".join(f"{d} {_list(r, g)}" for d, r, g in stream.dirs if _list(r, g)) or "none listed"
 
 
 def warnings(rate, allowed, default, devices):
@@ -104,6 +124,7 @@ def warnings(rate, allowed, default, devices):
     if not rate:
         return []
     out = []
+    devices = None if devices is None else [d for d in devices if d.status != "off"]  # an off card runs nothing
     for d in devices or []:
         if d.supports(rate) is False:
             out.append(f"{d.label} can't run at {khz(rate)} (it supports {describe(d.stream)})")

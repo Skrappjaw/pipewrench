@@ -9,7 +9,7 @@ import pipewrench
 
 FIX = Path(__file__).parent / "fixtures"
 CUR = pc.parse_settings((FIX / "settings.txt").read_text())  # force rate 48000, force buffer 128
-RATE, FORCE_Q = 0, 3                                          # SETTINGS rows
+RATE, FORCE_Q = 0, [s.key for s in pc.SETTINGS].index("clock.force-quantum")   # SETTINGS rows
 
 
 def S(**kw):

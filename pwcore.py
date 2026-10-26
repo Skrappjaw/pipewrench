@@ -141,12 +141,13 @@ class Setting:
 _BUFFERS = [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]
 LOG_NAMES = ["No log", "Error", "Warning", "Info", "Debug", "Trace"]
 
+# In screen order (Skrappjaw, 2026-10-26): the overrides, the limits, then Log level, alone under Advanced.
 SETTINGS = [
     Setting("clock.force-rate", "Force sample rate", "force rate",
             [0, 44100, 48000, 88200, 96000, 176400, 192000]),
+    Setting("clock.force-quantum", "Force buffer size", "force buffer", [0] + _BUFFERS),
     Setting("clock.min-quantum", "Minimum buffer", "min buffer", _BUFFERS),
     Setting("clock.max-quantum", "Max buffer", "max buffer", _BUFFERS),
-    Setting("clock.force-quantum", "Force buffer size", "force buffer", [0] + _BUFFERS),
     Setting("log.level", "Log level", "log level", list(range(6))),
 ]
 KEYS = [s.key for s in SETTINGS]
@@ -188,7 +189,7 @@ def display_value(s, value):
     if value is None:
         return "?"
     if s.key in FORCE_KEYS and value == 0:
-        return "do not force"
+        return "off"
     if s.key == "log.level" and 0 <= value < len(LOG_NAMES):
         return LOG_NAMES[value]
     if value not in s.choices:
@@ -441,7 +442,15 @@ def handle_key(st, key, current, devices=None, patch=None, mixer=None):
 # Each category is its own list; st.cursor is the row in the open one.
 SETTINGS_CATS = [("audio", "Audio"), ("prefs", "Preferences")]
 MENU_W = 15                         # the menu column, its │ included
-CLOCK_BUTTONS_ROW = len(SETTINGS)   # Audio: the clock rows, then Apply · Save · Reset
+CLOCK_BUTTONS_ROW = len(SETTINGS) - 1  # Audio: the clock rows, then Apply · Save · Reset · Restart,
+LOG_ROW = CLOCK_BUTTONS_ROW + 1         # then Log level under Advanced
+
+
+def audio_setting(cursor):
+    """The Setting on an Audio cursor row, or None for the buttons row."""
+    if 0 <= cursor < CLOCK_BUTTONS_ROW:
+        return SETTINGS[cursor]
+    return SETTINGS[-1] if cursor == LOG_ROW else None
 CLOCK_BUTTONS = ["Apply", "Save", "Reset", "Restart"]
 # Preferences: Display (PipeWrench's own rows; they apply at once), then Keys.
 THEME_ROW = 0
@@ -480,8 +489,8 @@ def _leave(st):
 
 def _begin_edit(st):
     """Open the cursor row's value for ←→. Only value rows open; buttons and Keys rows don't."""
-    if st.settings_cat == "audio" and st.cursor < CLOCK_BUTTONS_ROW:
-        k = SETTINGS[st.cursor].key
+    if st.settings_cat == "audio" and audio_setting(st.cursor):
+        k = audio_setting(st.cursor).key
         st.editing, st.edit_from = True, (k in st.pending, st.pending.get(k))
     elif st.settings_cat == "prefs" and st.cursor in PREF_ROWS:
         attr = PREF_ROWS[st.cursor]
@@ -544,12 +553,12 @@ def _key_settings_menu(st, key):
 
 
 def _key_audio(st, key, current):
-    st.cursor = max(0, min(CLOCK_BUTTONS_ROW, st.cursor))
-    if st.editing and st.cursor < CLOCK_BUTTONS_ROW:
+    st.cursor = max(0, min(LOG_ROW, st.cursor))
+    if st.editing and audio_setting(st.cursor):
         return _edit_clock(st, key, current)
     _end_edit(st)
     if key in ("up", "down"):
-        st.cursor = max(0, min(CLOCK_BUTTONS_ROW, st.cursor + (1 if key == "down" else -1)))
+        st.cursor = max(0, min(LOG_ROW, st.cursor + (1 if key == "down" else -1)))
     elif st.cursor == CLOCK_BUTTONS_ROW and key == "left" and st.clock_button == 0:
         return _leave(st)
     elif st.cursor == CLOCK_BUTTONS_ROW and key in ("left", "right"):
@@ -575,7 +584,7 @@ def _key_audio(st, key, current):
 
 def _edit_clock(st, key, current):
     """An open clock row: ←→ step it (pending), Enter applies, Esc puts it back, ↑↓ keep it pending."""
-    s = SETTINGS[st.cursor]
+    s = audio_setting(st.cursor)
     if key in ("left", "right"):
         base = st.pending.get(s.key, current.get(s.key))
         new = cycle(s, base if isinstance(base, int) else s.choices[0], 1 if key == "right" else -1)
@@ -594,7 +603,7 @@ def _edit_clock(st, key, current):
             st.pending.pop(s.key, None)
         _end_edit(st).message = "cancelled"
     elif key in ("up", "down"):
-        _end_edit(st).cursor = max(0, min(CLOCK_BUTTONS_ROW, st.cursor + (1 if key == "down" else -1)))
+        _end_edit(st).cursor = max(0, min(LOG_ROW, st.cursor + (1 if key == "down" else -1)))
     return st, []
 
 
@@ -901,10 +910,23 @@ PREF_NOTES = {THEME_ROW: "applies at once", FPS_ROW: "how often Mixer meters red
               KEY_BOX_ROW: "the key list at the bottom of the screen"}
 
 
-def _pref_note(st):
-    if st.tab == "settings" and st.settings_cat == "prefs" and st.settings_focus == "pane":
+# The same for Audio's rows: what each one means, in plain words (Skrappjaw, 2026-10-26).
+AUDIO_NOTES = {
+    "clock.force-rate": "PipeWire's rate: every app and device meets here. Off: its default, or a rate an app asks for",
+    "clock.force-quantum": "PipeWire's buffer for everything. Off: the smallest an app asks for. Smaller = less delay, more CPU",
+    "clock.min-quantum": "the smallest buffer an app may ask PipeWire for",
+    "clock.max-quantum": "the largest buffer an app may ask PipeWire for",
+    "log.level": "how much PipeWire writes to its log (the journal); for chasing bugs, it never changes the sound"}
+
+
+def _row_note(st):
+    """The status-line note for the Settings row under the cursor, if it has one."""
+    if st.tab != "settings" or st.settings_focus != "pane":
+        return None
+    if st.settings_cat == "prefs":
         return PREF_NOTES.get(st.cursor)
-    return None
+    s = audio_setting(st.cursor)
+    return AUDIO_NOTES.get(s.key) if s else None
 
 
 # The status line under the legend: messages, else a short hint (never keys).
@@ -1150,7 +1172,7 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
     elif st.tab == "about":
         _render_about(cv, about, st.theme)
     elif st.tab == "settings":
-        _render_settings(cv, st, current, body_h, realtime, rates)
+        _render_settings(cv, st, current, body_h, realtime, rates, block)
     else:
         _render_top(cv, st, block, body_h)
     body_end = height - MEDIA_BOX_H - 1 - len(footer)
@@ -1168,7 +1190,7 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
         bad = st.message == st.failed
         cv.add(f" {'✖' if bad else '✓'} {st.message}".ljust(width), "band_alert" if bad else "band_ok")
     else:
-        cv.add(f" {_pref_note(st) or HINTS.get(st.tab, '')}", "dim")
+        cv.add(f" {_row_note(st) or HINTS.get(st.tab, '')}", "dim")
     if st.popup:
         _overlay_popup(cv, st, devices, width, height)
     return cv.lines, cv.hits
@@ -1229,7 +1251,13 @@ def _media_bar(cv, media):
         cv.hit(row, c0 + a, c0 + b, ("key", k))
 
 
-def _render_settings(cv, st, current, body_h, realtime=None, rates=None):
+def _has_cursor(style):
+    """Is this the cursor's line? Boxed lines carry the cursor bar as a span."""
+    base, spans = style if isinstance(style, tuple) else (style, [])
+    return base in ("selected", "anchor") or any(r in ("selected", "anchor") for _, _, r in spans)
+
+
+def _render_settings(cv, st, current, body_h, realtime=None, rates=None, block=None):
     """The category menu on the left, the open category on the right, scrolled so its cursor row shows.
     While the menu has the keys the pane shows no cursor and the open category is an anchor."""
     focused = st.settings_focus == "pane"
@@ -1238,8 +1266,8 @@ def _render_settings(cv, st, current, body_h, realtime=None, rates=None):
     if st.settings_cat == "prefs":
         _render_prefs(pane, view)
     else:
-        _render_audio(pane, view, current, realtime, rates)
-    cursor = next((n for n, (_, style) in enumerate(pane.lines) if style == "selected"), 0)
+        _render_audio(pane, view, current, realtime, rates, block)
+    cursor = next((n for n, (_, style) in enumerate(pane.lines) if _has_cursor(style)), 0)
     rows = list(_window(len(pane.lines), min(len(pane.lines) - 1, cursor + 3), max(1, body_h)))
     top = len(cv.lines)
     for i in range(max(len(rows), len(SETTINGS_CATS))):
@@ -1263,34 +1291,92 @@ def _render_settings(cv, st, current, body_h, realtime=None, rates=None):
             cv.hit(top + rows.index(r), MENU_W + c0, MENU_W + c1, t)
 
 
-def _render_audio(cv, st, current, realtime=None, rates=None):
-    cv.add("  Clock", "title")
-    merged = {**current, **st.pending}
-    for i, s in enumerate(SETTINGS):
-        value = st.pending.get(s.key, current.get(s.key))
-        mark = "*" if s.key in st.pending else " "
-        prefix = "> " if i == st.cursor else "  "
-        head = f"{prefix}{s.label:<20} "
-        line = f"{head}◀ {display_value(s, value):^14} ▶ {mark}"
-        lat = row_latency(s, value, merged)
-        spans = [(len(line) - 1, len(line), "pending")] + ([(len(line), len(line) + len(lat) + 2, "dim")] if lat else [])
-        line += f"  {lat}" if lat else ""
-        arrow_l, arrow_r = len(head), len(head) + 17
-        arrows = _arrow_spans(arrow_l, arrow_r, i == st.cursor, i == st.cursor and st.editing)
-        if i == st.cursor:  # an open row is drawn as the anchor, so editing reads differently from selecting
-            style = ("anchor" if st.editing else "selected", arrows)
-        else:
-            style = ("normal", spans + arrows)
-        row = cv.add(line, style)
-        cv.hit(row, 0, arrow_l, ("setting", i))
-        cv.hit(row, arrow_l, arrow_l + 1, ("arrow", i, -1))
-        cv.hit(row, arrow_l + 1, arrow_r, ("setting", i))
-        cv.hit(row, arrow_r, arrow_r + 1, ("arrow", i, +1))
+def _khz(rate):
+    return f"{rate / 1000:g} kHz"
+
+
+def pipewire_now(block):
+    """What PipeWire runs now, from a pw-top block: [(quantum, rate, driver)] for each running driver;
+    [] when nothing plays; None before pw-top has answered."""
+    if block is None:
+        return None
+    return [(r.quant, r.rate, r.name) for r in block if r.state == "R" and not r.follower and r.quant > 0]
+
+
+def _boxed(cv, title, draw):
+    """Draw a section into its own box, framed like the Keys box (Skrappjaw, 2026-10-26: "visually break up what is
+    on screen"). draw(inner) fills an inner canvas; its styles and hits move inside the frame."""
+    inner = _Canvas(max(10, cv.width - 4))
+    draw(inner)
+    cv.add("┌─ " + title + " " + "─" * max(0, cv.width - len(title) - 5) + "┐", "dim")
+    top = len(cv.lines)
+    for text, style in inner.lines:
+        base, spans = style if isinstance(style, tuple) else (style, [])
+        bar = [(2, 2 + inner.width, base)] if base != "normal" else []
+        frame = [(0, 1, "dim"), (inner.width + 3, inner.width + 4, "dim")]
+        cv.add("│ " + text.ljust(inner.width) + " │", ("normal", frame + bar + [(a + 2, b + 2, r) for a, b, r in spans]))
+    for row, c0, c1, target in inner.hits:
+        cv.hit(top + row, c0 + 2, c1 + 2, target)
+    cv.add("└" + "─" * max(0, cv.width - 2) + "┘", "dim")
+
+
+def _render_audio(cv, st, current, realtime=None, rates=None, block=None):
+    """PipeWire, Devices, Realtime and Advanced, each in a box (Skrappjaw, 2026-10-26)."""
+    now = pipewire_now(block)
+    labels = {n: label for r in rates or [] for n, label in r.nodes}
+    now = [(q, r, labels.get(name, name)) for q, r, name in now] if now else now  # drivers by their device label
+    _boxed(cv, "PipeWire", lambda c: _render_pipewire(c, st, current, now, rates))
+    cv.add("")
+    _boxed(cv, "Devices", lambda c: _render_device_rates(c, rates, _mix_rate(current, now)))
+    cv.add("")
+    _boxed(cv, "Realtime", lambda c: _render_realtime(c, realtime))
+    cv.add("")
+    _boxed(cv, "Advanced", lambda c: _clock_row(c, st, current, LOG_ROW))
+
+
+def _mix_rate(current, now):
+    """PipeWire's rate: the running one, else the forced one, else its default."""
+    if now:
+        return now[0][1]
+    return current.get("clock.force-rate") or current.get("clock.rate")
+
+
+def _render_pipewire(cv, st, current, now, rates):
+    rate = current.get("clock.force-rate") or current.get("clock.rate")
+    quantum = current.get("clock.force-quantum") or current.get("clock.quantum")
+    if now is None:
+        cv.add("  Running now    waiting for pw-top…", "dim")
+    elif not now:
+        cv.add(f"  Running now    idle · when something plays: {_khz(rate) if isinstance(rate, int) else '?'}"
+               f" · {quantum} samples", "normal")
+    distinct = list(dict.fromkeys((q, r) for q, r, _ in now or []))
+    shown = [(q, r, None) for q, r in distinct] if len(distinct) == 1 else now or []  # drivers that agree: one line
+    for n, (q, r, name) in enumerate(shown):
+        line = f"  {'Running now' if n == 0 else '':<14} {_khz(r)} · {q} samples · {latency_ms(q, r)}"
+        if name:
+            line += "   " + _fit(name, max(4, cv.width - len(line) - 3))
+        cv.add(line, ("normal", [(17, len(line) if not name else line.index("   ", 17), "title")]))
+    lo, hi = current.get("clock.min-quantum"), current.get("clock.max-quantum")
+    buf = "forced" if current.get("clock.force-quantum") else f"smallest an app asks for ({lo}–{hi})"
+    if current.get("clock.force-rate"):
+        why = "forced"
+    elif now and now[0][1] != current.get("clock.rate"):
+        why = "an app asked for it (allowed rates)"
+    else:
+        why = "PipeWire's default"
+    cv.add(f"  {'':<14} buffer: {buf}", "dim")
+    cv.add(f"  {'':<14} rate: {why}", "dim")
+    cv.add("")
+    cv.add("  Overrides · off lets PipeWire and apps decide", "dim")
+    for i in (0, 1):
+        _clock_row(cv, st, current, i, now)
+    cv.add("  Limits · what apps may ask for", "dim")
+    for i in (2, 3):
+        _clock_row(cv, st, current, i, now)
     allowed = current.get("clock.allowed-rates")
-    allowed = ", ".join(map(str, allowed)) if isinstance(allowed, list) else "?"
-    cv.add(f"  allowed rates: {allowed}   defaults: rate {current.get('clock.rate', '?')}"
-           f" · quantum {current.get('clock.quantum', '?')}", "dim")
-    _render_device_rates(cv, rates)
+    allowed = ", ".join(_khz(r) for r in allowed) if isinstance(allowed, list) else "?"
+    dr, dq = current.get("clock.rate"), current.get("clock.quantum")
+    cv.add(f"  allowed rates: {allowed} · defaults: {_khz(dr) if isinstance(dr, int) else '?'} · {dq} samples", "dim")
     try:
         warnings = validate(current, st.pending, rates) if st.pending else []
     except ValueError as e:
@@ -1302,21 +1388,71 @@ def _render_audio(cv, st, current, realtime=None, rates=None):
     for line in textwrap.wrap("Apply: live now · Save: for the next PipeWire start · Reset: PipeWire's defaults",
                               max(10, cv.width - 2)):
         cv.add("  " + line, "dim")
-    cv.add("")
-    _render_realtime(cv, realtime)
 
 
-def _render_device_rates(cv, rates):
-    """What each card on can run at, from the kernel (pwrates). Only USB cards report a list."""
-    if not rates:
+def _clock_row(cv, st, current, idx, now=None):
+    """One Audio value row: ◀ value ▶, * when pending, then the latency it stands for, or for an override that's
+    off, what's running now instead (Skrappjaw, 2026-10-26: "no indicator for the current setting")."""
+    s = audio_setting(idx)
+    merged = {**current, **st.pending}
+    value = st.pending.get(s.key, current.get(s.key))
+    mark = "*" if s.key in st.pending else " "
+    head = f"{'> ' if idx == st.cursor else '  '}{s.label:<20} "
+    line = f"{head}◀ {display_value(s, value):^14} ▶ {mark}"
+    if s.key in FORCE_KEYS and value == 0 and now:
+        q, r, _ = now[0]
+        extra = f"→ {_khz(r)} now" if s.key == "clock.force-rate" else f"→ {q} now ({latency_ms(q, r)})"
+    else:
+        extra = row_latency(s, value, merged)
+    spans = [(len(line) - 1, len(line), "pending")] + ([(len(line), len(line) + len(extra) + 2, "dim")] if extra else [])
+    line += f"  {extra}" if extra else ""
+    arrow_l, arrow_r = len(head), len(head) + 17
+    arrows = _arrow_spans(arrow_l, arrow_r, idx == st.cursor, idx == st.cursor and st.editing)
+    if idx == st.cursor:  # an open row is drawn as the anchor, so editing reads differently from selecting
+        style = ("anchor" if st.editing else "selected", arrows)
+    else:
+        style = ("normal", spans + arrows)
+    row = cv.add(line, style)
+    cv.hit(row, 0, arrow_l, ("setting", idx))
+    cv.hit(row, arrow_l, arrow_l + 1, ("arrow", idx, -1))
+    cv.hit(row, arrow_l + 1, arrow_r, ("setting", idx))
+    cv.hit(row, arrow_r, arrow_r + 1, ("arrow", idx, +1))
+
+
+def _render_device_rates(cv, rates, mix):
+    """Every card with its status, its rate, and how it meets PipeWire: the same rate passes straight through,
+    another is resampled. "Can run" is the kernel's list (USB cards only report one)."""
+    if rates is None:
+        cv.add("  not read (fixtures, or pw-dump didn't answer)", "dim")
         return
-    width = max(len(r.label) for r in rates)
+    width = max([len(r.label) for r in rates] + [6])
+    head = f"  {'Device':<{width}}  {'Status':<10} {'Rate':<9} {'vs PipeWire':<21}"
+    cv.add(head + "Can run", "dim")
     for r in rates:
-        if r.known:
-            what = pwrates.describe(r.stream) + (f" · running {pwrates.khz(r.running)}" if r.running else "")
+        rate = r.live or r.running  # PipeWire's rate for a running device, else the kernel's momentary rate
+        if r.status == "off" or rate is None:
+            vs = ""
+        elif rate == mix:
+            vs = "✓ same as PipeWire"
         else:
-            what = "not reported"
-        cv.add(f"  {r.label:<{width}}  {what}", "dim")
+            vs = "⇄ resampled"  # PipeWire's own rate is in the box above
+        can = "" if r.status == "off" else pwrates.describe(r.stream) if r.known else "not reported"
+        cols = f"  {r.label:<{width}}  {r.status or '?':<10} {_khz(rate) if rate else '—':<9} "
+        line = f"{cols}{vs:<21}{can}".rstrip()
+        wrap = len(line) > cv.width
+        if wrap:  # a long list of rates gets its own line rather than being cut
+            line = f"{cols}{vs}".rstrip()
+        role = "dim" if r.status == "off" else "normal"
+        spans = []
+        if vs.startswith("✓"):
+            spans.append((len(cols), len(cols) + 1, "ok"))
+        elif vs.startswith("⇄"):
+            spans.append((len(cols), len(cols) + len(vs), "pending"))
+        if can and not wrap:
+            spans.append((len(cols) + 21, len(line), "dim"))
+        cv.add(line, (role, spans))
+        if wrap:
+            cv.add(f"  {'':<{width}}  can run: {can}", "dim")
 
 
 def _clock_buttons(cv, st):
@@ -1386,8 +1522,7 @@ def _render_keys(cv, st):
 
 
 def _render_realtime(cv, status):
-    """Read-only rows (no cursor): is PipeWire's audio thread realtime, and the fix when it isn't."""
-    cv.add("  Realtime", "title")
+    """Read-only rows (no cursor): is PipeWire's audio thread realtime, and the fix when it isn't. Its box is the title."""
     if status is None:
         cv.add("  checking…", "dim")
         return

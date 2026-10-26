@@ -26,6 +26,7 @@ import pwcore as pc  # noqa: E402
 import pwinventory as pi  # noqa: E402
 import pwmedia as pm  # noqa: E402
 import pwpatch as pp  # noqa: E402
+import pwrates as pr  # noqa: E402
 import pwrealtime as prt  # noqa: E402
 import pwthemes as pt  # noqa: E402
 
@@ -188,7 +189,7 @@ def studio_dump():
 
 
 def frame(st, height=H, **kw):
-    lines, _ = pc.render_screen(st, CUR, kw.pop("block", None), W, height, **kw)
+    lines, _ = pc.render_screen(st, kw.pop("current", CUR), kw.pop("block", None), W, height, **kw)
     return lines
 
 
@@ -295,12 +296,21 @@ def shots():
     st = patch_at(g, pc.UIState(tab="patch", patch_ports=True, patch_side="dst"), source="GCS-8 CH 2", dest="REAPER")
     yield "patch-ports", frame(st, patch=g, media=MEDIA)
 
-    # Settings scrolls to the cursor; these are taken on a taller terminal (40 rows) to show more of it.
-    yield "settings", frame(pc.UIState(tab="settings", settings_focus="pane", cursor=1,
-                                       pending={"clock.min-quantum": 64}), height=40,
-                            media=MEDIA, realtime=realtime_status(False))
-    yield "settings-realtime-ok", frame(pc.UIState(tab="settings", settings_focus="pane", cursor=pc.CLOCK_BUTTONS_ROW,
-                                                   clock_button=1), height=40, media=MEDIA,
+    # Settings scrolls to the cursor; these are taken on a taller terminal to show more of it. Audio: nothing
+    # forced, the GCS-8 driving at 256 samples, and a card of each kind in Devices.
+    free = {**CUR, "clock.force-rate": 0, "clock.force-quantum": 0}
+    driving = [pc.TopRow("R", 60, 256, 48000, "0.1ms", "0.2ms", "0.03", "0.05", 0, "S32LE 2 48000",
+                         "alsa_output.usb-BOSS_GCS-8-01.HiFi", False)]
+    cards = [pr.CardRates("GCS-8", pr.Stream(frozenset({48000}), (), 48000), "running", 48000),
+             pr.CardRates("UMC404HD 192k", pr.Stream(frozenset({44100, 48000, 88200, 96000, 176400, 192000}), ()),
+                          "suspended"),
+             pr.CardRates("HD Pro Webcam C920", pr.Stream(frozenset({16000, 32000}), (), 32000), "running", 32000),
+             pr.CardRates("Built-in Audio", None, "idle"),
+             pr.CardRates("HDA ATI HDMI", None, "off")]
+    yield "settings", frame(pc.UIState(tab="settings", settings_focus="pane", cursor=1), height=50, current=free,
+                            block=driving, rates=cards, media=MEDIA, realtime=realtime_status(False))
+    yield "settings-realtime-ok", frame(pc.UIState(tab="settings", settings_focus="pane", cursor=pc.LOG_ROW),
+                                        height=50, current=free, block=driving, rates=cards, media=MEDIA,
                                         realtime=realtime_status(True))
     yield "settings-preferences", frame(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane",
                                                    cursor=pc.BAR_ROW), height=40, media=MEDIA)
