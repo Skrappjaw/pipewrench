@@ -1585,6 +1585,9 @@ class Tui:
             return
         e = pv.find(c, d, action[2])
         if kind == "vban_set":
+            if "target" in action[3] and self.st.net and self.st.net.graph is not None:
+                for cmd in pv.unlink_cmds(d, e, self.st.net.graph):  # the old source goes with the pick
+                    _run(self.runner, cmd)
             c = pv.update_entry(c, d, action[2], **action[3])
             ch = action[3]
             msg = (f"{e['name']} {'on' if ch['on'] else 'off'}" if "on" in ch else

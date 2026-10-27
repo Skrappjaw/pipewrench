@@ -1,7 +1,7 @@
 # PipeWrench
 
 A terminal control panel for PipeWire on Linux. Volume and mute, default devices, sound card profiles,
-virtual buses, a patch bay, sample rate and buffer size, and a realtime check, all live. It never restarts
+virtual buses, a patch bay, network audio (VBAN), sample rate and buffer size, and a realtime check, all live. It never restarts
 PipeWire unless you ask.
 
 ![The Mixer](docs/guide/mixer.png)
@@ -25,7 +25,7 @@ pwrench
 ```
 
 Six tabs: **Mixer** (levels and mute), **Devices** (cards, buses and MIDI devices), **Patch** (what goes where, audio and MIDI),
-**Settings** (audio clock and realtime; display and keys), **Top** (`pw-top`) and **About**. `Tab` or `1`–`6` switches, `q`
+**Settings** (audio clock and realtime; network streams; display and keys), **Top** (`pw-top`) and **About**. `Tab` or `1`–`6` switches, `q`
 quits, and every tab lists its keys at the bottom. The mouse works too.
 
 ## Command line
@@ -39,6 +39,8 @@ pwrench devices label DEV TEXT | label DEV --clear | hide NAME | unhide NAME
 pwrench devices bus add NAME [LABEL] | bus delete NAME
 pwrench devices preview | apply [--restart] | rollback | restart
 pwrench patch [list] | connect SRC DST | disconnect SRC DST
+pwrench vban [list] | detect [SECONDS] | add in|out NAME IP [--to|--from NODE] [--midi]
+pwrench vban on|off|remove in|out NAME
 pwrench theme list | export ID [FILE] | check [FILE]
 ```
 
@@ -52,5 +54,6 @@ Make your own colours: [the theme guide](docs/themes.md).
 - Your themes: `~/.config/pipewrench/themes/*.toml`
 - Buses and the clock: `~/.config/pipewire/pipewire.conf.d/50-pipewrench-devices.conf`
 - Device names: `~/.config/wireplumber/…/51-pipewrench-labels.*`
+- Network streams (VBAN): `~/.config/pipewrench/vban/` and `~/.config/systemd/user/pipewrench-vban@.service`
 
 PipeWrench only touches files it made, and keeps the previous version so `pwrench devices rollback` can undo.

@@ -307,3 +307,18 @@ def test_volume_at_100_asks_and_dont_ask_again_saves_the_boost(app, tmp_path):
     assert app.wait_exit() == 0
     saved = json.loads((tmp_path / "pipewrench" / "devices.json").read_text())
     assert saved["boost"] == [rows[i][2].name]
+
+
+def test_network_add_stream_popover(app):
+    """Settings → Network (VBAN, 2026-10-26): Enter on + Add stream… opens the Detect / Manual popover."""
+    app.expect("Playback")
+    app.send(tab("settings"))
+    app.send("\x1bOB")  # Network
+    app.expect("VBAN: audio and MIDI")
+    app.send("\r")
+    app.expect("Address")
+    app.send("\x1bOB\x1bOB\r")  # This machine's two rows, then Incoming's + Add stream…
+    app.expect("Add incoming stream")
+    app.expect("Detect on network")
+    app.send("\x1b")
+    app.expect("cancelled")

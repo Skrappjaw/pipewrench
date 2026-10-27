@@ -366,3 +366,12 @@ def test_keeps_links():
     assert pv.keeps_links(pv.update_entry(c, "in", "a", media="midi"))
     c = pv.add_entry(pv.default_config(), "out", {**pv.new_entry("out", "A", "10.0.0.1"), "target": "x"}, rules=False)
     assert pv.keeps_links(c) and not pv.keeps_links(pv.update_entry(c, "out", "a", on=False))
+
+
+def test_unlink_the_old_source():
+    g = _graph()
+    g.links = {(1, 3): 100, (2, 4): 101}
+    old = {**pv.new_entry("out", "Studio", "10.0.0.1"), "target": "Brave"}
+    assert pv.unlink_cmds("out", old, g) == [["pw-link", "-d", "1", "3"], ["pw-link", "-d", "2", "4"]]
+    assert pv.unlink_cmds("in", {**pv.new_entry("in", "A", "10.0.0.1"), "target": "alsa_output.gcs8"}, g) == []
+    assert pv.unlink_cmds("out", {**old, "target": None}, g) == []

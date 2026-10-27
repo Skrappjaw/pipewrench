@@ -241,7 +241,7 @@ channel into REAPER in3 only. Enter links or unlinks the port under the cursor.
 ## Settings
 
 A menu on the left picks the category, and the category opens on the right. Settings opens on the
-menu: ↑↓ picks **Audio** or **Preferences**, and Enter or → goes into it. ← or Esc comes back to the
+menu: ↑↓ picks **Audio**, **Network** or **Preferences**, and Enter or → goes into it. ← or Esc comes back to the
 menu, and coming back drops any unapplied change. A click on a category opens it.
 
 A value never changes on a stray arrow: **Enter opens a row**, then ←→ change it. A row's `◀ ▶` stay grey until it's open. Enter applies (or keeps)
@@ -347,6 +347,62 @@ Four buttons end the box. ↓ to their row, ←→ picks one, and Enter or a cli
 Warning, Info and Debug to Trace. It never changes the sound. Raise it only to chase a bug, then put it
 back to Warning: the high levels cost CPU and fill the journal fast. Enter opens it, ←→ picks, Enter
 applies.
+
+### Network
+
+Audio and MIDI to and from other machines on your network, over **VBAN**: an open protocol that
+Voicemeeter, VBAN apps and PipeWire all speak. PipeWire has it built in, so there's nothing to install.
+Each stream runs on its own, so adding, changing or turning one off never restarts PipeWire, and the ones
+that are on come back at login.
+
+The page has three boxes:
+
+- **This machine**: the address other machines send to, and which PipeWire you have.
+- **Incoming streams**: audio or MIDI arriving from another machine. Each shows where it comes from, the
+  port it listens on, where it plays (`→ GCS-8 CH USB`, or `not connected`) and its format.
+- **Outgoing streams**: what this machine sends. Each is also an output device: it shows in the Mixer and
+  in your system sound settings, so an app can play straight to it. It never becomes the default.
+
+`●` is on, `○` off. A stream that isn't running says why: `off`, `stopped` or `failed`.
+
+**Add a stream.** Enter on **+ Add stream…** in either box, then pick:
+
+- **Detect on network**: listens for 2 seconds and lists what's arriving ("Studio · 192.168.1.86 · 48 kHz ·
+  2 ch"). Pick one and its name, address and format are filled in. On Outgoing it lists the machines
+  sending to this one (one that sends VBAN usually receives it too).
+- **Manual**: type the device's name, then its IP address.
+
+Then a short list asks where it goes: **Select Playback Destination** for an incoming stream (a device, a
+bus or an app's input), **Select Source Audio** for an outgoing one (an input, a monitor of an output, or
+an app). **Not connected** leaves it for the Patch tab.
+
+**Enter on a stream**: Turn off / Turn on, Playback destination… (or Source audio…), Format…, Remove (it
+asks first). Format… has the common ones (48 kHz 16-bit stereo, which Voicemeeter uses, mono, 44.1 kHz,
+24-bit, 32-bit float) and MIDI.
+
+**Things to know**
+
+- **Both ends must use the same format.** PipeWire doesn't convert what arrives: a mono sender into a
+  stereo stream sounds wrong. Detect fills it in for you; with Manual, check Format… against the sender.
+- **PipeWire before 1.4.2** (Linux Mint 22 has 1.0.5) takes one incoming stream per port, so each incoming
+  stream gets its own port: 6980, then 6981 and so on. The status line says what to point the sender at
+  ("sends to 192.168.1.99:6981"). From 1.4.2 they all share 6980 and PipeWrench tells senders apart by
+  their address.
+- **An incoming stream plays where you picked every time it starts**, even with PipeWrench closed. An
+  outgoing stream's source, and MIDI, are linked by PipeWrench: if the source goes away and comes back (an
+  app restarts), PipeWrench links it again within a few seconds while it's open, or the next time it starts.
+- **Picking an app as an outgoing source moves it there:** the app plays to the stream instead of its own
+  output. To send what's playing *and* keep hearing it, pick the output's monitor ("UMC404HD 192k Pro
+  (monitor)").
+- **Detect needs port 6980 free.** While an incoming stream listens there it can't, and says so; Manual
+  still works.
+- **A firewall can block it.** VBAN uses UDP port 6980 (and up, before 1.4.2). If Detect hears nothing,
+  check the receiving machine's firewall.
+- VBAN isn't encrypted. Use it on your own network.
+
+Files: `~/.config/pipewrench/vban.json` (your streams), `~/.config/pipewrench/vban/*.conf` (one per
+running stream) and `~/.config/systemd/user/pipewrench-vban@.service`. PipeWrench made them and keeps them
+in step; edit streams here, not there.
 
 ### Preferences
 
@@ -493,6 +549,17 @@ Everything below works without opening the screen, for scripts and quick changes
 | `patch connect SRC DST` | connect them, channels paired (a MIDI source picks the app's MIDI input) |
 | `patch disconnect SRC DST` | disconnect them |
 
+**Network** (VBAN; `pwrench vban` alone is `list`)
+
+| Command | Does |
+|---|---|
+| `vban list` | incoming and outgoing streams, where they go and whether they run |
+| `vban detect [SECONDS]` | VBAN streams arriving on port 6980 (default 2 s) |
+| `vban add in NAME IP [--to DST] [--midi]` | a stream from that machine, playing to DST (or not connected) |
+| `vban add out NAME IP [--from SRC] [--midi]` | a stream to that machine, fed from SRC (or nothing yet) |
+| `vban on\|off in\|out NAME` | start or stop it; it stays saved |
+| `vban remove in\|out NAME` | stop it and forget it |
+
 **Themes**
 
 | Command | Does |
@@ -517,6 +584,7 @@ DEV, CARD, SRC and DST take a device's name as `devices list` and `patch list` s
 |---|---|
 | Stutter, dropouts, "robot voice" on calls | Settings → Audio → Realtime; Top's ERR column |
 | Friends can't hear you | Mixer: is the right input ★ default, unmuted, with a moving meter? |
+| Nothing arrives from another machine (VBAN) | Settings → Network: is the stream `●`? Is the sender pointed at this address *and port*, in the same format? Is UDP 6980 open in the firewall? |
 | OBS isn't getting desktop audio | Patch → Monitors: is the output's monitor connected to OBS? |
 | A device is missing from the Mixer | Devices: is its card hidden (H) or on profile `off`? |
 | A new name doesn't show | It shows after a WirePlumber restart (Settings → Audio → Restart) or the next login |

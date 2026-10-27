@@ -439,6 +439,16 @@ def own_endpoint(g, direction, e):
     return next((x for x in items if x.name == name and not x.monitor), None)
 
 
+def unlink_cmds(direction, e, g):
+    """pw-link -d for a kept link that's being replaced (a new source or MIDI target): the old one goes."""
+    if g is None or not e.get("target") or (direction == "in" and e["media"] == "audio"):
+        return []
+    mine, other = own_endpoint(g, direction, e), target_endpoint(g, direction, e)
+    if not (mine and other):
+        return []
+    return pp.disconnect_cmds(g, mine, other) if direction == "in" else pp.disconnect_cmds(g, other, mine)
+
+
 def keeps_links(c):
     """Does any stream need PipeWrench to keep its link (outgoing sources, incoming MIDI)?"""
     return any(e["on"] and e.get("target") for e in c["outgoing"]) or \
