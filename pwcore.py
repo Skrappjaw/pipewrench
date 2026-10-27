@@ -1343,7 +1343,7 @@ POPUPS = {
     "vban_remove": ("Remove stream", [("Remove", "ok"), ("Cancel", "cancel")], 1),
 }
 VBAN_ADD_TEXT = {"in": "Listen for VBAN senders on the network, or type one in.",
-                 "out": "Find machines sending VBAN to this one, or type one in."}
+                 "out": "Search the network for computers to send to, or type one in."}
 PW_DOWN_TEXT = "PipeWire stopped answering. PipeWrench keeps the last screen and checks again every 5 s."
 
 
@@ -3102,6 +3102,11 @@ def heard_pick(d, heard):
     return ("heard", d, None, title, tuple((pv.heard_label(h, ip), (ip, h)) for ip, h in heard))
 
 
+def found_pick(found):
+    """found: [pwvban.Found] from a network search, for an outgoing stream."""
+    return ("found", "out", None, "Machines on the network", tuple((pv.found_label(f), f) for f in found))
+
+
 def open_pick(st, pick, current=None):
     values = [v for _, v in pick[4]]
     st.pick, st.pick_cursor = pick, values.index(current) if current in values else 0
@@ -3145,6 +3150,8 @@ def _key_pick(st, key):
     st.pick = None
     if purpose == "heard":
         return st, [("vban_heard", d, value)]
+    if purpose == "found":
+        return st, [("vban_found", d, value)]
     e = net_entry(st.net, d, eid)
     if e is None:
         st.message = st.failed = "that stream has gone"

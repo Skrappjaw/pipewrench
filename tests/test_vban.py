@@ -396,3 +396,58 @@ def test_from_heard_outgoing_sends_back_under_this_host():
     assert (e["name"], e["stream"]) == ("Studio", "desktop")
     e = pv.from_heard("in", pv.Heard("studio-pc", "audio", 48000, 2, "S16LE"), "192.168.1.86", "desktop")
     assert (e["name"], e["stream"]) == ("studio-pc", "studio-pc")
+
+
+# --- finding machines for an outgoing stream (Skrappjaw, 2026-10-26: "other linux tools do. nmap") ----------
+
+NMAP = """# Nmap 7.94SVN scan initiated as: nmap -sn -oG - 192.168.1.0/24
+Host: 192.168.1.1 (ZenWiFi_BE5000-12E4)	Status: Up
+Host: 192.168.1.23 (den-pc)	Status: Up
+Host: 192.168.1.63 (Roku4kStreamStick)	Status: Up
+Host: 192.168.1.99 (desktop)	Status: Up
+Host: 192.168.1.119 ()	Status: Up
+# Nmap done at Mon Oct 26 23:50:01 2026 -- 256 IP addresses (5 hosts up) scanned in 2.40 seconds
+"""
+ADDR = ("2: enp5s0    inet 192.168.1.99/24 brd 192.168.1.255 scope global dynamic noprefixroute enp5s0\\       valid_lft 54300sec\n"
+        "5: docker0    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0\\       valid_lft forever\n")
+NEIGH = ("192.168.1.1 dev enp5s0 lladdr 02:00:00:00:00:02 REACHABLE\n192.168.1.86 dev enp5s0 lladdr 02:00:00:00:00:01 STALE\n"
+         "192.168.1.77 dev enp5s0 FAILED\n")
+
+
+def test_parse_nmap_hosts():
+    assert pv.parse_nmap_hosts(NMAP) == [("192.168.1.1", "ZenWiFi_BE5000-12E4"), ("192.168.1.23", "den-pc"),
+                                         ("192.168.1.63", "Roku4kStreamStick"), ("192.168.1.99", "desktop"),
+                                         ("192.168.1.119", "")]
+
+
+def test_parse_neigh_leaves_out_failed():
+    assert pv.parse_neigh(NEIGH) == ["192.168.1.1", "192.168.1.86"]
+
+
+def test_subnet_of_this_address():
+    assert pv.subnet_of(ADDR, "192.168.1.99") == "192.168.1.0/24"
+    assert pv.subnet_of(ADDR, "10.0.0.5") is None
+
+
+def test_wide_subnets_are_cut_to_a_24():
+    assert pv.subnet_of("2: wlan0    inet 10.1.2.3/16 brd 10.1.255.255 scope global wlan0\n", "10.1.2.3") == "10.1.2.0/24"
+
+
+def test_machines_keep_computers_and_vban_senders_only():
+    probes = {"192.168.1.1": [], "192.168.1.23": [22], "192.168.1.63": [], "192.168.1.99": [22, 445],
+              "192.168.1.119": [], "192.168.1.86": [22, 445]}
+    found = pv.machines(pv.parse_nmap_hosts(NMAP), ["192.168.1.86"], {"192.168.1.86": "studio-pc"}, probes, "192.168.1.99")
+    assert [(f.ip, f.name) for f in found] == [("192.168.1.86", "studio-pc"), ("192.168.1.23", "den-pc")]
+    assert found[0].vban and not found[1].vban
+
+
+def test_found_label():
+    assert pv.found_label(pv.Found("192.168.1.86", "studio-pc", (22, 445), True)) == "studio-pc · 192.168.1.86 · sends VBAN"
+    assert pv.found_label(pv.Found("192.168.1.20", "", (3389,), False)) == "192.168.1.20 · Remote Desktop"
+    assert pv.found_label(pv.Found("192.168.1.23", "den-pc", (22,), False)) == "den-pc · 192.168.1.23 · SSH"
+
+
+def test_entry_from_found():
+    e = pv.from_found(pv.Found("192.168.1.86", "studio-pc", (22,), True), "desktop")
+    assert (e["name"], e["ip"], e["stream"]) == ("studio-pc", "192.168.1.86", "desktop")
+    assert pv.from_found(pv.Found("192.168.1.20", "", (3389,), False), "desktop")["name"] == "192.168.1.20"

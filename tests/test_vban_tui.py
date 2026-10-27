@@ -69,3 +69,25 @@ def test_remove_then_add_back():
     e = json.loads(pv.config_path().read_text())["incoming"]
     assert [x["id"] for x in e] == ["studio"] and e[0]["port"] == 6980
     assert (pv.conf_dir() / "in-studio.conf").exists()
+
+
+def test_outgoing_detect_lists_machines_then_asks_for_the_source(monkeypatch):
+    f = pv.Found("192.168.1.86", "studio-pc", (22,), True)
+    seen = {}
+    monkeypatch.setattr(pipewrench, "_find_machines", lambda runner, address, known: (seen.update(known=known), [f])[1])
+    t = tui(["Studio", "192.168.1.86"])
+    t._do_vban(None, ("vban_manual", "in"))  # an incoming stream: a known VBAN sender
+    t._do_vban(None, ("vban_detect", "out"))
+    assert seen["known"] == {"192.168.1.86": "Studio"}
+    assert t.st.pick[0] == "found" and t.calls[-1] == ("draw", None)  # "searching the network…" shown first
+    t._do_vban(None, ("vban_found", "out", f))
+    e = json.loads(pv.config_path().read_text())["outgoing"][0]
+    assert (e["name"], e["ip"], e["stream"]) == ("studio-pc", "192.168.1.86", "desktop")
+    assert t.st.pick[3] == "Select Source Audio"
+
+
+def test_outgoing_detect_finding_nothing(monkeypatch):
+    monkeypatch.setattr(pipewrench, "_find_machines", lambda runner, address, known: [])
+    t = tui([])
+    t._do_vban(None, ("vban_detect", "out"))
+    assert t.st.message == "found no computers on this network; use Manual" and t.st.pick is None

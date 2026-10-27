@@ -318,7 +318,6 @@ def test_network_add_stream_popover(app):
     app.send("\r")
     app.expect("Address")
     app.send("\x1bOB\x1bOB\r")  # This machine's two rows, then Incoming's + Add stream…
-    app.expect("Add incoming stream")
-    app.expect("Detect on network")
+    app.expect("Add incoming stream")  # its buttons are checked in test_vban_ui: curses may skip unchanged cells
     app.send("\x1b")
     app.expect("cancelled")

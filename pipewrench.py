@@ -682,6 +682,7 @@ def _patch(args, runner, out):
 VBAN_USAGE = """usage:
   pwrench vban [list]
   pwrench vban detect [SECONDS]            VBAN streams arriving on port 6980
+  pwrench vban scan                        computers on this network to send to
   pwrench vban add in|out NAME IP [--to NODE | --from NODE] [--midi]
   pwrench vban connect in|out NAME NODE    where it plays (in) or what feeds it (out)
   pwrench vban disconnect in|out NAME
@@ -774,6 +775,63 @@ def _vban_detect(port=pv.PORT, seconds=2.0):
     return [(ip, h) for (ip, _, _), h in heard.items()]
 
 
+def _probe(ip, ports, timeout=0.4):
+    found = []
+    for port in ports:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        try:
+            if s.connect_ex((ip, port)) == 0:
+                found.append(port)
+        except OSError:
+            pass
+        finally:
+            s.close()
+    return found
+
+
+def _find_machines(runner, address, known=None):
+    """[pwvban.Found] on this machine's network for an outgoing stream: nmap's sweep (names from DNS) and the
+    kernel's neighbours, kept if they answer like a computer or send VBAN. known: {ip: name} already sending
+    here (incoming streams). nmap missing just means no sweep."""
+    from concurrent.futures import ThreadPoolExecutor
+    heard = dict(known or {})
+    try:
+        heard.update({ip: h.stream for ip, h in _vban_detect(seconds=1.0)})
+    except CliError:
+        pass  # our own listener holds the port: the incoming streams stand in
+    rc, text = _safe(runner, pv.ADDR_CMD)
+    subnet = pv.subnet_of(text, address) if rc == 0 and address else None
+    hosts = []
+    if subnet:
+        rc, text = _safe(runner, pv.nmap_cmd(subnet))
+        hosts = pv.parse_nmap_hosts(text) if rc == 0 else []
+    rc, text = _safe(runner, pv.NEIGH_CMD)
+    neighbours = pv.parse_neigh(text) if rc == 0 else []
+    ips = list(dict.fromkeys([ip for ip, _ in hosts] + neighbours + list(heard)))
+    with ThreadPoolExecutor(32) as pool:
+        probes = dict(zip(ips, pool.map(lambda ip: _probe(ip, pv.SCAN_PORTS), ips)))
+        named = dict(hosts)
+        nameless = [ip for ip in ips if probes[ip] and not named.get(ip) and ip not in heard]
+        hosts += [(ip, n) for ip, n in zip(nameless, pool.map(_reverse_name, nameless)) if n]  # the sweep missed them
+    return pv.machines(hosts, neighbours, heard, probes, address)
+
+
+def _reverse_name(ip):
+    """The short name the network's DNS (usually the router) has for an address, or ""."""
+    try:
+        return socket.gethostbyaddr(ip)[0].split(".")[0]
+    except OSError:
+        return ""
+
+
+def _safe(runner, cmd):
+    try:
+        return runner(cmd)
+    except (FileNotFoundError, OSError):
+        return 127, ""
+
+
 def _vban_view(runner, version):
     c = pv.load_config(pv.config_path())
     try:
@@ -821,6 +879,11 @@ def _vban(args, runner, out):
                 out.write(f"  {text}\n")
             if not c[key]:
                 out.write("  (none)\n")
+        return 0
+    if sub == "scan" and not rest:
+        known = {e["ip"]: e["name"] for e in c["incoming"]}
+        for f in _find_machines(runner, _local_address(), known):
+            out.write(pv.found_label(f) + "\n")
         return 0
     if sub == "detect" and len(rest) <= 1:
         for ip, h in _vban_detect(seconds=float(rest[0]) if rest else 2.0):
@@ -1567,6 +1630,16 @@ class Tui:
             self.vban_version = _vban_version(self.runner) or ()
         rules = pv.supports_rules(self.vban_version)
         c = pv.load_config(pv.config_path())
+        if kind == "vban_detect" and d == "out":
+            self.st.message, self.st.failed = "searching the network…", ""
+            self._draw(scr)
+            found = _find_machines(self.runner, _local_address(), {e["ip"]: e["name"] for e in c["incoming"]})
+            if not found:
+                self.st.message = self.st.failed = "found no computers on this network; use Manual"
+                return
+            self.st.message = ""
+            pc.open_pick(self.st, pc.found_pick(found))
+            return
         if kind == "vban_detect":
             self.st.message, self.st.failed = f"listening for VBAN on port {pv.PORT}…", ""
             self._draw(scr)
@@ -1578,7 +1651,7 @@ class Tui:
             self.st.message = ""
             pc.open_pick(self.st, pc.heard_pick(d, heard))
             return
-        if kind in ("vban_manual", "vban_heard"):
+        if kind in ("vban_manual", "vban_heard", "vban_found"):
             if kind == "vban_manual":
                 self._draw(scr)  # the popover's gone: show that before the prompts (Skrappjaw, 2026-10-26)
                 name = self._prompt(scr, "device name (empty cancels):")
@@ -1587,6 +1660,8 @@ class Tui:
                     self.st.message = "cancelled"
                     return
                 e = pv.new_entry(d, name, ip, socket.gethostname())
+            elif kind == "vban_found":
+                e = pv.from_found(action[2], socket.gethostname())
             else:
                 ip, heard = action[2]
                 e = pv.from_heard(d, heard, ip, socket.gethostname())

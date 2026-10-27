@@ -301,3 +301,19 @@ def test_menu_rename():
     st = state(view([envy_in()]), cursor=2)
     st, actions = key(st, "enter", "down", "down", "down", "enter")
     assert actions == [("vban_rename", "in", "studio")] and st.pick is None
+
+
+def test_outgoing_detect_searches_the_network():
+    st = state(view())
+    st, _ = key(st, *["down"] * 3, "enter")
+    assert pc.popup_view(st)[1] == "Search the network for computers to send to, or type one in."
+    _, actions = key(st, "left", "left", "enter")
+    assert actions == [("vban_detect", "out")]
+
+
+def test_found_pick_hands_back_the_machine():
+    f = pv.Found("192.168.1.86", "studio-pc", (22,), True)
+    st = pc.open_pick(state(view()), pc.found_pick([f]))
+    assert st.pick[3] == "Machines on the network" and st.pick[4][0][0] == "studio-pc · 192.168.1.86 · sends VBAN"
+    _, actions = key(st, "enter")
+    assert actions == [("vban_found", "out", f)]

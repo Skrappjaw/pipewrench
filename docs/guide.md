@@ -367,9 +367,13 @@ The page has three boxes:
 
 **Add a stream.** Enter on **+ Add stream…** in either box, then pick:
 
-- **Detect on network**: listens for 2 seconds and lists what's arriving ("Studio · 192.168.1.86 · 48 kHz ·
-  2 ch"). Pick one and its name, address and format are filled in. On Outgoing it lists the machines
-  sending to this one (one that sends VBAN usually receives it too).
+- **Detect on network**: on Incoming it listens for 2 seconds and lists what's arriving ("Studio ·
+  192.168.1.86 · 48 kHz · 2 ch"); pick one and its name, address and format are filled in. On Outgoing it
+  searches your network for computers (about 5 seconds): it lists only machines that answer like a
+  computer (SSH, Windows sharing, Remote Desktop, VNC), named by your router, with ones already sending
+  VBAN first ("studio-pc · 192.168.1.86 · sends VBAN"). Phones, TVs, cameras and the router are left out.
+  The search uses `nmap` when it's installed (`sudo apt install nmap`); without it it still finds the
+  machines this one has talked to lately.
 - **Manual**: type the device's name, then its IP address.
 
 An outgoing stream goes out under this machine's name, so Detect on the other end names it after you.
@@ -557,6 +561,7 @@ Everything below works without opening the screen, for scripts and quick changes
 |---|---|
 | `vban list` | incoming and outgoing streams, where they go and whether they run |
 | `vban detect [SECONDS]` | VBAN streams arriving on port 6980 (default 2 s) |
+| `vban scan` | computers on this network to send to, as Outgoing's Detect lists them |
 | `vban add in NAME IP [--to DST] [--midi]` | a stream from that machine, playing to DST (or not connected) |
 | `vban add out NAME IP [--from SRC] [--midi]` | a stream to that machine, fed from SRC (or nothing yet) |
 | `vban connect in\|out NAME NODE` | where an incoming stream plays, or what feeds an outgoing one |

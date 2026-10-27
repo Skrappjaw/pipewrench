@@ -10,7 +10,8 @@ PipeWire unless you ask.
 
 ## Install
 
-Needs Python 3 and PipeWire's tools (`pw-dump`, `pw-metadata`, `pw-top`, `pw-link`, `wpctl`). No other packages.
+Needs Python 3 and PipeWire's tools (`pw-dump`, `pw-metadata`, `pw-top`, `pw-link`, `wpctl`). No other packages;
+`nmap`, if you have it, helps Settings → Network find computers to send to.
 
 ```
 git clone https://github.com/Skrappjaw/pipewrench.git
@@ -39,7 +40,7 @@ pwrench devices label DEV TEXT | label DEV --clear | hide NAME | unhide NAME
 pwrench devices bus add NAME [LABEL] | bus delete NAME
 pwrench devices preview | apply [--restart] | rollback | restart
 pwrench patch [list] | connect SRC DST | disconnect SRC DST
-pwrench vban [list] | detect [SECONDS] | add in|out NAME IP [--to|--from NODE] [--midi]
+pwrench vban [list] | detect [SECONDS] | scan | add in|out NAME IP [--to|--from NODE] [--midi]
 pwrench vban connect in|out NAME NODE | disconnect in|out NAME | on|off|remove in|out NAME
 pwrench theme list | export ID [FILE] | check [FILE]
 ```

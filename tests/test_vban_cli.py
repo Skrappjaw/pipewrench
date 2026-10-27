@@ -197,3 +197,46 @@ def test_outgoing_stream_name_is_this_host(monkeypatch):
     monkeypatch.setattr(pipewrench.socket, "gethostname", lambda: "studio-pc")
     run("add", "out", "desktop", "192.168.1.99")
     assert saved()["outgoing"][0]["stream"] == "studio-pc"
+
+
+def test_scan_lists_computers(monkeypatch):
+    nmap = "Host: 192.168.1.1 (router)\tStatus: Up\nHost: 192.168.1.23 (den-pc)\tStatus: Up\n"
+
+    class R(Runner):
+        def __call__(self, argv):
+            if argv[0] == "nmap":
+                self.calls.append(argv)
+                return 0, nmap
+            if argv == pv.ADDR_CMD:
+                return 0, "2: enp5s0    inet 192.168.1.99/24 brd 192.168.1.255 scope global enp5s0\n"
+            if argv == pv.NEIGH_CMD:
+                return 0, "192.168.1.86 dev enp5s0 lladdr 02:00:00:00:00:01 STALE\n"
+            return super().__call__(argv)
+
+    monkeypatch.setattr(pipewrench, "_local_address", lambda: "192.168.1.99")
+    monkeypatch.setattr(pipewrench, "_probe", lambda ip, ports, timeout=0.4: [22] if ip in ("192.168.1.23", "192.168.1.86") else [])
+    monkeypatch.setattr(pipewrench, "_vban_detect", lambda seconds=2.0: [])
+    monkeypatch.setattr(pipewrench, "_reverse_name", lambda ip: "")
+    rc, out, _, r = run("scan", runner=R())
+    assert rc == 0
+    assert out.splitlines() == ["den-pc · 192.168.1.23 · SSH", "192.168.1.86 · SSH"]
+    assert ["nmap", "-sn", "-oG", "-", "192.168.1.0/24"] in r.calls
+
+
+def test_scan_without_nmap_still_uses_the_neighbours(monkeypatch):
+    class R(Runner):
+        def __call__(self, argv):
+            if argv[0] == "nmap":
+                raise FileNotFoundError("nmap")
+            if argv == pv.ADDR_CMD:
+                return 0, "2: enp5s0    inet 192.168.1.99/24 brd 192.168.1.255 scope global enp5s0\n"
+            if argv == pv.NEIGH_CMD:
+                return 0, "192.168.1.86 dev enp5s0 lladdr 02:00:00:00:00:01 STALE\n"
+            return super().__call__(argv)
+
+    monkeypatch.setattr(pipewrench, "_local_address", lambda: "192.168.1.99")
+    monkeypatch.setattr(pipewrench, "_probe", lambda ip, ports, timeout=0.4: [22])
+    monkeypatch.setattr(pipewrench, "_vban_detect", lambda seconds=2.0: [])
+    monkeypatch.setattr(pipewrench, "_reverse_name", lambda ip: "studio-pc")
+    rc, out, _, _ = run("scan", runner=R())
+    assert rc == 0 and out == "studio-pc · 192.168.1.86 · SSH\n"

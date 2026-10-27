@@ -481,3 +481,59 @@ def link_cmds(c, g):
 
 # What Settings → Network shows: the saved streams and what's live. The Tui refreshes it.
 View = namedtuple("View", "config units address host version rules graph", defaults=(None,))
+
+
+# --- finding machines for an outgoing stream ---------------------------------------
+# VBAN has no discovery and a receiver sends nothing, so Detect on Outgoing searches the network instead (Skrappjaw,
+# 2026-10-26: "other linux tools do. nmap"): hosts up (nmap -sn, plus the kernel's neighbours, since a sweep
+# without root misses some), kept only if they answer like a computer or were heard sending VBAN.
+
+SCAN_PORTS = {22: "SSH", 3389: "Remote Desktop", 5900: "VNC", 445: "Windows sharing", 139: "Windows sharing",
+              135: "Windows sharing"}
+Found = namedtuple("Found", "ip name ports vban")
+
+
+def nmap_cmd(subnet):
+    return ["nmap", "-sn", "-oG", "-", subnet]
+
+
+NEIGH_CMD = ["ip", "-4", "neigh", "show"]
+ADDR_CMD = ["ip", "-4", "-o", "addr", "show", "scope", "global"]
+
+
+def parse_nmap_hosts(text):
+    """[(ip, name)] for hosts up in nmap's grepable output; name is "" when nothing resolved."""
+    return re.findall(r"^Host: (\d+\.\d+\.\d+\.\d+) \(([^)]*)\)\s+Status: Up", text, re.M)
+
+
+def parse_neigh(text):
+    return [line.split()[0] for line in text.splitlines()
+            if line.strip() and not any(w in line.split() for w in ("FAILED", "INCOMPLETE"))]
+
+
+def subnet_of(addr_text, address):
+    """The address's network from `ip -o addr`, cut to a /24 at most so a sweep stays short."""
+    for m in re.finditer(r"inet (\d+\.\d+\.\d+\.\d+)/(\d+)", addr_text):
+        if m.group(1) == address:
+            net = ipaddress.ip_network(f"{address}/{max(24, int(m.group(2)))}", strict=False)
+            return str(net)
+    return None
+
+
+def machines(hosts, neighbours, heard, probes, self_ip):
+    """Found machines, VBAN senders first. hosts: [(ip, name)] from nmap; neighbours: [ip]; heard: {ip: stream name}
+    sending VBAN here; probes: {ip: [open SCAN_PORTS]}. This machine is left out."""
+    names = dict(hosts)
+    ips = list(dict.fromkeys([ip for ip, _ in hosts] + list(neighbours) + list(heard)))
+    out = [Found(ip, names.get(ip) or heard.get(ip, ""), tuple(probes.get(ip, ())), ip in heard)
+           for ip in ips if ip != self_ip and (probes.get(ip) or ip in heard)]
+    return sorted(out, key=lambda f: (not f.vban, tuple(int(x) for x in f.ip.split("."))))
+
+
+def found_label(f):
+    what = "sends VBAN" if f.vban else next((SCAN_PORTS[p] for p in SCAN_PORTS if p in f.ports), "")
+    return " · ".join(x for x in (f.name, f.ip, what) if x)
+
+
+def from_found(f, host):
+    return new_entry("out", f.name or f.ip, f.ip, host)
