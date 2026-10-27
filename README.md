@@ -31,14 +31,18 @@ quits, and every tab lists its keys at the bottom. The mouse works too.
 ## Command line
 
 ```
-pwrench status | rate N | buf N | min N | max N | reset
-pwrench devices [list] | default DEV | volume DEV STEP | mute DEV | profile CARD PROFILE | restore | test DEV
-pwrench devices label DEV TEXT | hide NAME | bus add NAME | bus delete NAME
+pwrench status | realtime | top
+pwrench rate N | buf N | min N | max N | log N | reset
+pwrench devices [list] [--hidden] [--monitors] | default DEV | volume DEV STEP | mute DEV | test DEV
+pwrench devices profile CARD PROFILE | restore
+pwrench devices label DEV TEXT | label DEV --clear | hide NAME | unhide NAME
+pwrench devices bus add NAME [LABEL] | bus delete NAME
 pwrench devices preview | apply [--restart] | rollback | restart
 pwrench patch [list] | connect SRC DST | disconnect SRC DST
-pwrench realtime
 pwrench theme list | export ID [FILE] | check [FILE]
 ```
+
+What each one does: [the user guide's Command line section](docs/guide.md#command-line).
 
 Make your own colours: [the theme guide](docs/themes.md).
 

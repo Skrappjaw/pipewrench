@@ -4,8 +4,8 @@ PipeWrench is a terminal control panel for PipeWire: volume and mute, the defaul
 profiles, virtual buses, a patch bay, the clock and buffer settings, and a realtime check. It changes
 PipeWire live and never restarts anything unless you ask.
 
-Start it with `pwrench`. The command line and where files live are in [`README.md`](../README.md); this
-guide is about using the screen.
+Start it with `pwrench`. Every command-line option is under [Command line](#command-line); where files live is in
+[`README.md`](../README.md).
 
 > The pictures are drawn from the test data by `tools/screenshots.py`, so device names are from the
 > author's BOSS GCS-8 setup. Yours will show your own devices.
@@ -438,6 +438,78 @@ the theme: dark and light show the PipeWrench wrench, and Crowbar, the Pipe Boys
 have their own lettering.
 
 ![About](guide/about.png)
+
+## Command line
+
+Everything below works without opening the screen, for scripts and quick changes. `pwrench -h` (or
+`--help`, `help`) prints the short version.
+
+**General**
+
+| Command | Does |
+|---|---|
+| `pwrench` | the screen (keyboard and mouse) |
+| `pwrench status` | the clock settings, allowed rates, defaults and each card's rates |
+| `pwrench realtime` | whether PipeWire's audio runs realtime, and the fix if not; exits 0 when it does, 1 when it doesn't |
+| `pwrench top` | runs `pw-top` |
+
+**Clock** (live, like Settings → Audio → Clock; nothing restarts)
+
+| Command | Does |
+|---|---|
+| `pwrench rate N` | force the sample rate (`0` = off) |
+| `pwrench buf N` | force the buffer size (`0` = off) |
+| `pwrench min N` | the smallest buffer an app may ask for |
+| `pwrench max N` | the largest buffer an app may ask for |
+| `pwrench log N` | PipeWire's log level, `0` (no log) to `5` (trace) |
+| `pwrench reset` | stop forcing the rate and the buffer |
+
+**Devices** (`pwrench devices` alone is `list`)
+
+| Command | Does |
+|---|---|
+| `devices list [--hidden] [--monitors]` | cards and channels; `--hidden` includes hidden ones, `--monitors` each output's monitor |
+| `devices default DEV` | make it the system default |
+| `devices volume DEV STEP` | change the volume, e.g. `+5%` or `-5%` (up to 150%) |
+| `devices mute DEV` | mute or unmute |
+| `devices test DEV` | play a test noise on it |
+| `devices profile CARD PROFILE` | switch a card's profile (asks first) and save it |
+| `devices restore` | put every card back on its saved profile (for a login script) |
+| `devices label DEV TEXT` | give it a name |
+| `devices label DEV --clear` | remove the name |
+| `devices hide NAME` · `devices unhide NAME` | hide or show a card or channel |
+| `devices bus add NAME [LABEL]` | add a bus |
+| `devices bus delete NAME` | delete a bus |
+| `devices preview` | show what `apply` would write |
+| `devices apply [--restart]` | write PipeWrench's PipeWire and WirePlumber files; `--restart` also restarts WirePlumber |
+| `devices rollback` | put the previous files back |
+| `devices restart` | restart WirePlumber (apps may lose their audio for a moment) |
+
+**Patch** (`pwrench patch` alone is `list`)
+
+| Command | Does |
+|---|---|
+| `patch list` | every source and destination, and what's linked |
+| `patch connect SRC DST` | connect them, channels paired (a MIDI source picks the app's MIDI input) |
+| `patch disconnect SRC DST` | disconnect them |
+
+**Themes**
+
+| Command | Does |
+|---|---|
+| `theme list` | the themes it found |
+| `theme export ID [FILE]` | write a theme as TOML, to FILE or the terminal |
+| `theme check [FILE]` | check theme files for mistakes |
+
+DEV, CARD, SRC and DST take a device's name as `devices list` and `patch list` show it.
+
+**Environment**
+
+| Variable | Does |
+|---|---|
+| `XDG_CONFIG_HOME` | where PipeWrench keeps its settings (`…/pipewrench/`); default `~/.config` |
+| `PIPEWRENCH_DEVICES` | use this file instead of `~/.config/pipewrench/devices.json` |
+| `PIPEWRENCH_FIXTURES` | run on recorded test data instead of live PipeWire (for the tests) |
 
 ## When something's wrong
 
