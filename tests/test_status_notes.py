@@ -57,3 +57,12 @@ def test_settings_menu_pane_and_top_have_notes():
 def test_notes_fit_the_status_line(tab):
     text = note(pc.UIState(tab=tab), width=60)
     assert len(text) <= 60
+
+
+@pytest.mark.parametrize("k", ["left", "right", " "])
+def test_volume_keys_on_devices_leave_the_status_line_alone(k):
+    # Skrappjaw, 2026-10-26: "status lines are broken if you attempt to change volume on the device screen". The
+    # pointer message ("volume and mute are on the Mixer") stuck over every row's note; the keys now do nothing.
+    st = pc.UIState(tab="devices", dev_cursor=0)
+    after, actions = pc.handle_key(st, k, CUR, DEV)
+    assert after.message == "" and actions == [] and note(after) == note(st)

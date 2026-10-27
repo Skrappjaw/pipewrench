@@ -806,8 +806,6 @@ def _key_devices(st, key, devices):
     kind, obj = items[st.dev_cursor]
     if key in ("up", "down"):
         st.dev_cursor = max(0, min(len(items) - 1, st.dev_cursor + (1 if key == "down" else -1)))
-    elif key in ("left", "right", " "):  # pointers for old habits: levels live on the Mixer only
-        st.message = "volume and mute are on the Mixer (1)"
     elif key == "d":
         st.message = "default and rename are on the Mixer (1)"
     elif key == "enter":

@@ -133,11 +133,15 @@ def test_loading_when_devices_missing():
 
 # --- keys: live actions --------------------------------------------------------------
 
-def test_volume_mute_and_d_point_elsewhere_instead_of_acting():
+def test_volume_and_mute_keys_do_nothing_and_d_still_points_to_the_mixer():
+    # ←→ and Space lost their pointer message (Skrappjaw, 2026-10-26: it broke the status line). d's pointer is
+    # flagged to Skrappjaw under the "no feature only because another disappeared" rule, unchanged until he decides.
     for target in ("SYSTEM", "GCS-8"):
-        for k in ("left", "right", " ", "d"):
+        for k in ("left", "right", " "):
             st, actions = key(at(target), k)
-            assert actions == [] and "Mixer" in st.message and st.dev_menu is None, (target, k)
+            assert actions == [] and st.message == "" and st.dev_menu is None, (target, k)
+        st, actions = key(at(target), "d")
+        assert actions == [] and "Mixer" in st.message and st.dev_menu is None, target
 
 def test_monitor_rows_are_listed_but_not_selectable():
     st = pc.UIState(tab="devices", dev_monitors=True)
