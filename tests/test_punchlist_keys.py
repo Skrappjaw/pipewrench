@@ -29,8 +29,9 @@ def lines(st, height=80):
 
 
 def body(st, height=80):
-    """The Settings pane's lines, without the category menu on the left."""
-    return [t.split("│", 1)[1] for t, _ in lines(st, height) if "│" in t]
+    """The Settings pane's lines, without the category menu on the left, inside their section boxes."""
+    out = [t.split("│", 1)[1] for t, _ in lines(st, height) if "│" in t]
+    return [t[2:-2] if t.startswith("│") else t for t in out]
 
 
 def row_of(kind, ident):
@@ -73,7 +74,7 @@ def test_save_and_restart_buttons_still_work():
 
 def test_key_bindings_page_layout():
     text = body(prefs())
-    assert any(t.strip() == "Key Bindings" for t in text) and not any(t.strip() == "Keys" for t in text)
+    assert any(t.startswith("┌─ Key Bindings ") for t in text) and not any(t.strip() == "Keys" for t in text)
     head = next(t for t in text if "Action" in t and "MIDI/CC" in t)
     assert head.index("Action") < head.index("Key") < head.index("MIDI/CC")
     order = [t.strip() for t in text if t.strip() in ("Global", "Mixer", "Devices", "Patch Bay")]

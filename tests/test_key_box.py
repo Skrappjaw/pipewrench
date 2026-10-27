@@ -80,7 +80,7 @@ def test_hidden_box_leaves_no_footer_and_no_chips():
 
 def test_the_body_gets_the_lines():
     st = prefs()                                                   # the Keys list runs past 30 lines
-    shown = lambda st: sum(1 for t, _ in screen(st, height=30)[0] if any(pc.binding_label(a) in t for a in pk.ACTIONS))
+    shown = lambda st: sum(1 for t, _ in screen(st, height=30)[0] if t[pc.MENU_W - 1:pc.MENU_W] == "│")  # pane lines
     footer = sum(1 for t, _ in screen(st, height=30)[0] if t[:1] in "┌│└")
     assert footer >= 3 and shown(pc.dataclasses.replace(st, key_box=False)) > shown(st)
 

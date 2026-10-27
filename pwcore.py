@@ -787,8 +787,12 @@ def _dev_lines(devices, st):
     return lines + ([("off", None)] + off if off else [])
 
 
+DEV_HEADS = ("virtual", "off", "midi")  # box titles, never rows
+
+
 def dev_selectable(devices, st):
-    return [line for line in _dev_lines(devices, st) if line[0] not in ("virtual", "off", "midi", "chan")]
+    """Every line is a row (Skrappjaw, 2026-10-26: "every item navigable"); channels only show something."""
+    return [line for line in _dev_lines(devices, st) if line[0] not in DEV_HEADS]
 
 
 def _key_devices(st, key, devices):
@@ -816,7 +820,8 @@ def _key_devices(st, key, devices):
     elif key == "enter":
         if kind == "addbus":
             return st, [("dev_prompt_bus",)]
-        _open_menu(st, kind, obj)
+        if kind != "chan":  # a channel only shows something; its work is on the Mixer
+            _open_menu(st, kind, obj)
     elif key == "p":
         card_id = obj.id if kind == "card" else obj.card_id if kind == "row" else None
         card = next((c for c in devices["inv"].cards if c.id == card_id), None)
@@ -888,6 +893,8 @@ def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer
         st = _end_edit(dataclasses.replace(st, cursor=audio_index(("buttons",), st.audio_rows), clock_button=target[1],
                                            settings_focus="pane"))
         keys = ["enter"] if event in ("click", "double") else []
+    elif kind == "top_row":  # Top only shows: a tap selects
+        st = dataclasses.replace(st, top_scroll=target[1])
     elif kind == "key":  # a legend chip
         keys = [target[1]] if event in ("click", "double") else []
     elif kind == "mix_row":
@@ -1014,7 +1021,6 @@ MENU_NOTES = {"default": "every app that follows the default moves with it", "mu
               "hide": "hides it from the lists; Show hidden (h) brings it back", "unhide": "shows it again",
               "create": "makes the bus in PipeWire now", "delete": "removes the bus, after asking",
               "back": "closes the menu"}
-TOP_NOTE = "S: R running, S suspended · QUANT buffer · WAIT/BUSY time per cycle · ERR dropouts (red)"
 
 
 def _row_note(st, current=None, realtime=None, rates=None, block=None, devices=None, patch=None, mixer=None):
@@ -1029,7 +1035,7 @@ def _row_note(st, current=None, realtime=None, rates=None, block=None, devices=N
         if st.tab == "patch":
             return _patch_note(st, patch)
         if st.tab == "top":
-            return TOP_NOTE
+            return _top_note(st, block)
     except (IndexError, KeyError, ValueError, AttributeError, TypeError):
         return None  # data mid-refresh: the tab's hint stands in for a moment
     return None
@@ -1081,7 +1087,8 @@ def _mixer_note(st, mx):
         return None
     if st.mix_menu:
         items = mix_menu_items(mx, st)
-        return MENU_NOTES.get(items[st.mix_menu_cursor][1][0]) if items else None
+        label, op = items[st.mix_menu_cursor] if items else ("", ("",))
+        return "already the system default · Enter closes the menu" if label.startswith("★") else MENU_NOTES.get(op[0])
     kind, section, row = mixer_selectable(mx)[st.mix_cursor]
     if kind == "app":  # the row shows its name; the note says what it is
         what = f"an app {'playing' if section == 'playback' else 'recording'}"
@@ -1091,6 +1098,17 @@ def _mixer_note(st, mx):
     if row.volume is None:
         return f"{what} · no volume here" + (" · connect it on Patch (3)" if row.media == "midi" else "")
     return f"{what} · ←→ volume{_enter_list(_mix_items(mx, kind, section, row))}"
+
+
+def _channel_note(obj, devices):
+    if obj.kind == "midi":
+        return f"a MIDI {'output' if obj.direction == 'out' else 'input'} port · connect it on Patch (3)"
+    if obj.kind == "monitor":
+        return "a monitor: what an output plays, for recording it (OBS desktop audio) · connect it on Patch (3)"
+    what = {"out": "an output", "in": "an input"}.get(obj.direction, "a channel")
+    hidden = " · hidden" if obj.name in devices["config"]["hidden"] else ""
+    default = " · ★ the default" if obj.default else ""
+    return f"{what}{default} · {obj.state or 'unknown'}{hidden} · default, rename and test it on the Mixer (1)"
 
 
 def _devices_note(st, devices):
@@ -1103,6 +1121,8 @@ def _devices_note(st, devices):
     kind, obj = dev_selectable(devices, st)[st.dev_cursor]
     if kind == "addbus":
         return "a new bus: a virtual device apps can play into · Enter to name it"
+    if kind == "chan":
+        return _channel_note(obj, devices)
     probe = dataclasses.replace(st)
     _open_menu(probe, kind, obj)
     actions = _enter_list(dev_menu_items(devices, probe))
@@ -1572,6 +1592,23 @@ def _boxed(cv, title, draw):
     cv.add("└" + "─" * max(0, cv.width - 2) + "┘", "dim")
 
 
+def _box_lines(title, entries, width, title_role="title"):
+    """A section framed like _boxed, for pages that scroll a list of (text, style, idx) themselves (Mixer, Devices,
+    Top; Skrappjaw, 2026-10-26: "box separation was the right move"). Styles and the cursor bar move inside the frame;
+    idx stays with its line, so hits and scrolling work as before."""
+    inner = max(10, width - 4)
+    out = [("┌─ " + title + " " + "─" * max(0, width - len(title) - 5) + "┐", ("dim", [(3, 3 + len(title), title_role)]),
+            None)]
+    for text, style, idx in entries:
+        base, spans = style if isinstance(style, tuple) else (style, [])
+        bar = [(2, 2 + inner, base)] if base != "normal" else []
+        frame = [(0, 1, "dim"), (inner + 3, inner + 4, "dim")]
+        out.append(("│ " + text[:inner].ljust(inner) + " │",
+                    ("normal", frame + bar + [(a + 2, min(b, inner) + 2, r) for a, b, r in spans if a < inner]), idx))
+    out.append(("└" + "─" * max(0, width - 2) + "┘", "dim", None))
+    return out
+
+
 def _render_audio(cv, st, current, realtime=None, rates=None, block=None):
     """The server, the devices it manages, the clock you change, then Advanced, each in a box (Skrappjaw, 2026-10-26:
     "what then status ... a heirarchy of importance"). Every line is a row; see audio_rows."""
@@ -1766,7 +1803,13 @@ def _clock_buttons(cv, st, idx):
 
 
 def _render_prefs(cv, st):
-    cv.add("  Display", "title")
+    """Display and Key Bindings, each in a box (Skrappjaw, 2026-10-26: "box up the sections there as well")."""
+    _boxed(cv, "Display", lambda c: _render_display(c, st))
+    cv.add("")
+    _boxed(cv, "Key Bindings", lambda c: _render_keys(c, st))
+
+
+def _render_display(cv, st):
     _display_row(cv, st, THEME_ROW, "Theme", theme_label(st.theme))
     _display_row(cv, st, FPS_ROW, "Meter frame rate", f"{st.meter_fps} fps")
     _display_row(cv, st, FALL_ROW, "Meter fall", f"{st.meter_fall} dB/s")
@@ -1776,8 +1819,6 @@ def _render_prefs(cv, st):
     _display_row(cv, st, SHOW_HIDDEN_ROW, "Show hidden devices", "on" if st.dev_show_hidden else "off")
     _display_row(cv, st, MONITORS_ROW, "Monitors on Devices", "on" if st.dev_monitors else "off")
     _display_row(cv, st, KEY_BOX_ROW, "Keys box", "on" if st.key_box else "off")
-    cv.add("")
-    _render_keys(cv, st)
 
 
 def binding_label(a):
@@ -1788,8 +1829,7 @@ def binding_label(a):
 def _render_keys(cv, st):
     """Key Bindings (Skrappjaw, 2026-10-26): Action · Key · MIDI/CC under a heading per view. Global keys are fixed;
     an action shows its key, * when changed, and why it can't fire when it clashes. MIDI/CC is a placeholder."""
-    cv.add("  Key Bindings", "title")
-    cv.add(f"  {'Action':<32} {'Key':^6}   {'MIDI/CC':^7}", "title")  # column headers are title
+    cv.add(f"  {'Action':<32} {'Key':^6}   {'MIDI/CC':^7}", "title")  # column headers are title; the box is the heading
     b = pk.bindings(st.keys)
     bad = pk.clashes(b)
     heading = None
@@ -1959,21 +1999,68 @@ def _render_about(cv, about, theme="dark"):
 _TOP_HDR = f"{'S':<2}{'ID':>5}{'QUANT':>7}{'RATE':>7}{'WAIT':>9}{'BUSY':>9}{'W/Q':>6}{'B/Q':>6}{'ERR':>5}  {'FORMAT':<16} NAME"
 
 
+def top_groups(block):
+    """[(title, rows)]: a box per running driver with its followers, then Idle for drivers with nothing running
+    (Skrappjaw, 2026-10-26: "A box per driver"). Rows keep pw-top's order inside each box."""
+    groups, idle = [], []
+    for r in block or []:
+        if not r.follower:
+            if r.state == "R":
+                groups.append((f"{r.name} · {r.quant} @ {r.rate / 1000:g}k", [r]))
+            else:
+                idle.append(r)
+        elif groups:
+            groups[-1][1].append(r)
+        else:
+            idle.append(r)
+    return groups + ([("Idle", idle)] if idle else [])
+
+
+def top_rows(block):
+    """Every Top row in screen order: st.top_scroll is the cursor into this."""
+    return [r for _, rows in top_groups(block) for r in rows]
+
+
 def _render_top(cv, st, block, body_h):
+    """Every line a row (QA pass, 2026-10-26: "every item navigable"), boxed by driver."""
     if block is None:
         cv.add("  waiting for pw-top…", "dim")
         return
-    row = cv.add(_TOP_HDR, "title")
-    cv.hit(row, 0, cv.width, ("toplist",))
-    visible = max(0, body_h - 1)
-    start = min(st.top_scroll, max(0, len(block) - visible))
-    for r in block[start:start + visible]:
-        name = f"+ {r.name}" if r.follower else r.name
-        line = (f"{r.state:<2}{r.id:>5}{r.quant:>7}{r.rate:>7}{r.wait:>9}{r.busy:>9}{r.wq:>6}{r.bq:>6}"
-                f"{r.err:>5}  {r.format:<16} {name}")
-        style = "alert" if r.err > 0 else ("normal" if r.state == "R" else "dim")
-        row = cv.add(line, style)
-        cv.hit(row, 0, cv.width, ("toplist",))
+    rows = top_rows(block)
+    st.top_scroll = max(0, min(len(rows) - 1, st.top_scroll)) if rows else 0
+    lines, n = [], 0
+    for title, members in top_groups(block):
+        entries = [(f"  {_TOP_HDR}", "title", None)]  # column headers, over the cursor gutter: drawn, never a row
+        for r in members:
+            name = f"+ {r.name}" if r.follower else r.name
+            text = (f"{'> ' if n == st.top_scroll else '  '}{r.state:<2}{r.id:>5}{r.quant:>7}{r.rate:>7}{r.wait:>9}"
+                    f"{r.busy:>9}{r.wq:>6}{r.bq:>6}{r.err:>5}  {r.format:<16} {name}")
+            style = "selected" if n == st.top_scroll else "alert" if r.err > 0 else "normal" if r.state == "R" else "dim"
+            entries.append((text, style, n))
+            n += 1
+        lines += _box_lines(_fit(title, max(10, cv.width - 8)), entries, cv.width)
+    at = next((k for k, line in enumerate(lines) if line[2] == st.top_scroll), 0)
+    at = min(len(lines) - 1, at + 1)
+    start = 0 if at < body_h else at - body_h + 1
+    for text, style, idx in lines[start:start + max(1, body_h)]:
+        row = cv.add(text, style)
+        if idx is not None:
+            cv.hit(row, 0, cv.width, ("top_row", idx))
+
+
+def _top_note(st, block):
+    rows = top_rows(block)
+    if not rows:
+        return None
+    r = rows[max(0, min(len(rows) - 1, st.top_scroll))]
+    err = f"{r.err} dropout{'' if r.err == 1 else 's'} (ERR) since it started"
+    if r.follower:
+        driver = next((d for d in reversed(rows[:rows.index(r)]) if not d.follower), None)
+        return f"follows {driver.name if driver else 'its driver'}: runs on its clock · {err}"
+    if r.state != "R":
+        return "an idle driver: nothing is running on it now"
+    n = sum(1 for _, ms in top_groups(block) if ms[0] is r for m in ms[1:])
+    return f"driver: sets the clock for {n} follower{'' if n == 1 else 's'} · {r.quant} samples at {_khz(r.rate)} · {err}"
 
 
 # Always on screen in the Devices tab; the bottom help line is too narrow and gives way to messages.
@@ -2022,35 +2109,60 @@ def _tag_spans(text):
     return spans
 
 
+DEV_COLUMNS = f"    {'Dir':<6} {'Name':<30} {'Status':<9} {'Vol':<6} {'Node':>5}"
+
+
 def _render_devices(cv, st, devices, body_h):
+    """A box per card (its profile, then its channels), then MIDI, Buses and Off (Skrappjaw, 2026-10-26: "box
+    separation was the right move. Along with every item navigable")."""
     if devices is None:
         cv.add("  loading devices…", "dim")
         return
-    lines, n_sel = [], 0
     selectable = dev_selectable(devices, st)
     cursor = max(0, min(len(selectable) - 1, st.dev_cursor)) if selectable else -1
-    menu_at = None
+    menu = _menu_target(devices, st) is not None
+    groups, n_sel = [], 0
+
+    def box(title, header=True):
+        groups.append((title, [(DEV_COLUMNS, "title", None)] if header else []))
     for kind, obj in _dev_lines(devices, st):
-        idx = None if kind in ("virtual", "off", "midi", "chan") else n_sel
-        text, style = _device_line_text("row" if kind == "chan" else kind, obj, devices, idx == cursor)
-        if kind == "chan":  # read-only; in pipeOS its direction word is the portal colour
-            role = {"out": "dir_out", "in": "dir_in"}.get(obj.direction)
-            style = ("dim", [(4, 4 + len(obj.direction), role)]) if role else "dim"
-        menu_open = idx == cursor and _menu_target(devices, st) is not None
-        lines.append((text, "anchor" if menu_open else "selected" if idx == cursor else style, idx))
-        if idx is not None:
-            n_sel += 1
-        if idx == cursor and _menu_target(devices, st) is not None:
+        if kind in DEV_HEADS:
+            box({"virtual": "Buses", "off": "Off", "midi": "MIDI"}[kind], header=kind == "virtual")
+            continue
+        if kind == "card" and obj.active != "off":
+            groups.append((obj.label, []))
+        idx, n_sel = n_sel, n_sel + 1
+        sel = idx == cursor
+        prefix = "> " if sel else "  "
+        if kind == "card" and obj.active == "off":
+            text, style = f"{prefix}{obj.label}", "dim"
+        elif kind == "card":
+            text, style = f"{prefix}{'Profile':<20} {obj.active or '?'}", "normal"
+        else:
+            text, style = _device_line_text("row" if kind == "chan" else kind, obj, devices, sel)
+            if kind == "chan":  # in pipeOS its direction word is the portal colour
+                role = {"out": "dir_out", "in": "dir_in"}.get(obj.direction)
+                hidden = obj.name in devices["config"]["hidden"]
+                style = ("dim" if hidden else "normal", [(4, 4 + len(obj.direction), role)] if role else [])
+        entries = groups[-1][1]
+        if kind == "card" and obj.active != "off":
+            entries.append((text, "anchor" if sel and menu else "selected" if sel else style, idx))
+            entries.append((DEV_COLUMNS, "title", None))  # column headers: drawn, never a row
+        else:
+            entries.append((text, "anchor" if sel and menu else "selected" if sel else style, idx))
+        if sel and menu:
             title = obj.label if kind in ("row", "card") else kind.title() if obj is None else obj["name"]
-            lines += _menu_lines(devices, st, title)
-            menu_at = len(lines) - 1
+            entries += _menu_lines(devices, st, title)
+    lines = [line for title, entries in groups for line in _box_lines(title, entries, cv.width)]
     room = max(1, body_h)
-    at = menu_at if menu_at is not None else next((n for n, line in enumerate(lines) if line[1] == "selected"), 0)
+    menu_at = max((n for n, line in enumerate(lines) if isinstance(line[2], tuple)), default=None)
+    at = menu_at + 1 if menu_at is not None else next((n for n, line in enumerate(lines) if line[2] == cursor), 0)
+    at = min(len(lines) - 1, at + (1 if menu_at is None else 0))  # a little room below, and the box foot
     start = 0 if at < room else at - room + 1
     for text, style, idx in lines[start:start + room]:
         row = cv.add(text, style)
         if isinstance(idx, tuple):
-            cv.hit(row, 4, cv.width, ("dev_menu_item", idx[1]))
+            cv.hit(row, 6, cv.width, ("dev_menu_item", idx[1]))
         elif idx is not None:
             cv.hit(row, 0, cv.width, ("device", idx))
 
@@ -2326,14 +2438,20 @@ def _render_mixer(cv, st, mx, body_h):
     metered = mx.get("metered", {}) if st.meters else {}
     levels = mx.get("levels", {})
     vol_w = _BAR if st.volume_bar else 5  # bar off: just "100%" or "muted", and the meter moves in
-    label_w = max(20, min(44, cv.width - vol_w - 6 - (_METER + 2 if metered else 0)))
-    out, n_sel = [], 0
+    inner = max(10, cv.width - 4)  # each section is a box (Skrappjaw, 2026-10-26)
+    label_w = max(20, min(44, inner - vol_w - 6 - (_METER + 2 if metered else 0)))
+    out, n_sel, box, heading = [], 0, [], None
+
+    def close():
+        if heading:
+            out.extend(_box_lines(heading, box, cv.width, "head_play" if heading == "Playback" else "head_rec"))
     for kind, section, row in _mixer_lines(mx):
         if kind == "head":
-            out.append((f"  {section}", "head_play" if section == "Playback" else "head_rec", None))
+            close()
+            box, heading = [], section
             continue
         if kind == "sub":
-            out.append((f"    {section}", "dim", None))
+            box.append((f"  {section}", "title", None))  # a heading inside the box: title (ui-conventions)
             continue
         sel = n_sel == st.mix_cursor
         if kind == "dev":
@@ -2359,11 +2477,12 @@ def _render_mixer(cv, st, mx, body_h):
         side = "src" if section == "playback" else "dst"  # playback blue, recording orange (pipeOS)
         if sel:  # the cursor bar covers the name; the volume keeps its colours
             spans = [(0, c0 - 1, f"anchor_{side}" if target else f"bar_{side}")] + spans
-        out.append((head + bar, ("normal", spans), n_sel))
+        box.append((head + bar, ("normal", spans), n_sel))
         if sel and target:
-            out += _menu_box(row.label, [label for label, _ in mix_menu_items(mx, st)], st.mix_menu_cursor,
+            box += _menu_box(row.label, [label for label, _ in mix_menu_items(mx, st)], st.mix_menu_cursor,
                              f"bar_{side}", "head_play" if section == "playback" else "head_rec")
         n_sel += 1
+    close()
     cursor_at = next((k for k, line in enumerate(out) if line[2] == st.mix_cursor), 0)
     if target:  # keep the whole box in view: scroll to its foot
         cursor_at = next(k for k in range(len(out) - 1, -1, -1) if isinstance(out[k][2], tuple)) + 1

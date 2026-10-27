@@ -122,7 +122,7 @@ def test_devices_tab_lists_inventory_and_adds_a_bus(app, tmp_path):
     app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send(tab("devices"))
-    app.expect("GCS-8 · profile HiFi")
+    app.expect("Profile")  # a box per card since the QA pass
     app.send("a")
     app.expect("bus name")
     app.send("OBS\r")

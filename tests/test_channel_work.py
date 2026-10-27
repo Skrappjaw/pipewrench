@@ -101,9 +101,10 @@ def test_card_profile_jumps_to_card_with_menu_open():
 
 # --- Devices --------------------------------------------------------------------
 
-def test_cursor_skips_channels():
+def test_cursor_visits_channels_and_rows_stay_buses():
+    # QA pass, 2026-10-26: "every item navigable". Channels are rows that only show something.
     kinds = {kind for kind, _ in pc.dev_selectable(dv(), pc.UIState(tab="devices"))}
-    assert kinds <= {"card", "row", "pending", "addbus", "view", "actions"}
+    assert "chan" in kinds and kinds <= {"card", "row", "chan", "pending", "addbus"}
     rows = [obj for kind, obj in pc.dev_selectable(dv(), pc.UIState(tab="devices")) if kind == "row"]
     assert rows and all(r.kind == "virtual" for r in rows)
 
@@ -114,12 +115,11 @@ def test_monitors_are_read_only_too():
     assert all(r.kind == "virtual" for r in rows)
 
 
-def test_channels_still_listed_dim():
+def test_channels_are_rows_with_their_direction_tinted():
     lines, hits = pc.render_screen(pc.UIState(tab="devices"), CUR, None, 120, 80, devices=dv())
-    row = next((t, s) for t, s in lines if "GCS-8 CH 2 " in t or t.rstrip().endswith("GCS-8 CH 2"))
-    assert row[1][0] == "dim" and {r for *_, r in row[1][1]} <= {"dir_out", "dir_in"}  # dim; the direction word tinted
-    n = next(i for i, (t, _) in enumerate(lines) if t == row[0])
-    assert not [h for h in hits if h[0] == n]
+    n, (text, style) = next((i, ls) for i, ls in enumerate(lines) if "GCS-8 CH 2 " in ls[0])
+    assert {r for *_, r in style[1]} <= {"dim", "dir_out", "dir_in"}   # the frame, and the direction word
+    assert [h for h in hits if h[0] == n and h[3][0] == "device"]        # selectable now
 
 
 def test_bus_menu_is_hide_and_delete():

@@ -46,6 +46,16 @@ def body(lines):
     return "\n".join(t for t, _ in lines)
 
 
+def selected(lines):
+    """The cursor's lines (inside a box the bar is a span, not the line's style)."""
+    return [t for t, s in lines if pc._has_cursor(s) and t.startswith("│")]
+
+
+def role_at(style, col):
+    base, spans = style if isinstance(style, tuple) else (style, [])
+    return next((r for a, b, r in reversed(spans) if a <= col < b), base)
+
+
 def hit_for(hits, target):
     for row, c0, c1, t in hits:
         if t == target:
@@ -57,7 +67,9 @@ def hit_for(hits, target):
 
 def test_render_cards_rows_and_virtual():
     text = body(screen(pc.UIState(tab="devices"), height=50)[0])
-    assert text.index("GCS-8 · profile HiFi") < text.index("GCS-8 CH 2 ") < text.index("Virtual") < text.index("VOIP_MIC")
+    assert text.index("┌─ GCS-8 ") < text.index("Profile", text.index("┌─ GCS-8 ")) < text.index("GCS-8 CH 2 ") \
+        < text.index("┌─ Buses") \
+        < text.index("VOIP_MIC")
     mic = next(line for line in text.splitlines() if "GCS-8 CH 2 " in line)
     assert "★" in mic and "running" in mic and "100%" in mic and " in " in mic
     assert "40%" in next(line for line in text.splitlines() if "GCS-8 CH 3-AUX" in line)
@@ -65,19 +77,18 @@ def test_render_cards_rows_and_virtual():
 
 def test_render_cursor_starts_on_first_card_and_moves():
     lines, _ = screen(pc.UIState(tab="devices"))
-    sel = [t for t, s in lines if s == "selected"]
-    assert len(sel) == 1 and "DualShock" in sel[0] and "profile" in sel[0]
-    st, _ = key(pc.UIState(tab="devices"), "down")  # skips the DualShock's channels: they're read-only
-    sel = [t for t, s in screen(st)[0] if s == "selected"]
-    assert "GCS-8" in sel[0] and "profile" in sel[0]
+    sel = selected(lines)
+    assert len(sel) == 1 and "Profile" in sel[0] and lines[2][0].startswith("┌─ DualShock")
+    st, _ = key(pc.UIState(tab="devices"), "down")  # every channel is a row now (QA pass, 2026-10-26)
+    assert "DualShock" in selected(screen(st)[0])[0] and " out " in selected(screen(st)[0])[0]
 
 def test_off_cards_group_at_the_bottom_and_turn_on_from_their_menu():
     lines, _ = screen(pc.UIState(tab="devices"), height=60)
     text = body(lines)
-    assert text.index("Virtual") < text.index("+ Add bus…") < text.index("  Off\n") < text.index("Built-in Audio · off")
+    assert text.index("┌─ Buses") < text.index("+ Add bus…") < text.index("┌─ Off ") < text.index("Built-in Audio")
     assert "profile off" not in text
-    assert next(s for t, s in lines if t == "  Off") == "title"
-    assert next(s for t, s in lines if "HDA ATI HDMI · off" in t) == "dim"
+    hdmi = next((t, s) for t, s in lines if "HDA ATI HDMI" in t)
+    assert role_at(hdmi[1], 4) == "dim"
     entries = pc.dev_selectable(dv(), pc.UIState(tab="devices"))
     assert [o.label for k, o in entries[-3:]] == ["Built-in Audio", "HD Pro Webcam C920", "HDA ATI HDMI"]
     st, actions = key(at("HDA ATI HDMI"), "enter")
@@ -89,7 +100,7 @@ def test_no_off_heading_when_every_off_card_is_hidden():
     for card in INV.cards:
         if card.active == "off":
             c = pcfg.toggle_hidden(c, card.name)
-    assert "  Off" not in [t for t, _ in screen(pc.UIState(tab="devices"), dv(c), height=60)[0]]
+    assert not [t for t, _ in screen(pc.UIState(tab="devices"), dv(c), height=60)[0] if t.startswith("┌─ Off ")]
 
 
 def test_hidden_rows_vanish_until_h():
@@ -101,12 +112,12 @@ def test_hidden_rows_vanish_until_h():
     assert st.dev_show_hidden and actions == [("save_ui",)]
     assert not key(st, "h", devices=d)[0].dev_show_hidden
     lines, _ = screen(st, d)
-    assert any("GCS-8 CH 2 " in t and (s[0] if isinstance(s, tuple) else s) == "dim" for t, s in lines)
+    assert any("GCS-8 CH 2 " in t and role_at(s, t.index("GCS-8 CH 2 ")) == "dim" for t, s in lines)
 
 
 def test_m_shows_monitors():
     st, _ = key(pc.UIState(tab="devices"), "m")
-    assert st.dev_monitors and "GCS-8 CH 3-AUX (monitor)" in body(screen(st)[0])
+    assert st.dev_monitors and "GCS-8 CH 3-AUX (monitor)" in body(screen(st, height=80)[0])
 
 
 def test_pending_buses():
@@ -116,14 +127,14 @@ def test_pending_buses():
 
 
 def test_clash_tag_on_bus_made_outside_pipewrench():
-    text = body(screen(pc.UIState(tab="devices"), dv(clash={"SYSTEM"}))[0])
+    text = body(screen(pc.UIState(tab="devices"), dv(clash={"SYSTEM"}), height=80)[0])
     assert "outside PipeWrench" in next(line for line in text.splitlines() if "SYSTEM" in line)
 
 
 def test_scrolls_to_keep_cursor_visible():
     st = at("VOIP_MIC")
     lines, _ = screen(st, height=20)
-    assert len(lines) == 20 and any(s == "selected" and "VOIP_MIC" in t for t, s in lines)
+    assert len(lines) == 20 and any("VOIP_MIC" in t for t in selected(lines))
 
 
 def test_loading_when_devices_missing():
@@ -185,7 +196,7 @@ def test_nothing_happens_until_devices_load():
 # --- mouse ----------------------------------------------------------------------------------
 
 def click(st, target, event="click"):
-    lines, hits = screen(st)
+    lines, hits = screen(st, height=80)  # tall enough to show the buses since every channel became a row
     row, c0, _ = hit_for(hits, target)
     return pc.handle_mouse(st, hits, row, c0, event, CUR, devices=dv())
 
@@ -335,7 +346,8 @@ def test_rename_restart_question_warns_about_apps():
 @pytest.mark.parametrize("target", ["SYSTEM", "GCS-8", "VOIP"])
 def test_menu_box_lines_are_all_the_same_width(target):
     st, d = open_menu(target)
-    box = [t.rstrip() for t, _ in screen(st, d, height=60)[0] if t.startswith(("    ┌", "    │", "    └"))]
+    box = [t[2:-2].rstrip() for t, _ in screen(st, d, height=80)[0]
+           if t.startswith(("│     ┌", "│     │", "│     └"))]  # the menu box, inside its section box
     assert len(box) >= 3
     assert len({len(line) for line in box}) == 1, box
     assert len({line.index(line.lstrip()[0]) for line in box}) == 1          # left edges line up

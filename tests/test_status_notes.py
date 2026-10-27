@@ -29,7 +29,7 @@ def test_every_mixer_row_has_its_own_note_naming_enter():
 def test_every_devices_row_has_its_own_note():
     for n, (kind, _) in enumerate(pc.dev_selectable(DEV, pc.UIState(tab="devices"))):
         text = note(pc.UIState(tab="devices", dev_cursor=n))
-        assert text and text != hint("devices") and "Enter" in text, kind
+        assert text and text != hint("devices") and ("Enter" in text or kind == "chan"), kind  # a channel only shows
 
 
 def test_menu_items_explain_themselves():
@@ -50,7 +50,9 @@ def test_settings_menu_pane_and_top_have_notes():
         assert note(pc.UIState(tab="settings", settings_focus="pane", cursor=cursor)), cursor
     for cursor in range(pc.RESET_KEYS_ROW + 1):
         assert note(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane", cursor=cursor)), cursor
-    assert "QUANT" in note(pc.UIState(tab="top"))
+    from test_page_boxes import top_block
+    lines, _ = pc.render_screen(pc.UIState(tab="top"), CUR, top_block(), 100, 40)
+    assert "driver" in lines[-1][0]                      # Top's rows explain themselves (QA pass)
 
 
 @pytest.mark.parametrize("tab", ["mixer", "devices", "patch", "settings", "top"])
@@ -79,7 +81,7 @@ def test_the_d_pointer_clears_when_you_move_on_devices():
     st = handle(pc.UIState(tab="devices"), "d")
     assert "Mixer" in st.message
     st = handle(st, "down")
-    assert st.message == "" and note(st) and "Mixer (1)" not in note(st)
+    assert st.message == "" and note(st).startswith(("an ", "a ", "sound card"))  # the row's own note is back
 
 
 @pytest.mark.parametrize("tab,k", [("mixer", "down"), ("settings", "down"), ("patch", "up"), ("devices", "up"),
@@ -105,3 +107,10 @@ def test_peak_hold_note_explains_the_setting_and_nothing_else():
     # Skrappjaw, 2026-10-26: "correct peak status line to reflect variable settings" → "Just explain the setting."
     text = note(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane", cursor=pc.HOLD_ROW))
     assert "peak" in text and "dB/s" not in text
+
+
+def test_the_default_item_says_it_is_already_the_default():
+    items = pc.mixer_selectable(MX)
+    n = next(i for i, (k, sec, r) in enumerate(items) if k == "dev" and pc._is_default(MX, sec, r))
+    st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=n), "enter", CUR, mixer=MX)
+    assert "already the system default" in note(st)

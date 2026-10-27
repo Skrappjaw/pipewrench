@@ -52,7 +52,7 @@ def vol_col(text):
 
 def test_one_line_per_channel():
     lines = screen()[0]
-    rows = [t for t, _ in lines if t.startswith(("> ", "  ★", "    ")) and "%" in t]
+    rows = [t[2:] for t, _ in lines if t.startswith("│ ") and t[2:].startswith(("> ", "  ★", "    ")) and "%" in t]
     assert len(rows) == len(pc.mixer_selectable(mx()))
     t, _ = line(lines, FIRST)
     assert "100%█" in t
@@ -84,8 +84,8 @@ def test_muted_word_is_dim():
 
 
 def test_bar_off_leaves_the_percent_and_the_meter_moves_in():
-    on = line(screen(mx(metered=True))[0], FIRST)[0]
-    off = line(screen(mx(metered=True), volume_bar=False)[0], FIRST)[0]
+    on = line(screen(mx(metered=True))[0], FIRST)[0].rstrip(" │")  # inside the box frame
+    off = line(screen(mx(metered=True), volume_bar=False)[0], FIRST)[0].rstrip(" │")
     assert "█" in on and "░" not in off
     meter_on, meter_off = on.rindex("  ") + 2, off.rindex("  ") + 2
     assert off.index("100%") + 7 == meter_off       # "100% " then two spaces, then the meter
@@ -94,7 +94,7 @@ def test_bar_off_leaves_the_percent_and_the_meter_moves_in():
 
 def test_bar_off_columns_line_up():
     lines = screen(volume_bar=False)[0]
-    cols = {t.index("%") - 3 for t, _ in lines if t.rstrip().endswith("100%")}
+    cols = {t.index("%") - 3 for t, _ in lines if t.rstrip(" │").endswith("100%")}
     assert len(cols) == 1
 
 

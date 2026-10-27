@@ -60,13 +60,15 @@ def devices():
 def test_tui_lists_midi_read_only():
     lines, hits = pc.render_screen(pc.UIState(tab="devices"), {}, None, 120, 80, devices=devices())
     text = [t for t, _ in lines]
-    head = next(i for i, t in enumerate(text) if t.strip() == "MIDI")
+    head = next(i for i, t in enumerate(text) if t.startswith("┌─ MIDI "))
     kb = next(i for i, t in enumerate(text) if "KB16-01 MIDI 1" in t)
-    assert head < kb < next(i for i, t in enumerate(text) if t.strip() == "Virtual")
+    assert head < kb < next(i for i, t in enumerate(text) if t.startswith("┌─ Buses "))
     assert "title" in str(lines[head][1]) and "hw:7" in text[kb] and "← REAPER  → REAPER" in text[kb]
-    assert not [h for h in hits if h[0] in (head, kb)]
-    assert not [o for k, o in pc.dev_selectable(devices(), pc.UIState(tab="devices")) if k == "midi"
-                or getattr(o, "kind", None) == "midi"]
+    assert [h for h in hits if h[0] == kb and h[3][0] == "device"]       # a row now, with its note
+    i = next(n for n, (k, o) in enumerate(pc.dev_selectable(devices(), pc.UIState(tab="devices")))
+             if getattr(o, "kind", None) == "midi")
+    st = pc.UIState(tab="devices", dev_cursor=i)
+    assert "Patch (3)" in pc.render_screen(st, {}, None, 120, 80, devices=devices())[0][-1][0]
 
 
 def test_cli_lists_midi():

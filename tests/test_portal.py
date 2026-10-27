@@ -125,8 +125,9 @@ def test_mixer_headings_use_their_roles():
     inv = pi.inventory(_json.loads((FIX / "pwdump_inventory.json").read_text()))
     mx = pc.mixer_view(inv, {"version": 2, "clock_rate": None, "buses": [], "labels": {}, "hidden": []}, [])
     lines = pc.render_screen(pc.UIState(tab="mixer"), {}, None, 100, 60, mixer=mx)[0]
-    assert next(s for t, s in lines if t.strip() == "Playback") == "head_play"
-    assert next(s for t, s in lines if t.strip() == "Recording") == "head_rec"
+    for title, role in (("Playback", "head_play"), ("Recording", "head_rec")):  # box titles since the QA pass
+        text, style = next((t, s) for t, s in lines if t.startswith(f"┌─ {title} "))
+        assert role_at(style, 3) == role
 
 
 def test_placeholder_names_still_load(tmp_path):
@@ -226,15 +227,16 @@ def mixer_lines(theme, section, **kw):
                                                          ("recording", "bar_dst", "anchor_dst", "head_rec")])
 def test_mixer_cursor_and_menu_follow_the_direction(section, bar, anchor, edge):
     lines = mixer_lines("pipeos-dark", section)
-    text, style = next((t, s) for t, s in lines if t.startswith("> "))
-    assert role_at(style, 2) == bar
+    text, style = next((t, s) for t, s in lines if t.startswith("│ > "))  # rows sit inside their box (+2)
+    assert role_at(style, 4) == bar
     lines = mixer_lines("pipeos-dark", section, mix_menu=True)
-    assert role_at(next(s for t, s in lines if t.startswith("> ")), 2) == anchor
-    item = next((t, s) for t, s in lines if t.startswith("    │ > "))
-    assert role_at(item[1], 6) == bar
-    top = next((t, s) for t, s in lines if t.startswith("    ┌"))
-    assert role_at(top[1], 5) == edge
-    assert role_at(item[1], 4) == edge and role_at(item[1], len(item[0].rstrip()) - 1) == edge  # its sides too
+    assert role_at(next(s for t, s in lines if t.startswith("│ > ")), 4) == anchor
+    item = next((t, s) for t, s in lines if t.startswith("│     │ > "))
+    assert role_at(item[1], 8) == bar
+    top = next((t, s) for t, s in lines if t.startswith("│     ┌"))
+    assert role_at(top[1], 7) == edge
+    right = 2 + len(item[0][2:-2].rstrip()) - 1
+    assert role_at(item[1], 6) == edge and role_at(item[1], right) == edge  # its sides too
 
 
 def devices_lines(theme, pick, **kw):
@@ -248,8 +250,8 @@ def devices_lines(theme, pick, **kw):
 @pytest.mark.parametrize("direction, role", [("out", "dir_out"), ("in", "dir_in")])
 def test_devices_channel_rows_tint_their_direction(direction, role):
     lines, _ = devices_lines("pipeos-dark", lambda k, o: k == "card")
-    text, style = next((t, s) for t, s in lines if t[4:].startswith(direction + " "))
-    assert role_at(style, 4) == role and role_at(style, 20) == "dim"
+    text, style = next((t, s) for t, s in lines if t[6:].startswith(direction + " "))  # inside the card's box
+    assert role_at(style, 6) == role and role_at(style, 22) == "normal"  # a row now, not dim (QA pass)
     want = "src" if direction == "out" else "dst"
     assert pc.THEMES["pipeos-dark"][role][0] == pc.THEMES["pipeos-dark"][want][0]
 
@@ -263,7 +265,7 @@ def test_other_themes_keep_channel_rows_dim(name):
 def test_devices_card_bar_and_menu_are_neutral_blue_with_plain_profile_dots():
     lines, (_, card) = devices_lines("pipeos-dark", lambda k, o: k == "card" and o.profiles,
                                      dev_menu=None)
-    assert role_at(next(s for t, s in lines if t.startswith("> ")), 2) == "selected"
+    assert role_at(next(s for t, s in lines if t.startswith("│ > ")), 4) == "selected"
     lines, _ = devices_lines("pipeos-dark", lambda k, o: k == "card" and o.profiles, dev_menu=("card", card.id))
     for text, style in lines:
         for n, ch in enumerate(text):

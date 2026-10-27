@@ -69,7 +69,9 @@ def prefs(**kw):
 
 
 def pane(t):
-    return t[pc.MENU_W:]
+    """The pane's text, inside its section box since the QA pass (2026-10-26)."""
+    p = t[pc.MENU_W:]
+    return p[2:-2] if p.startswith("│") else p
 
 
 def row_of(action_id):
@@ -97,7 +99,7 @@ def test_keys_section_follows_display_in_preferences():
     body = "\n".join(t for t, _ in text(prefs()))
     assert body.index("Display") < body.index("Key Bindings") < body.index("Reset all keys")
     kb = body.index("Key Bindings")
-    assert body.index("│  Devices\n", kb) < body.index("Show hidden ", kb)   # under its view's heading
+    assert body.index("│   Devices ", kb) < body.index("Show hidden ", kb)   # under its view's heading, in the box
     assert pc.RESET_KEYS_ROW == pc.KEYS_ROW + len(pc.BINDING_ROWS)
 
 
@@ -150,7 +152,8 @@ def test_hand_edited_clash_is_flagged_red():
     st = prefs(keys={"devices.add_bus": "m", "mixer.meters": "q"})
     lines = text(st)
     row = binding_line(lines, "Add bus")
-    assert "also Devices · monitors" in row[0] and (pc.MENU_W, len(row[0]), "alert") in row[1][1]
+    at = row[0].index("Add bus")  # inside the Key Bindings box the alert is the bar under the text
+    assert "also Devices · monitors" in row[0] and any(r == "alert" and a <= at < b for a, b, r in row[1][1])
     assert "global: quit" in binding_line(lines, "Meters")[0]
 
 

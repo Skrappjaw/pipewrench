@@ -105,7 +105,7 @@ def test_volume_bar_over_100_reads_as_alert_and_mute_as_dim():
 def test_cursor_bar_covers_the_name_not_the_volume():
     lines, _ = screen(at("Discord"))
     style = next(s for t, s in lines if "Discord →" in t)
-    roles = [r for *_, r in style[1]]
+    roles = [r for *_, r in style[1]][2:]  # after the box frame's two edges (QA pass, 2026-10-26)
     assert roles[0] == "bar_src" and "vol" in roles  # the playback cursor: blue in pipeOS, the plain cursor elsewhere
 
 
@@ -215,7 +215,7 @@ def test_the_menu_box_sits_under_its_row_and_stays_in_view():
     text = [t for t, _ in lines]
     row = next(i for i, t in enumerate(text) if "GCS-8 CH 3-AUX" in t and "█" in t)
     assert "GCS-8 CH 3-AUX" in text[row + 1] and "> Set as system default" in text[row + 2]
-    assert lines[row][1][1][0][2] in ("anchor_src", "anchor_dst")  # the row under an open menu is an anchor, not a cursor
+    assert lines[row][1][1][2][2] in ("anchor_src", "anchor_dst")  # [2]: after the box frame's edges  # the row under an open menu is an anchor, not a cursor
     st, _ = key(at("GCS-8 CH 4", "recording"), "enter")
     lines, _ = screen(st, height=20)
     assert any("Back" in t for t, _ in lines)
@@ -432,7 +432,7 @@ def test_metered_rows_draw_cells_and_v_turns_them_off():
     m = {**m, "metered": {("playback", disc.id): (disc.serial, False)}, "levels": {("playback", disc.id): 0.5}}
     lines, _ = screen(pc.UIState(), m=m)
     row = next(t for t, _ in lines if "Discord →" in t)
-    assert row.rstrip().endswith("·") and "█" in row.split("%", 1)[1]
+    assert row.rstrip(" │").endswith("·") and "█" in row.split("%", 1)[1]
     st, _ = key(pc.UIState(), "v", m=m)
     assert not st.meters and st.message == "meters off"
     assert "·" not in next(t for t, _ in screen(st, m=m)[0] if "Discord →" in t)

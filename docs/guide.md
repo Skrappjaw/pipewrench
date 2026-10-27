@@ -44,7 +44,8 @@ like changing the default device, goes through a menu so a stray key can't do it
 
 ## Mixer: everyday levels
 
-Every output and input, then the apps playing or recording under each. ★ marks the system default.
+Two boxes, **Playback** and **Recording**: every output or input, then the apps playing or recording under
+an **Apps** heading. ★ marks the system default.
 
 | Key | Does |
 |---|---|
@@ -99,15 +100,16 @@ the next restart or login.
 
 ## Devices: hardware and buses
 
-The sound cards with their profiles, and the virtual buses. A card's channels are listed under it,
-dimmed: they're there so you can see what a profile gives you. Channel work (default, rename, test,
-levels) is on the Mixer.
+A box per sound card: its **Profile** first, then its channels, each with its direction, status, volume and
+node number. Every line can be selected, and the status line says what it is. Channels only show
+something: Enter does nothing on them, because channel work (default, rename, test, levels) is on the Mixer.
+Then **MIDI**, **Buses** and **Off**, each in its own box.
 
 ![Devices](guide/devices.png)
 
 | Key | Does |
 |---|---|
-| Enter | the card's or bus's menu, or open the line under the cursor |
+| Enter | the card's menu (on its Profile line) or the bus's menu; nothing on a channel |
 
 | Shortcut | Does | Without it |
 |---|---|---|
@@ -124,12 +126,12 @@ Monitors are on. There's no Apply step. A name or a bus shows once WirePlumber r
 where that matters). If WirePlumber comes back with a card on the wrong profile, PipeWrench puts it back
 when it starts; `pwrench devices restore` does the same from a login script.
 
-Cards on profile `off` (unused HDMI, a webcam you don't use for sound) wait at the bottom under
-**Off**.
+Cards on profile `off` (unused HDMI, a webcam you don't use for sound) wait at the bottom, in the **Off** box.
+Enter on one opens its profiles, to turn it on.
 
-MIDI devices (a controller, the GCS-8's MIDI ports, a macro pad) are listed under **MIDI**, after the
-cards. They're read-only: each shows its ALSA card (`hw:3`) and what it's connected to
-(`← REAPER  → REAPER`). Connect them on Patch.
+MIDI devices (a controller, the GCS-8's MIDI ports, a macro pad) are listed in the **MIDI** box, after the
+cards. Each shows its ALSA card (`hw:3`) and what it's connected to (`← REAPER  → REAPER`); there's nothing to
+set on one here. Connect them on Patch.
 
 ### Switch a card's profile
 
@@ -145,7 +147,7 @@ Select its card and press Enter → Hide card (there's no shortcut, so a stray k
 them again, dimmed, so you can unhide one. Most people want every channel; hiding is for whole
 devices, like onboard audio you never plug into.
 
-### Virtual buses
+### Buses
 
 A bus is a virtual device apps can play into or record from, for example a "Stream" bus that OBS
 records and your music plays into. Press `a` (or Enter on **+ Add bus…**) and give it a name:
@@ -350,6 +352,8 @@ keeps it and Esc puts it back. They're kept in `~/.config/pipewrench/ui.json`.
 
 ![Settings → Preferences](guide/settings-preferences.png)
 
+Preferences has two boxes, **Display** and **Key Bindings**.
+
 #### Display
 
 Theme (dark, light, crowbar orange, Pipe Boy in green, amber, cyan or white, Vaporware, Pipecraft, or
@@ -416,8 +420,11 @@ Every key, in columns **Action · Key · MIDI/CC**, under a heading for each vie
 
 ## Top
 
-A live `pw-top`: every node's quantum, rate, timing and errors (ERR). Rows with errors show red. Use
-it to see what's running and whether anything is dropping out. ↑↓ and PgUp/PgDn scroll.
+A live `pw-top`: every node's quantum, rate, timing and errors (ERR). A box per driver (the device that
+sets a clock), titled with its buffer and rate, holds the nodes that follow it; drivers with nothing
+running wait in **Idle**. Rows with errors show red. Every row can be selected (↑↓, PgUp/PgDn ten at a time),
+and the status line says what it is: a driver and how many follow it, or what a follower follows, with its
+dropout count. Enter does nothing here: Top only shows.
 
 ![Top](guide/top.png)
 

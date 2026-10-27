@@ -87,8 +87,11 @@ def test_lines_fit_height():
 
 
 def test_top_render_styles():
+    def role(style):  # inside a box the row's colour is the span under its text (QA pass, 2026-10-26)
+        base, spans = style if isinstance(style, tuple) else (style, [])
+        return next((r for a, b, r in reversed(spans) if a <= 4 < b), base)
     lines, _ = pc.render_screen(UIState(tab="top"), CUR, block(), 200, 40)
-    styles = {t.split()[-1] if t.split() else "": s for t, s in lines}
+    styles = {t.rstrip(" │").split()[-1] if t.strip(" │") else "": role(s) for t, s in lines}
     assert any("QUANT" in t for t, _ in lines)
     assert styles["Dummy-Driver"] == "dim"
     assert styles["alsa_input.usb-Hercules_Rocksmith_USB_Guitar_Adapter-00.mono-fallback"] == "normal"
@@ -96,9 +99,10 @@ def test_top_render_styles():
     hdr = (FIX / "pwtop_batch.txt").read_text().splitlines()[0]
     p = pc.TopParser()
     p.feed(hdr)
+    p.feed("R  158    128  48000  60.3us   0.9us  0.02  0.00    0    S16LE 1 48000  driver")  # the cursor's row
     p.feed("R  155    227  44100  24.6us  32.9us  0.01  0.01    2    S16LE 2 44100  + ALSA plug-in [sunvox]")
     lines, _ = pc.render_screen(UIState(tab="top"), CUR, p.flush(), 120, 40)
-    assert [s for t, s in lines if "sunvox" in t] == ["alert"]
+    assert [role(s) for t, s in lines if "sunvox" in t] == ["alert"]
 
 
 def test_top_render_waiting_for_data():
@@ -407,9 +411,9 @@ def test_click_outside_targets_does_nothing():
 def test_wheel_scrolls_top():
     st = UIState(tab="top")
     _, hits = screen(st)
-    st, _ = click(st, hits, ("toplist",), event="wheel_down")
+    st, _ = click(st, hits, ("top_row", 0), event="wheel_down")
     assert st.top_scroll == 1
-    st, _ = click(st, hits, ("toplist",), event="wheel_up")
+    st, _ = click(st, hits, ("top_row", 0), event="wheel_up")
     assert st.top_scroll == 0
 
 
