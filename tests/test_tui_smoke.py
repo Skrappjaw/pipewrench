@@ -48,6 +48,22 @@ class Pty:
                     break
         raise AssertionError(f"never saw {needle!r}; tail: {self.buf[-400:]!r}")
 
+    def expect_all(self, *needles, timeout=5.0):
+        """Every needle, in any order: curses may paint a screen's lines out of order (Patch's side-by-side boxes
+        can draw a row before the title line above it), and expect() drops what came before its match."""
+        end = time.time() + timeout
+        while time.time() < end:
+            if all(n.encode() in self.buf for n in needles):
+                self.buf = b""
+                return True
+            r, _, _ = select.select([self.fd], [], [], 0.1)
+            if r:
+                try:
+                    self.buf += os.read(self.fd, 65536)
+                except OSError:
+                    break
+        raise AssertionError(f"never saw all of {needles!r}; tail: {self.buf[-400:]!r}")
+
     def send(self, data):
         os.write(self.fd, data.encode())
 
@@ -140,8 +156,7 @@ def test_patch_tab_shows_both_views(app):
     app.send(tab("settings"))
     app.expect("Force sample rate")
     app.send(tab("patch"))
-    app.expect("Destinations")
-    app.expect("Discord")
+    app.expect_all("Destinations", "Discord")
     app.send("g")
     app.expect("column view")
     app.send("p")
