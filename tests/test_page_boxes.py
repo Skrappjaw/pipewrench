@@ -138,3 +138,73 @@ def test_preferences_sections_are_boxes_with_view_headings_inside():
 def test_preferences_rows_still_select_inside_their_boxes():
     st = pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane", cursor=pc.RESET_KEYS_ROW)
     assert any(t.startswith("│ > Reset all keys") for t in prefs_pane(st))
+
+
+# --- Patch: side-by-side boxes, audio on top, MIDI below (Skrappjaw, 2026-10-26) ----------------------------------
+
+def midi_graph():
+    import json
+    from pathlib import Path
+    import pwpatch as pp
+    return pp.graph(json.loads((Path(__file__).parent / "fixtures" / "pwdump_midi.json").read_text()))
+
+
+def patch_screen(st, g, height=80, width=120):
+    return pc.render_screen(st, CUR, [], width, height, patch=g)
+
+
+def box_tops(lines):
+    """Box titles per line, left to right: a side-by-side pair shares one line."""
+    import re
+    return [re.findall(r"[┌]─ (.+?) ─", t) for t, _ in body(lines) if "┌─ " in t]
+
+
+def test_patch_columns_are_side_by_side_boxes_audio_then_midi():
+    g = midi_graph()
+    tops = box_tops(patch_screen(pc.UIState(tab="patch"), g)[0])
+    assert tops[:2] == [["Sources", "Destinations"], ["MIDI sources", "MIDI destinations"]]
+
+
+def test_patch_has_no_summary_line_and_monitors_is_a_heading_in_sources():
+    g = midi_graph()
+    lines = [t for t, _ in body(patch_screen(pc.UIState(tab="patch", patch_monitors=True), g)[0])]
+    assert all(t.startswith(("┌", "│", "└")) for t in lines if t.strip())  # nothing outside the boxes
+    assert not any(t.strip().startswith("Monitors") for t in lines)       # headings sit inside a box
+
+
+def test_patch_rows_select_on_both_sides_and_in_the_midi_box():
+    g = midi_graph()
+    srcs = pc.patch_sources(g, pc.UIState(tab="patch"))
+    m = next(i for i, e in enumerate(srcs) if e.media == "midi")
+    lines, hits = patch_screen(pc.UIState(tab="patch", patch_src=m), g)
+    row = next(h[0] for h in hits if h[3] == ("patch_src", m))
+    above = [t for t, _ in lines[:row] if "┌─ MIDI sources" in t]
+    assert above and lines[row][0].startswith("│ > ")
+
+
+def test_patch_grid_is_boxed_audio_midi_and_a_destination_key():
+    g = midi_graph()
+    tops = [x for row in box_tops(patch_screen(pc.UIState(tab="patch", patch_view="grid"), g)[0]) for x in row]
+    assert tops[:3] == ["Audio", "MIDI", "Destinations"]
+
+
+def test_patch_grid_cursor_stays_on_its_own_kind_of_destination():
+    g = midi_graph()
+    srcs = pc.patch_sources(g, pc.UIState(tab="patch"))
+    m = next(i for i, e in enumerate(srcs) if e.media == "midi")
+    st = pc.UIState(tab="patch", patch_view="grid", patch_src=m - 1)
+    st, _ = pc.handle_key(st, "down", CUR, patch=g)
+    assert st.patch_src == m and g.dests[st.patch_dst].media == "midi"
+
+
+def test_patch_port_matrix_is_one_box_titled_with_the_pair():
+    from test_patch_ui import G as GA
+    st = pc.UIState(tab="patch", patch_ports=True, patch_side="dst")
+    tops = [x for row in box_tops(patch_screen(st, GA)[0]) for x in row]
+    assert len(tops) == 1 and "→" in tops[0]
+
+
+def test_patch_grid_key_stays_on_screen_on_a_short_terminal():
+    g = midi_graph()
+    lines, _ = patch_screen(pc.UIState(tab="patch", patch_view="grid"), g, height=30)
+    assert any(t.startswith("┌─ Destinations") for t, _ in body(lines))

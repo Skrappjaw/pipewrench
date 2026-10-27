@@ -50,6 +50,12 @@ def hit_for(hits, target):
 
 # --- tab -------------------------------------------------------------------------------
 
+
+def cols(t):
+    """(left, right) box text of a side-by-side Patch line (boxes since the QA pass, 2026-10-26)."""
+    lw = len(t) // 2
+    return (t[2:lw - 2], t[lw + 2:-2]) if t.startswith("│") else ("", "")
+
 def test_patch_tab_by_number():
     st, _ = key(pc.UIState(), str(pc.TABS.index("patch") + 1))
     assert st.tab == "patch"
@@ -72,11 +78,11 @@ def test_loading_when_graph_missing():
 def test_columns_mark_targets_of_selected_source():
     text = body(screen(at("Discord"))[0])
     assert "Sources" in text and "Destinations" in text
-    row = next(line for line in text.splitlines() if "GCS-8 CH 4-AUX" in line and "│" in line)
-    assert "●" in row.split("│")[1]
-    other = next(line for line in text.splitlines() if "GCS-8 CH 3-AUX" in line and "│" in line)
-    assert "●" not in other.split("│")[1]
-    assert "Discord → GCS-8 CH 4-AUX" in text  # the status line for the selected pair
+    row = next(line for line in text.splitlines() if "GCS-8 CH 4-AUX" in cols(line)[1])
+    assert "●" in cols(row)[1]
+    other = next(line for line in text.splitlines() if "GCS-8 CH 3-AUX" in cols(line)[1])
+    assert "●" not in cols(other)[1]
+    assert "a source: 1 link" in text  # the status note (the summary line is gone, Skrappjaw 2026-10-26)
 
 
 def bars(st, g=G):
@@ -87,10 +93,10 @@ def bars(st, g=G):
 
 def test_highlight_covers_only_the_active_column():
     (src,) = bars(at("Discord"))
-    assert src == (0, src[1], "bar_src") and src[1] < 60  # left column only
+    assert src == (2, src[1], "bar_src") and src[1] <= 50  # inside the Sources box only
     src, dst = bars(at("Discord", "GCS-8 CH 4-AUX", patch_side="dst"))
-    assert src[0] == 0 and src[1] < 60 and src[2] == "anchor_src"  # the source stays lit, as the anchor
-    assert dst[0] > 40 and dst[1] == 100 and dst[2] == "bar_dst"  # the cursor, right column only
+    assert src[0] == 2 and src[1] <= 50 and src[2] == "anchor_src"  # the source stays lit, as the anchor
+    assert dst[0] > 40 and dst[1] == 98 and dst[2] == "bar_dst"  # the cursor, inside the Destinations box only
 
 
 def test_monitors_hidden_until_m():
@@ -134,9 +140,9 @@ def test_g_switches_to_grid_and_back():
 def test_grid_shows_dots_and_connections():
     st = at("Discord", "GCS-8 CH 4-AUX", patch_view="grid")
     text = body(screen(st)[0])
-    discord = next(line for line in text.splitlines() if line.lstrip("> ").startswith("Discord") and "·" in line)
+    discord = next(line for line in text.splitlines() if line.lstrip("│> ").startswith("Discord") and "·" in line)
     assert "●" in discord
-    assert "Discord → GCS-8 CH 4-AUX" in text
+    assert "Discord → GCS-8 CH 4-AUX: connected" in text  # the status note
     assert f"{di('GCS-8 CH 4-AUX') + 1} GCS-8 CH 4-AUX" in text  # the numbered key
 
 
@@ -175,7 +181,7 @@ def test_p_opens_a_port_matrix():
     header = next(line for line in text.splitlines() if "in1" in line and "in8" in line)
     assert header.index("in1") < header.index("in8")
     rows = [line for line in text.splitlines()[:-1]  # the last line is the status note
-            if line.lstrip("> ").startswith(("FL", "FR")) and ("·" in line or "●" in line)]
+            if line.lstrip("│> ").startswith(("FL", "FR")) and ("·" in line or "●" in line)]
     assert len(rows) == 2                      # one row per source port, not 16 lines
     assert "[·]" in rows[0]                    # cursor on FL × in1
 
@@ -194,9 +200,9 @@ def test_port_matrix_shows_existing_links():
     st, _ = key(at("Discord", "GCS-8 CH 4-AUX", patch_side="dst"), "p")
     text = body(screen(st)[0])
     rows = [line for line in text.splitlines()[:-1]  # the last line is the status note
-            if line.lstrip("> ").startswith(("FL", "FR")) and ("·" in line or "●" in line)]
+            if line.lstrip("│> ").startswith(("FL", "FR")) and ("·" in line or "●" in line)]
     assert "●" in rows[0] and "●" in rows[1]   # FL→FL and FR→FR linked
-    assert "Ports: Discord → GCS-8 CH 4-AUX" in text
+    assert "┌─ Discord → GCS-8 CH 4-AUX " in text    # the box is titled with the pair
 
 
 def test_ports_mode_works_from_grid_too():
@@ -235,7 +241,7 @@ def test_legend_fits_80(view):
 def test_scrolls_to_keep_cursor_visible():
     st = pc.UIState(tab="patch", patch_src=len(SRCS) - 1)
     lines, _ = screen(st, height=16)
-    assert any(SRCS[-1].label in t and t.startswith(">") for t, _ in lines)
+    assert any(SRCS[-1].label in t and t.startswith("│ >") for t, _ in lines)
 
 
 # --- mouse -------------------------------------------------------------------------------------
@@ -284,13 +290,13 @@ def test_unconnected_source_keeps_the_destination_cursor():
 def test_full_journey_opens_ports_for_the_chosen_pair():
     st, _ = key(at("GCS-8 CH 1", "Discord"), "enter", "down", "p")   # source, move to dests, pick, ports
     assert st.patch_ports
-    assert f"Ports: GCS-8 CH 1 → {G.dests[di('Discord') + 1].label}" in body(screen(st)[0])
+    assert f"┌─ GCS-8 CH 1 → {G.dests[di('Discord') + 1].label} " in body(screen(st)[0])
 
 
 @pytest.mark.parametrize("width", [80, 120])
 def test_grid_key_fits_the_screen(width):
     lines, _ = screen(pc.UIState(tab="patch", patch_view="grid"), width=width)
-    key_rows = [t for t, _ in lines if t.strip()[:2].strip().isdigit() and "·" not in t]
+    key_rows = [t for t, _ in lines if t.strip(" │")[:2].strip().isdigit() and "·" not in t]
     text = "\n".join(key_rows)
     for n, d in enumerate(G.dests):
         assert f"{n + 1} {d.label[:20]}" in text, (n, d.label, text)

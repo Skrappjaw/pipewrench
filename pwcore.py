@@ -2615,10 +2615,16 @@ def _key_patch(st, key, g):
         return st, []
     step = {"up": -1, "down": 1}.get(key)
     if st.patch_view == "grid":
+        # Audio and MIDI are separate grids (Skrappjaw, 2026-10-26): the cell stays on its source's kind of destination.
         if step:
             st.patch_src = max(0, min(len(srcs) - 1, st.patch_src + step))
+            same = [j for j, x in enumerate(g.dests) if x.media == srcs[st.patch_src].media]
+            if same and st.patch_dst not in same:
+                st.patch_dst = same[0]
         elif key in ("left", "right"):
-            st.patch_dst = max(0, min(len(g.dests) - 1, st.patch_dst + (1 if key == "right" else -1)))
+            same = [j for j, x in enumerate(g.dests) if x.media == s.media] or list(range(len(g.dests)))
+            k = same.index(st.patch_dst) if st.patch_dst in same else 0
+            st.patch_dst = same[max(0, min(len(same) - 1, k + (1 if key == "right" else -1)))]
         elif key == "enter":
             return _connect(g, st, s, d)
         return st, []
@@ -2671,7 +2677,7 @@ def _render_patch(cv, st, g, body_h):
     if s is None:
         cv.add("  no audio sources or destinations", "dim")
         return
-    room = max(1, body_h - 2)  # blank line and pair status sit below
+    room = max(1, body_h)  # no summary line (Skrappjaw, 2026-10-26: removed; the status note and ● marks carry it)
     # No View line (Skrappjaw, 2026-10-26: "View menu can go away ... patch bay shortcuts on screen are enough").
     if st.patch_ports:
         _render_port_matrix(cv, st, g, s, d, room)
@@ -2679,13 +2685,6 @@ def _render_patch(cv, st, g, body_h):
         _render_patch_grid(cv, st, g, srcs, s, d, room)
     else:
         _render_patch_cols(cv, st, g, srcs, s, room)
-    cv.add("")
-    if st.patch_view == "cols" and st.patch_side == "src" and not st.patch_ports:
-        targets = g.targets(s)
-        cv.add(f"  {s.label} → {', '.join(x.label for x in targets)}" if targets
-               else f"  {s.label}: not connected", "alert" if targets else "dim")
-    else:
-        cv.add(_pair_status(g, s, d), "alert" if g.state(s, d) not in ("none", "n/a") else "dim")
 
 
 def _slot_menu(g, st, s, d, avail):
@@ -2710,96 +2709,165 @@ def _slot_menu(g, st, s, d, avail):
     return out
 
 
+# Patch in boxes (Skrappjaw, 2026-10-26: "we could still side byt side box it. Audio up top and a midi box below").
+# Lines are (text, style, hits, cursor): hits are (col0, col1, target); one page scroll keeps the cursor in view.
+
+def _frame_top(title, width, role):
+    return "┌─ " + title + " " + "─" * max(0, width - len(title) - 5) + "┐", [(0, width, "dim"), (3, 3 + len(title), role)]
+
+
+def _framed(title, entries, width, role="title"):
+    """A box for Patch: entries are (text, spans, hits, cursor) with columns inside the box."""
+    inner = max(10, width - 4)
+    top, spans = _frame_top(title, width, role)
+    out = [(top, ("normal", spans), [], False)]
+    for text, sp, hits, cur in entries:
+        frame = [(0, 1, "dim"), (inner + 3, inner + 4, "dim")]
+        out.append(("│ " + text[:inner].ljust(inner) + " │",
+                    ("normal", frame + [(a + 2, min(b, inner) + 2, r) for a, b, r in sp if a < inner]),
+                    [(a + 2, min(b, inner) + 2, t) for a, b, t in hits], cur))
+    out.append(("└" + "─" * max(0, width - 2) + "┘", "dim", [], False))
+    return out
+
+
+def _side_by_side(left, right, lw, rw):
+    """Two framed boxes on the same lines, left then right; the shorter one is padded."""
+    blank_l = ("│" + " " * (lw - 2) + "│", ("normal", [(0, 1, "dim"), (lw - 1, lw, "dim")]), [], False)
+    blank_r = ("│" + " " * (rw - 2) + "│", ("normal", [(0, 1, "dim"), (rw - 1, rw, "dim")]), [], False)
+    left, right = list(left), list(right)
+    n = max(len(left), len(right))
+    left = left[:-1] + [blank_l] * (n - len(left)) + left[-1:]
+    right = right[:-1] + [blank_r] * (n - len(right)) + right[-1:]
+    out = []
+    for (lt, ls, lh, lc), (rt, rs, rh, rc) in zip(left, right):
+        lb, lsp = ls if isinstance(ls, tuple) else (ls, [(0, len(lt), ls)])
+        rb, rsp = rs if isinstance(rs, tuple) else (rs, [(0, len(rt), rs)])
+        out.append((lt + rt, ("normal", lsp + [(a + lw, b + lw, r) for a, b, r in rsp]),
+                    lh + [(a + lw, b + lw, t) for a, b, t in rh], lc or rc))
+    return out
+
+
+def _draw_page(cv, lines, room):
+    at = max((n for n, line in enumerate(lines) if line[3]), default=0)
+    at = min(len(lines) - 1, at + 1)  # a line of room below the cursor (its box's foot)
+    start = 0 if at < room else at - room + 1
+    for text, style, hits, _ in lines[start:start + max(1, room)]:
+        row = cv.add(text, style)
+        for c0, c1, target in hits:
+            cv.hit(row, c0, c1, target)
+
+
+def _media_split(items):
+    audio = [i for i, e in enumerate(items) if e.media != "midi"]
+    return audio, [i for i, e in enumerate(items) if e.media == "midi"]
+
+
 def _render_patch_cols(cv, st, g, srcs, s, room):
-    half = max(20, (cv.width - 3) // 2)
-    cv.add(f"  {'Sources':<{half - 2}}│ Destinations", ("title", [(2, 9, "head_src"), (half + 2, half + 14, "head_dst")]))
+    W = cv.width
+    lw = W // 2
+    rw = W - lw
+    li, ri = lw - 4, rw - 4
     on_dst = st.patch_side == "dst"
-    menu = _slot_menu(g, st, s, g.dests[st.patch_dst], cv.width - half - 2) if on_dst else []
-    left = _with_heads(srcs, list(_window(len(srcs), st.patch_src, room - 1 - _n_heads(srcs))))
-    right = []  # (text, highlighted, hit target); the slot menu sits under its destination
-    for j in _with_heads(g.dests, list(_window(len(g.dests), st.patch_dst,
-                                               max(1, room - 1 - len(menu) - _n_heads(g.dests))))):
-        if isinstance(j, str):
-            right.append((f"  {j}", "title", None, None))
+    menu = _slot_menu(g, st, s, g.dests[st.patch_dst], ri) if on_dst else []
+    (sa, sm), (da, dm) = _media_split(srcs), _media_split(g.dests)
+    lines = []
+    for lt_title, rt_title, si, di in (("Sources", "Destinations", sa, da), ("MIDI sources", "MIDI destinations", sm, dm)):
+        if not si and not di:
             continue
-        mark = "> " if j == st.patch_dst and on_dst else "  "
-        state = g.state(s, g.dests[j])
-        rt = f"{mark}{_STATE_MARK[state].replace('·', ' ')} {_fit(g.dests[j].label, half - 4)}"
-        lit = ("anchor_dst" if menu else "bar_dst") if j == st.patch_dst and on_dst else None
-        right.append((rt, lit, ("patch_dst", j), {"full": "dst", "partial": "dst_partial"}.get(state)))
-        if j == st.patch_dst:
-            right += menu
-    for n in range(max(len(left), len(right))):
-        lt, spans = "", []
-        if n < len(left) and isinstance(left[n], str):
-            lt, spans = f"  {left[n]}", [(0, half, "title")]
-        elif n < len(left):
-            i = left[n]
+        left = []
+        for i in _with_heads(srcs, si):
+            if isinstance(i, str):
+                if i != "MIDI":  # the MIDI box is its own heading
+                    left.append((f"  {i}", [(0, li, "title")], [], False))
+                continue
             count = len(g.targets(srcs[i]))
             mark = "> " if i == st.patch_src and not on_dst else "* " if i == st.patch_src else "  "
-            lt = f"{mark}{_fit(srcs[i].label, half - 7):<{half - 7}} {('●' + str(count)) if count else '':>3}"
+            lt = f"{mark}{_fit(srcs[i].label, li - 6):<{li - 6}} {('●' + str(count)) if count else '':>3}"
             bar = ("anchor_src" if on_dst else "bar_src") if i == st.patch_src else None
-            if bar:  # each bar covers only its own column; the source's stays as the anchor
-                spans.append((0, half, bar))
+            spans = [(0, li, bar)] if bar else []
             if count:  # the source's dot, drawn over its bar (src@bar_src) so it keeps its colour
                 spans.append((lt.index("●"), lt.index("●") + 1, f"src@{bar}" if bar else "src"))
-        rt, lit, target, dot = (right[n] + (None,))[:4] if n < len(right) else ("", None, None, None)
-        if lit:
-            spans.append((half + 2, cv.width if target and target[0] == "patch_dst" else half + 2 + len(rt), lit))
-        if dot:
-            spans.append((half + 2 + 2, half + 2 + 3, f"{dot}@{lit}" if lit in ("bar_dst", "anchor_dst") else dot))
-        row = cv.add(f"{lt:<{half}}│ {rt}".ljust(cv.width), ("normal", spans))
-        if n < len(left) and not isinstance(left[n], str):
-            cv.hit(row, 0, half, ("patch_src", left[n]))
-        if target:
-            cv.hit(row, half + 1, cv.width, target)
+            left.append((lt, spans, [(-2, li + 2, ("patch_src", i))], i == st.patch_src and not on_dst))
+        right = []
+        for j in _with_heads(g.dests, di):
+            if isinstance(j, str):
+                if j != "MIDI":
+                    right.append((f"  {j}", [(0, ri, "title")], [], False))
+                continue
+            state = g.state(s, g.dests[j])
+            sel = j == st.patch_dst and on_dst
+            rt = f"{'> ' if sel else '  '}{_STATE_MARK[state].replace('·', ' ')} {_fit(g.dests[j].label, ri - 4)}"
+            lit = ("anchor_dst" if menu else "bar_dst") if sel else None
+            dot = {"full": "dst", "partial": "dst_partial"}.get(state)
+            spans = [(0, ri, lit)] if lit else []
+            if dot:
+                spans.append((2, 3, f"{dot}@{lit}" if lit else dot))
+            right.append((rt, spans, [(-2, ri + 2, ("patch_dst", j))], sel and not menu))
+            if sel:
+                for k, (text, mlit, target) in enumerate(menu):
+                    right.append((text, [(0, len(text), mlit)] if mlit else [], [(0, ri, target)] if target else [],
+                                  k == len(menu) - 1))
+        lines += _side_by_side(_framed(lt_title, left, lw, "head_src"), _framed(rt_title, right, rw, "head_dst"), lw, rw)
+    _draw_page(cv, lines, room)
 
 
 def _render_patch_grid(cv, st, g, srcs, s, d, room):
-    label_w = 30
-    cols_fit = max(1, (cv.width - label_w - 3) // 3)
-    cols = list(_window(len(g.dests), st.patch_dst, cols_fit))
-    key_rows = -(-len(cols) // max(1, (cv.width - 2) // 35))
-    menu = _slot_menu(g, st, s, d, cv.width - 4)
-    rows = list(_window(len(srcs), st.patch_src, max(1, room - 2 - key_rows - len(menu) - _n_heads(srcs))))
-    cv.add(" " * (label_w + 2) + "".join(f"{j + 1:>3}" for j in cols), "title")
-    for i in _with_heads(srcs, rows):
-        if isinstance(i, str):
-            cv.add(f"  {i}", "title")
+    """An Audio grid and a MIDI grid, each its own kind of destination across the top, then the numbered key."""
+    label_w = min(30, max(12, cv.width - 30))
+    inner = cv.width - 4
+    cols_fit = max(1, (inner - label_w - 3) // 3)
+    menu = _slot_menu(g, st, s, d, inner - 4)
+    (sa, sm), (da, dm) = _media_split(srcs), _media_split(g.dests)
+    lines, shown = [], []
+    for title, si, di in (("Audio", sa, da), ("MIDI", sm, dm)):
+        if not si:
             continue
-        cells = ""
-        for j in cols:
-            mark = _STATE_MARK[g.state(srcs[i], g.dests[j])]
-            cells += f"[{mark}]" if (i, j) == (st.patch_src, st.patch_dst) else f" {mark} "
-        sel = i == st.patch_src
-        spans = []
-        if sel:
-            c0 = 2 + label_w + 3 * cols.index(st.patch_dst) if st.patch_dst in cols else None
-            spans = [(0, 2 + label_w, "anchor_src")] + ([(c0, c0 + 3, "bar_dst")] if c0 is not None else [])
-        row = cv.add(f"{'> ' if sel else '  '}{_fit(srcs[i].label, label_w):<{label_w}}{cells}", ("normal", spans))
-        for k, j in enumerate(cols):
-            c0 = 2 + label_w + 3 * k
-            cv.hit(row, c0, c0 + 3, ("patch_cell", i, j))
-    for text, lit, target in menu:
-        row = cv.add("    " + text, ("normal", [(4, 4 + len(text), lit)] if lit else []))
-        if target:
-            cv.hit(row, 4, 4 + len(text), target)
-    cv.add("")
-    per_row = max(1, (cv.width - 2) // 35)  # as many "nn name" columns as fit the screen
-    for start in range(0, len(cols), per_row):
-        cv.add("  " + "".join(f"{j + 1:>3} {_fit(g.dests[j].label, 30):<31}" for j in cols[start:start + per_row]), "dim")
+        at = di.index(st.patch_dst) if st.patch_dst in di else 0
+        cols = [di[k] for k in _window(len(di), at, cols_fit)]
+        shown += cols
+        entries = [(" " * (label_w + 2) + "".join(f"{j + 1:>3}" for j in cols), [(0, inner, "title")], [], False)]
+        for i in _with_heads(srcs, si):
+            if isinstance(i, str):
+                if i != "MIDI":
+                    entries.append((f"  {i}", [(0, inner, "title")], [], False))
+                continue
+            cells = ""
+            for j in cols:
+                mark = _STATE_MARK[g.state(srcs[i], g.dests[j])]
+                cells += f"[{mark}]" if (i, j) == (st.patch_src, st.patch_dst) else f" {mark} "
+            sel = i == st.patch_src
+            spans = []
+            if sel:
+                c0 = 2 + label_w + 3 * cols.index(st.patch_dst) if st.patch_dst in cols else None
+                spans = [(0, 2 + label_w, "anchor_src")] + ([(c0, c0 + 3, "bar_dst")] if c0 is not None else [])
+            hits = [(2 + label_w + 3 * k, 5 + label_w + 3 * k, ("patch_cell", i, j)) for k, j in enumerate(cols)]
+            entries.append((f"{'> ' if sel else '  '}{_fit(srcs[i].label, label_w):<{label_w}}{cells}", spans, hits,
+                            sel and not menu))
+            if sel:
+                for k, (text, lit, target) in enumerate(menu):
+                    entries.append(("    " + text, [(4, 4 + len(text), lit)] if lit else [],
+                                    [(4, 4 + len(text), target)] if target else [], k == len(menu) - 1))
+        lines += _framed(title, entries, cv.width, "head_src")
+    per_row = max(1, inner // 35)  # as many "nn name" columns as fit the screen
+    key = [("".join(f"{j + 1:>3} {_fit(g.dests[j].label, 30):<31}" for j in shown[k:k + per_row]), [(0, inner, "dim")],
+            [], False) for k in range(0, len(shown), per_row)]
+    key = _framed("Destinations", key, cv.width, "head_dst")  # pinned under the grids: the numbers need it
+    _draw_page(cv, lines, max(1, room - len(key)))
+    for text, style, hits, _ in key:
+        cv.add(text, style)
 
 
 def _render_port_matrix(cv, st, g, s, d, room):
-    """Source ports down the side, destination ports across the top; one cell per possible link."""
-    cv.add(f"  Ports: {s.label} → {d.label}", "title")
+    """Source ports down the side, destination ports across the top; one cell per possible link. Its own box."""
     st.patch_port_row = max(0, min(len(s.ports) - 1, st.patch_port_row))
     st.patch_port_col = max(0, min(len(d.ports) - 1, st.patch_port_col))
+    inner = cv.width - 4
     row_w = max(4, max((len(p.channel) for p in s.ports), default=0)) + 2
     cell_w = max(5, max((len(p.channel) for p in d.ports), default=0) + 2)
-    cols = list(_window(len(d.ports), st.patch_port_col, max(1, (cv.width - 2 - row_w) // cell_w)))
-    cv.add(" " * (2 + row_w) + "".join(d.ports[j].channel.center(cell_w) for j in cols), "title")
-    for i in _window(len(s.ports), st.patch_port_row, max(1, room - 2)):
+    cols = list(_window(len(d.ports), st.patch_port_col, max(1, (inner - 2 - row_w) // cell_w)))
+    entries = [(" " * (2 + row_w) + "".join(d.ports[j].channel.center(cell_w) for j in cols), [(0, inner, "title")],
+                [], False)]
+    for i in range(len(s.ports)):
         cells = ""
         for j in cols:
             mark = "●" if (s.ports[i].id, d.ports[j].id) in g.links else "·"
@@ -2810,10 +2878,9 @@ def _render_port_matrix(cv, st, g, s, d, room):
         if sel:
             c0 = 2 + row_w + cell_w * cols.index(st.patch_port_col) if st.patch_port_col in cols else None
             spans = [(0, 2 + row_w, "anchor_src")] + ([(c0, c0 + cell_w, "bar_dst")] if c0 is not None else [])
-        row = cv.add(f"{'> ' if sel else '  '}{s.ports[i].channel:<{row_w}}{cells}", ("normal", spans))
-        for k, j in enumerate(cols):
-            c0 = 2 + row_w + cell_w * k
-            cv.hit(row, c0, c0 + cell_w, ("patch_pcell", i, j))
+        hits = [(2 + row_w + cell_w * k, 2 + row_w + cell_w * (k + 1), ("patch_pcell", i, j)) for k, j in enumerate(cols)]
+        entries.append((f"{'> ' if sel else '  '}{s.ports[i].channel:<{row_w}}{cells}", spans, hits, sel))
+    _draw_page(cv, _framed(f"{s.label} → {d.label}", entries, cv.width), room)
 
 
 # --- Devices tab: Enter-driven action menus ------------------------------------------------

@@ -23,6 +23,12 @@ def render(st, width=140, height=80):
     return pc.render_screen(st, {}, None, width, height, patch=G)
 
 
+def cols(t):
+    """(left, right) box text of a side-by-side Patch line (boxes since the QA pass, 2026-10-26)."""
+    lw = len(t) // 2
+    return (t[2:lw - 2], t[lw + 2:-2]) if t.startswith("│") else ("", "")
+
+
 def key(st, *keys):
     actions = []
     for k in keys:
@@ -33,26 +39,25 @@ def key(st, *keys):
 
 def test_column_view_has_a_midi_heading_on_both_sides():
     lines, hits = render(pc.UIState(tab="patch"))
-    left = [t.split("│")[0].strip() for t, _ in lines]
-    right = [t.split("│")[1].strip() if "│" in t else "" for t, _ in lines]
-    head = left.index("MIDI")
-    assert head < next(i for i, t in enumerate(left) if "KB16-01 MIDI 1" in t)
-    assert "title" in str(lines[head][1])
-    assert not [h for h in hits if h[0] == head and h[3][0] == "patch_src"]
-    assert "MIDI" in right and right.index("MIDI") < next(i for i, t in enumerate(right) if "nanoKONTROL2" in t)
+    # The MIDI pair of boxes sits under the audio pair; its titles are the headings (QA pass, 2026-10-26).
+    text = [t for t, _ in lines]
+    head = next(i for i, t in enumerate(text) if t.startswith("┌─ MIDI sources") and "┌─ MIDI destinations" in t)
+    assert head < next(i for i, t in enumerate(text) if "KB16-01 MIDI 1" in cols(t)[0])
+    assert head < next(i for i, t in enumerate(text) if "nanoKONTROL2" in cols(t)[1])
+    assert "head_src" in str(lines[head][1]) and not [h for h in hits if h[0] == head and h[3][0] == "patch_src"]
 
 
 def test_kb16_shows_its_link_count():
     lines, _ = render(pc.UIState(tab="patch"))
-    row = next(t for t, _ in lines if "KB16-01 MIDI 1" in t.split("│")[0])
-    assert "●1" in row.split("│")[0]
+    row = next(t for t, _ in lines if "KB16-01 MIDI 1" in cols(t)[0])
+    assert "●1" in cols(row)[0]
 
 
 def test_grid_view_has_the_midi_heading():
     lines, _ = render(pc.UIState(tab="patch", patch_view="grid"))
     text = [t for t, _ in lines]
-    head = next(i for i, t in enumerate(text) if t.strip() == "MIDI")
-    assert head < next(i for i, t in enumerate(text) if "KB16-01 MIDI 1" in t and "[" not in t[:2])
+    head = next(i for i, t in enumerate(text) if t.startswith("┌─ MIDI "))       # the MIDI grid box
+    assert head < next(i for i, t in enumerate(text) if "KB16-01 MIDI 1" in t and "[" not in t[:4])
 
 
 def test_enter_on_audio_to_midi_explains_and_links_nothing():

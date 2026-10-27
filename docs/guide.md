@@ -162,14 +162,16 @@ Name a bus on the Mixer like any channel; a bus shows its new name after the nex
 
 ## Patch: what goes where
 
-Sources on the left (apps playing, inputs, buses), destinations on the right (apps recording, outputs,
-buses). Select a source, then `→` into the destinations and press Enter to connect or disconnect.
+Two boxes side by side: **Sources** on the left (apps playing, inputs, buses), **Destinations** on the right
+(apps recording, outputs, buses). MIDI has its own pair below, **MIDI sources** and **MIDI destinations**. Select
+a source, then `→` into the destinations and press Enter to connect or disconnect. The page scrolls to keep the
+cursor in view.
 
 ![Patch, column view](guide/patch.png)
 
 - ● next to a destination: the selected source goes there. `●3` next to a source: it feeds three
   destinations.
-- The line under the lists names everything the selected source feeds.
+- The status line says how many links the selected source has, or the selected pair's state.
 - Connecting pairs channels up (FL→FL, FR→FR). A mono source feeds both.
 - Links made here are live. PipeWire may not keep them after a restart; saved patch sets are planned
   with scenes.
@@ -204,7 +206,7 @@ App streams carry their own names when they give one: OBS's inputs read `OBS · 
 
 ### MIDI
 
-MIDI ports are listed after the audio, under a **MIDI** heading on both sides: controllers and
+MIDI ports are in the MIDI pair of boxes, under the audio: controllers and
 interfaces by their port name (`nanoKONTROL2 _ CTRL`, `GCS-8 MIDI 1`), and apps like REAPER by name.
 Connect them the same way, with Enter. MIDI only connects to MIDI; Enter on an audio destination says
 so and changes nothing.
@@ -214,8 +216,9 @@ From the command line, a MIDI source picks the app's MIDI input:
 
 ### Grid view
 
-`g` shows every source against every destination: ● connected, ◐ one channel only, · not connected.
-The numbers across the top are the destinations in the key below the grid.
+`g` shows sources against destinations: ● connected, ◐ one channel only, · not connected. Audio and MIDI are
+separate boxes, each with its own kind of destination across the top, and ←→ stay on that kind. The numbers
+are the destinations in the **Destinations** box, which stays at the bottom so the numbers always have their key.
 
 ![Patch, grid view](guide/patch-grid.png)
 
@@ -230,8 +233,8 @@ Pick **In 3-4** and the selected source records into REAPER's inputs 3 and 4.
 
 ### Port by port
 
-`p` opens a port matrix for the selected pair, for patches like CH 2's left channel into REAPER in3
-only. Enter links or unlinks the port under the cursor.
+`p` opens a port matrix for the selected pair, in a box titled with the pair, for patches like CH 2's left
+channel into REAPER in3 only. Enter links or unlinks the port under the cursor.
 
 ![The port matrix](guide/patch-ports.png)
 

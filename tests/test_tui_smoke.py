@@ -145,7 +145,7 @@ def test_patch_tab_shows_both_views(app):
     app.send("g")
     app.expect("column view")
     app.send("p")
-    app.expect("Ports:")
+    app.expect("back")  # the port matrix's key box: p Esc back
     app.quit()
     assert app.wait_exit() == 0
 

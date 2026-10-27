@@ -29,6 +29,12 @@ def patch_lines(theme="dark", **kw):
     return pc.render_screen(st, {}, None, 100, 40, patch=G)[0]
 
 
+
+def cols(t):
+    """(left, right) box text of a side-by-side Patch line (boxes since the QA pass, 2026-10-26)."""
+    lw = len(t) // 2
+    return (t[2:lw - 2], t[lw + 2:-2]) if t.startswith("│") else ("", "")
+
 def test_every_theme_has_the_dot_roles():
     for t in pc.THEMES.values():
         assert {"src", "dst", "dst_partial"} <= set(t)
@@ -60,37 +66,37 @@ def test_portal_light_is_light_and_portal_dark_is_dark():
 
 def test_patch_dots_use_source_and_destination_roles():
     lines = patch_lines(patch_side="dst")  # cursor on the destinations, so the source row isn't the active bar
-    text, style = next((t, s) for t, s in lines if t.lstrip("> *").startswith("Discord") and "│" in t)
+    text, style = next((t, s) for t, s in lines if cols(t)[0].lstrip("> *").startswith("Discord"))
     assert role_at(style, text.index("●")) == "src@anchor_src"
-    dst_text, dst_style = next((t, s) for t, s in lines if "GCS-8 CH 4-AUX" in t and "│" in t)
-    col = dst_text.index("●", dst_text.index("│"))
-    assert role_at(dst_style, col) in ("dst", "dst@bar_dst")
+    half = len(text) // 2
+    dst_text, dst_style = next((t, s) for t, s in lines if "GCS-8 CH 4-AUX" in cols(t)[1])
+    assert role_at(dst_style, dst_text.index("●", half)) in ("dst", "dst@bar_dst")
     # a destination row that isn't under the cursor shows the dst role itself
-    dots = [(t, s) for t, s in lines if "│" in t and "●" in t.split("│")[1]]
-    assert any(role_at(s, t.index("●", t.index("│"))) == "dst" for t, s in dots) or len(dots) == 1
+    dots = [(t, s) for t, s in lines if "●" in cols(t)[1]]
+    assert any(role_at(s, t.index("●", half)) == "dst" for t, s in dots) or len(dots) == 1
 
 
 def test_source_dot_is_src_off_the_cursor():
     lines = patch_lines()  # cursor on the sources: Discord's bar is "selected", other linked sources show src
-    linked = [(t, s) for t, s in lines if "│" in t and "●" in t.split("│")[0] and not t.startswith(("> ", "* "))]
+    linked = [(t, s) for t, s in lines if "●" in cols(t)[0] and not cols(t)[0].startswith(("> ", "* "))]
     assert linked and all(role_at(s, t.index("●")) == "src" for t, s in linked)
 
 
 def test_dot_under_a_bar_keeps_its_colour():
     # Skrappjaw: the dots were white when highlighted; they keep blue/orange on the bar's background
     lines = patch_lines()
-    text, style = next((t, s) for t, s in lines if t.startswith("> ") and "│" in t)
-    assert "●" in text.split("│")[0]
+    text, style = next((t, s) for t, s in lines if cols(t)[0].startswith("> "))
+    assert "●" in cols(text)[0]
     assert role_at(style, text.index("●")) == "src@bar_src"
-    assert role_at(style, 0) == "bar_src"
+    assert role_at(style, 2) == "bar_src"                   # inside the box frame
     lines = patch_lines(patch_side="dst")
-    text, style = next((t, s) for t, s in lines if "│" in t and "> " in t.split("│")[1])
-    right = text.index("│")
-    assert role_at(style, right + 3) == "bar_dst"
+    text, style = next((t, s) for t, s in lines if cols(t)[1].startswith("> "))
+    right = len(text) // 2 + 2
+    assert role_at(style, right + 1) == "bar_dst"
     if "●" in text[right:]:
         assert role_at(style, text.index("●", right)) == "dst@bar_dst"
-    src_row = next((t, s) for t, s in lines if t.startswith("* "))
-    assert role_at(src_row[1], 0) == "anchor_src"
+    src_row = next((t, s) for t, s in lines if cols(t)[0].startswith("* "))
+    assert role_at(src_row[1], 2) == "anchor_src"
 
 
 @pytest.mark.parametrize("name", ["pipeos-lite", "pipeos-dark"])
@@ -278,7 +284,7 @@ def test_patch_slot_menu_edges_are_orange():
     st, _ = reaper_menu()
     st.theme = "pipeos-dark"
     lines = pc.render_screen(st, {}, None, 100, 40, patch=GR)[0]
-    text, style = next((t, s) for t, s in lines if "┌─" in t)
+    text, style = next((t, s) for t, s in lines if t.startswith("│") and "┌─" in t)  # the menu, inside its box
     assert role_at(style, text.index("┌")) == "head_dst"
 
 

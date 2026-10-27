@@ -20,6 +20,12 @@ def stream(app, media, binary=None, cls="Stream/Input/Audio"):
             "application.process.binary": binary or app.lower()}
 
 
+
+def cols(t):
+    """(left, right) box text of a side-by-side Patch line (boxes since the QA pass, 2026-10-26)."""
+    lw = len(t) // 2
+    return (t[2:lw - 2], t[lw + 2:-2]) if t.startswith("│") else ("", "")
+
 def test_obs_streams_carry_their_media_name():
     assert pi.display_name(stream("OBS", "Desktop Audio", "obs")) == "OBS · Desktop Audio"
     assert pi.display_name(stream("OBS", "Mic/Aux 2", "obs")) == "OBS · Mic/Aux 2"
@@ -77,18 +83,19 @@ def render(dump, width=140, height=60, **st):
 
 def test_column_view_has_a_monitors_heading_above_the_monitors():
     dump, label = with_monitor_link()
-    left = [t.split("│")[0].rstrip() for t, _ in render(dump)]
+    lines = [t for t, _ in render(dump)]
+    left = [cols(t)[0].rstrip() for t in lines]
     head = next(i for i, t in enumerate(left) if t.strip() == "Monitors")
     mon = next(i for i, t in enumerate(left) if label in t)
     assert head < mon
     assert all("(monitor)" not in t for t in left[:head])
-    assert left.index(next(t for t in left if t.strip().startswith("Sources"))) < head
+    assert next(i for i, t in enumerate(lines) if t.startswith("┌─ Sources")) < head   # inside the Sources box
 
 
 def test_monitors_heading_is_a_title_and_not_clickable():
     dump, _ = with_monitor_link()
     lines, hits = pc.render_screen(pc.UIState(tab="patch"), {}, None, 140, 60, patch=pp.graph(dump))
-    i = next(n for n, (t, _) in enumerate(lines) if t.split("│")[0].strip() == "Monitors")
+    i = next(n for n, (t, _) in enumerate(lines) if cols(t)[0].strip() == "Monitors")
     assert ("title" in str(lines[i][1]))
     assert not [h for h in hits if h[0] == i and h[3][0] == "patch_src"]
 
@@ -101,7 +108,7 @@ def test_no_monitors_heading_without_monitors():
 def test_grid_view_has_the_heading_too():
     dump, label = with_monitor_link()
     text = [t for t, _ in render(dump, patch_view="grid")]
-    head = next(i for i, t in enumerate(text) if t.strip() == "Monitors")
+    head = next(i for i, t in enumerate(text) if t.strip(" │") == "Monitors")   # a heading inside the Audio box
     assert head < next(i for i, t in enumerate(text) if label in t)
 
 
@@ -111,4 +118,4 @@ def test_cursor_still_walks_every_source():
     srcs = pc.patch_sources(g, pc.UIState(tab="patch"))
     st = pc.UIState(tab="patch", patch_src=len(srcs) - 1)
     lines = render(dump, patch_src=len(srcs) - 1)
-    assert any(t.startswith("> ") and label in t for t, _ in lines)
+    assert any(t.startswith("│ > ") and label in t for t, _ in lines)
