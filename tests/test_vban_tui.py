@@ -91,3 +91,36 @@ def test_outgoing_detect_finding_nothing(monkeypatch):
     t = tui([])
     t._do_vban(None, ("vban_detect", "out"))
     assert t.st.message == "found no computers on this network; use Manual" and t.st.pick is None
+
+
+def test_incoming_detect_falls_back_to_the_search_when_the_port_is_held(monkeypatch):
+    def held(seconds=2.0):
+        raise pipewrench.CliError("port 6980 is in use", 1)
+    f = pv.Found("192.168.1.23", "den-pc", False)
+    monkeypatch.setattr(pipewrench, "_vban_detect", held)
+    monkeypatch.setattr(pipewrench, "_find_machines", lambda runner, address, known=None, listen=True: [f])
+    t = tui([])
+    t._do_vban(None, ("vban_detect", "in"))
+    assert t.st.pick[0] == "detect" and t.st.pick[4] == (("den-pc · 192.168.1.23", f),)
+    t._do_vban(None, ("vban_found", "in", f))
+    e = json.loads(pv.config_path().read_text())["incoming"][0]
+    assert (e["name"], e["ip"], e["stream"], e["port"]) == ("den-pc", "192.168.1.23", "", 6980)
+    assert t.st.pick[3] == "Select Playback Destination"
+
+
+def test_incoming_detect_leaves_a_heard_sender_out_of_the_found_list(monkeypatch):
+    h = pv.Heard("studio-pc", "audio", 48000, 2, "S16LE")
+    monkeypatch.setattr(pipewrench, "_vban_detect", lambda seconds=2.0: [("192.168.1.86", h)])
+    monkeypatch.setattr(pipewrench, "_find_machines", lambda runner, address, known=None, listen=True:
+                        [pv.Found("192.168.1.86", "studio-pc", False), pv.Found("192.168.1.23", "den-pc", False)])
+    t = tui([])
+    t._do_vban(None, ("vban_detect", "in"))
+    assert [label for label, _ in t.st.pick[4]] == ["studio-pc · 192.168.1.86 · 48 kHz · 2 ch", "den-pc · 192.168.1.23"]
+
+
+def test_incoming_detect_with_nothing_anywhere(monkeypatch):
+    monkeypatch.setattr(pipewrench, "_vban_detect", lambda seconds=2.0: [])
+    monkeypatch.setattr(pipewrench, "_find_machines", lambda runner, address, known=None, listen=True: [])
+    t = tui([])
+    t._do_vban(None, ("vban_detect", "in"))
+    assert t.st.message == "heard and found nothing on this network; use Manual"

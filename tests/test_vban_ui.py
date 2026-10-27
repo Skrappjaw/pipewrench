@@ -208,14 +208,6 @@ def test_pick_esc_cancels():
     assert st.pick is None and actions == [] and st.message == "cancelled"
 
 
-def test_heard_pick_hands_back_the_stream():
-    h = pv.Heard("Studio", "audio", 48000, 2, "S16LE")
-    st = pc.open_pick(state(view()), pc.heard_pick("in", [("192.168.1.86", h)]))
-    assert st.pick[4][0][0] == "Studio · 192.168.1.86 · 48 kHz · 2 ch"
-    _, actions = key(st, "enter")
-    assert actions == [("vban_heard", "in", ("192.168.1.86", h))]
-
-
 def test_a_stream_that_went_away_mid_pick():
     st = state(view([envy_in()]), cursor=2)
     st, _ = key(st, "enter")
@@ -317,3 +309,15 @@ def test_found_pick_hands_back_the_machine():
     assert st.pick[3] == "Machines on the network" and st.pick[4][0][0] == "studio-pc · 192.168.1.86 · sends VBAN"
     _, actions = key(st, "enter")
     assert actions == [("vban_found", "out", f)]
+
+
+def test_incoming_detect_lists_heard_streams_then_found_machines():
+    h = pv.Heard("studio-pc", "audio", 48000, 2, "S16LE")
+    f = pv.Found("192.168.1.23", "den-pc", False)
+    st = pc.open_pick(state(view()), pc.detect_pick([("192.168.1.86", h)], [f]))
+    assert [label for label, _ in st.pick[4]] == ["studio-pc · 192.168.1.86 · 48 kHz · 2 ch", "den-pc · 192.168.1.23"]
+    _, actions = key(st, "enter")
+    assert actions == [("vban_heard", "in", ("192.168.1.86", h))]
+    _, actions = key(st, "down", "enter")
+    assert actions == [("vban_found", "in", f)]
+    assert pc.popup_view(pc.UIState(popup=("vban_add", "in")))[1] == "Listen for VBAN senders and search the network, or type one in."

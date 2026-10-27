@@ -1342,7 +1342,7 @@ POPUPS = {
     "vban_add": ("Add stream", [("Detect on network", "detect"), ("Manual", "manual"), ("Cancel", "cancel")], 2),
     "vban_remove": ("Remove stream", [("Remove", "ok"), ("Cancel", "cancel")], 1),
 }
-VBAN_ADD_TEXT = {"in": "Listen for VBAN senders on the network, or type one in.",
+VBAN_ADD_TEXT = {"in": "Listen for VBAN senders and search the network, or type one in.",
                  "out": "Search the network for computers to send to, or type one in."}
 PW_DOWN_TEXT = "PipeWire stopped answering. PipeWrench keeps the last screen and checks again every 5 s."
 
@@ -3096,10 +3096,12 @@ def target_pick(view, d, e):
     return ("target", d, e["id"], PICK_TITLES[d], items)
 
 
-def heard_pick(d, heard):
-    """heard: [(ip, pwvban.Heard)] from Detect."""
-    title = "Heard on the network"
-    return ("heard", d, None, title, tuple((pv.heard_label(h, ip), (ip, h)) for ip, h in heard))
+def detect_pick(heard, found):
+    """Incoming's Detect: streams heard (format known) first, then computers the search found (Skrappjaw, 2026-10-26:
+    "if vban cant do what we want on this version then nmap can be the workaround")."""
+    items = tuple((pv.heard_label(h, ip), (ip, h)) for ip, h in heard)
+    items += tuple((pv.found_label(f), f) for f in found)
+    return ("detect", "in", None, "Heard on the network", items)
 
 
 def found_pick(found):
@@ -3150,8 +3152,10 @@ def _key_pick(st, key):
     st.pick = None
     if purpose == "heard":
         return st, [("vban_heard", d, value)]
-    if purpose == "found":
+    if purpose == "found" or (purpose == "detect" and isinstance(value, pv.Found)):
         return st, [("vban_found", d, value)]
+    if purpose == "detect":
+        return st, [("vban_heard", d, value)]
     e = net_entry(st.net, d, eid)
     if e is None:
         st.message = st.failed = "that stream has gone"

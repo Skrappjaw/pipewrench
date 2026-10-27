@@ -200,7 +200,9 @@ def _copy(c):
 
 
 def add_entry(c, direction, e, rules):
-    """Add a stream with a unique id. Before 1.4.2 an incoming stream takes the next free port from 6980."""
+    """Add a stream with a unique id. Before 1.4.2 an incoming stream takes the next free port from 6980. An outgoing
+    stream takes the next port free *to that machine* (Skrappjaw, 2026-10-26: "iterate on ports when adding out going
+    streams"): a receiver before 1.4.2 keeps one stream per port, so two to one machine need two ports."""
     c = _copy(c)
     rows = c[_key(direction)]
     ids = {x["id"] for x in rows}
@@ -209,6 +211,9 @@ def add_entry(c, direction, e, rules):
         e["id"], n = f"{base}-{n}", n + 1
     if direction == "in" and not rules:
         used = {x["port"] for x in rows}
+        e["port"] = next(p for p in range(PORT, PORT + 1000) if p not in used)
+    elif direction == "out":
+        used = {x["port"] for x in rows if x["ip"] == e["ip"]}
         e["port"] = next(p for p in range(PORT, PORT + 1000) if p not in used)
     rows.append(e)
     validate_config(c)
@@ -534,5 +539,6 @@ def found_label(f):
     return " · ".join(x for x in (f.name, f.ip, "sends VBAN" if f.vban else "") if x)
 
 
-def from_found(f, host):
-    return new_entry("out", f.name or f.ip, f.ip, host)
+def from_found(f, host, direction="out"):
+    """A stream to or from a machine the search found. Incoming takes the usual format: Format… if it differs."""
+    return new_entry(direction, f.name or f.ip, f.ip, host)

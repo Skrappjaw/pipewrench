@@ -367,9 +367,11 @@ The page has three boxes:
 
 **Add a stream.** Enter on **+ Add stream…** in either box, then pick:
 
-- **Detect on network**: on Incoming it listens for 2 seconds and lists what's arriving ("Studio ·
-  192.168.1.86 · 48 kHz · 2 ch"); pick one and its name, address and format are filled in. On Outgoing it
-  searches your network for computers (about 5 seconds) and lists each by name and address, named by your
+- **Detect on network**: on Incoming it listens for 2 seconds and lists what's arriving first ("Studio ·
+  192.168.1.86 · 48 kHz · 2 ch"; pick one and its name, address and format are filled in), then the
+  computers the network search finds (pick one and set Format… to match its sender). The search covers
+  the times listening can't: PipeWire before 1.4.2 holds port 6980 once you have an incoming stream, and a
+  sender that isn't sending yet can't be heard. On Outgoing it searches your network for computers (about 5 seconds) and lists each by name and address, named by your
   router, with ones already sending VBAN first ("studio-pc · 192.168.1.86 · sends VBAN"). Phones, TVs,
   cameras and the router are left out. It never shows what a machine runs, only that it's there.
   The search uses `nmap` when it's installed (`sudo apt install nmap`); without it it still finds the
@@ -393,7 +395,8 @@ Remove (it asks first). Format… has the common ones (48 kHz 16-bit stereo, whi
 - **PipeWire before 1.4.2** (Linux Mint 22 has 1.0.5) takes one incoming stream per port, so each incoming
   stream gets its own port: 6980, then 6981 and so on. The status line says what to point the sender at
   ("sends to 192.168.1.99:6981"). From 1.4.2 they all share 6980 and PipeWrench tells senders apart by
-  their address.
+  their address. Outgoing works the same way round: a second stream to the same machine goes to 6981, a
+  third to 6982, so a receiver before 1.4.2 can take each one. Streams to different machines all use 6980.
 - **An incoming stream plays where you picked every time it starts**, even with PipeWrench closed. An
   outgoing stream's source, and MIDI, are linked by PipeWrench: if the source goes away and comes back (an
   app restarts), PipeWrench links it again within a few seconds while it's open, or the next time it starts.

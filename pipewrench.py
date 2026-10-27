@@ -790,14 +790,15 @@ def _probe(ip, ports, timeout=0.4):
     return False
 
 
-def _find_machines(runner, address, known=None):
+def _find_machines(runner, address, known=None, listen=True):
     """[pwvban.Found] on this machine's network for an outgoing stream: nmap's sweep (names from DNS) and the
     kernel's neighbours, kept if they answer like a computer or send VBAN. known: {ip: name} already sending
     here (incoming streams). nmap missing just means no sweep."""
     from concurrent.futures import ThreadPoolExecutor
     heard = dict(known or {})
     try:
-        heard.update({ip: h.stream for ip, h in _vban_detect(seconds=1.0)})
+        if listen:
+            heard.update({ip: h.stream for ip, h in _vban_detect(seconds=1.0)})
     except CliError:
         pass  # our own listener holds the port: the incoming streams stand in
     rc, text = _safe(runner, pv.ADDR_CMD)
@@ -1641,15 +1642,19 @@ class Tui:
             pc.open_pick(self.st, pc.found_pick(found))
             return
         if kind == "vban_detect":
-            self.st.message, self.st.failed = f"listening for VBAN on port {pv.PORT}…", ""
+            self.st.message, self.st.failed = "listening for VBAN and searching the network…", ""
             self._draw(scr)
-            heard = _vban_detect()
-            if not heard:
-                self.st.message = self.st.failed = (f"heard nothing on port {pv.PORT} in 2 s (a firewall can block it); "
-                                                    "point a sender here, or use Manual")
+            try:
+                heard = _vban_detect()
+            except CliError:
+                heard = []  # PipeWire's listener holds the port (1.0.5 with an incoming stream): the search stands in
+            senders = {ip for ip, _ in heard}
+            found = [f for f in _find_machines(self.runner, _local_address(), listen=False) if f.ip not in senders]
+            if not heard and not found:
+                self.st.message = self.st.failed = "heard and found nothing on this network; use Manual"
                 return
             self.st.message = ""
-            pc.open_pick(self.st, pc.heard_pick(d, heard))
+            pc.open_pick(self.st, pc.detect_pick(heard, found))
             return
         if kind in ("vban_manual", "vban_heard", "vban_found"):
             if kind == "vban_manual":
@@ -1661,7 +1666,7 @@ class Tui:
                     return
                 e = pv.new_entry(d, name, ip, socket.gethostname())
             elif kind == "vban_found":
-                e = pv.from_found(action[2], socket.gethostname())
+                e = pv.from_found(action[2], socket.gethostname(), d)
             else:
                 ip, heard = action[2]
                 e = pv.from_heard(d, heard, ip, socket.gethostname())

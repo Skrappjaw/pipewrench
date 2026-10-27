@@ -87,11 +87,21 @@ def test_add_entry_shares_the_port_with_rules():
     assert [e["port"] for e in c["incoming"]] == [6980, 6980]
 
 
-def test_outgoing_ports_stay_6980():
+def test_outgoing_ports_iterate_per_machine():
+    c = pv.default_config()
+    for n, ip in (("A", "10.0.0.1"), ("B", "10.0.0.1"), ("C", "10.0.0.2"), ("D", "10.0.0.1")):
+        c = pv.add_entry(c, "out", pv.new_entry("out", n, ip), rules=True)  # the far end's version is unknown
+    assert [(e["ip"], e["port"]) for e in c["outgoing"]] == [("10.0.0.1", 6980), ("10.0.0.1", 6981),
+                                                             ("10.0.0.2", 6980), ("10.0.0.1", 6982)]
+
+
+def test_outgoing_port_reused_after_a_remove():
     c = pv.default_config()
     for n in ("A", "B"):
         c = pv.add_entry(c, "out", pv.new_entry("out", n, "10.0.0.1"), rules=False)
-    assert [e["port"] for e in c["outgoing"]] == [6980, 6980]
+    c = pv.remove_entry(c, "out", "a")
+    c = pv.add_entry(c, "out", pv.new_entry("out", "C", "10.0.0.1"), rules=False)
+    assert sorted(e["port"] for e in c["outgoing"]) == [6980, 6981]
 
 
 def test_ports_skip_ones_in_use_after_a_remove():
