@@ -375,3 +375,24 @@ def test_unlink_the_old_source():
     assert pv.unlink_cmds("out", old, g) == [["pw-link", "-d", "1", "3"], ["pw-link", "-d", "2", "4"]]
     assert pv.unlink_cmds("in", {**pv.new_entry("in", "A", "10.0.0.1"), "target": "alsa_output.gcs8"}, g) == []
     assert pv.unlink_cmds("out", {**old, "target": None}, g) == []
+
+
+def test_incoming_manual_matches_by_ip_alone():
+    """With stream.rules, a typed-in sender must not be matched by its display name (Skrappjaw, 2026-10-26: the Studio
+    came back as "desktop")."""
+    e = pv.new_entry("in", "Studio", "192.168.1.86")
+    assert e["stream"] == ""
+    text = pv.render_listener([e], rules=True)
+    assert 'vban.ip = "192.168.1.86"' in text and "sess.name" not in text
+
+
+def test_outgoing_is_named_after_this_machine():
+    assert pv.new_entry("out", "desktop", "192.168.1.99", "studio-pc")["stream"] == "studio-pc"
+    assert 'sess.name = "studio-pc"' in pv.render_sender(pv.new_entry("out", "desktop", "192.168.1.99", "studio-pc"))
+
+
+def test_from_heard_outgoing_sends_back_under_this_host():
+    e = pv.from_heard("out", pv.Heard("Studio", "audio", 48000, 2, "S16LE"), "192.168.1.86", "desktop")
+    assert (e["name"], e["stream"]) == ("Studio", "desktop")
+    e = pv.from_heard("in", pv.Heard("studio-pc", "audio", 48000, 2, "S16LE"), "192.168.1.86", "desktop")
+    assert (e["name"], e["stream"]) == ("studio-pc", "studio-pc")

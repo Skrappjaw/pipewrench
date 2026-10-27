@@ -147,7 +147,7 @@ def test_enter_on_a_stream_opens_its_menu():
     st, _ = key(st, "enter")
     purpose, d, eid, title, items = st.pick
     assert (purpose, d, eid, title) == ("menu", "in", "studio", "Studio")
-    assert [label for label, _ in items] == ["Turn off", "Playback destination…", "Format…", "Remove"]
+    assert [label for label, _ in items] == ["Turn off", "Playback destination…", "Format…", "Rename…", "Remove"]
 
 
 def test_outgoing_menu_says_source_audio():
@@ -196,7 +196,7 @@ def test_menu_format():
 
 def test_menu_remove_asks_first():
     st = state(view([envy_in()]), cursor=2)
-    st, actions = key(st, "enter", "down", "down", "down", "enter")
+    st, actions = key(st, "enter", "down", "down", "down", "down", "enter")
     assert st.popup == ("vban_remove", "in", "studio", "Studio") and actions == []
     assert pc.popup_view(st)[1] == "Remove Studio? Its stream stops now."
     st, actions = key(st, "left", "enter")
@@ -245,10 +245,10 @@ def test_notes_explain_each_row():
     assert status_line(state(v, 0)).startswith("what other machines send to")
     assert "VBAN is built into PipeWire" in status_line(state(v, 1))
     assert status_line(state(v, 2)) == ("From Studio (sends to 192.168.1.99:6980) to GCS-8 CH USB"
-                                        " · Enter: turn off, destination, format, remove")
+                                        " · Enter: on/off, destination, format, rename, remove")
     assert "Enter: detect on network, manual" in status_line(state(v, 3))
-    assert status_line(state(v, 4)) == ("To Studio (192.168.1.86:6980) from Brave, an output in Mixer"
-                                        " · Enter: turn off, destination, format, remove")
+    assert status_line(state(v, 4)) == ("To Studio (192.168.1.86:6980), fed from Brave"
+                                        " · Enter: on/off, source, format, rename, remove")
     assert status_line(pc.UIState(tab="settings", settings_cat="network")).startswith("VBAN: audio and MIDI")
 
 
@@ -295,3 +295,9 @@ def test_tap_a_stream_row_then_tap_again_opens_its_menu():
 def test_narrow_screen_still_draws():
     for w in (60, 80):
         assert "Incoming streams" in text(state(view([envy_in()], [envy_out()])), width=w)
+
+
+def test_menu_rename():
+    st = state(view([envy_in()]), cursor=2)
+    st, actions = key(st, "enter", "down", "down", "down", "enter")
+    assert actions == [("vban_rename", "in", "studio")] and st.pick is None

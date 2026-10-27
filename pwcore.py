@@ -3049,7 +3049,7 @@ def _menu_box(title, labels, cursor, bar="selected", edge="title"):
 
 NET_BOXES = (("in", "incoming", "Incoming streams"), ("out", "outgoing", "Outgoing streams"))
 PICK_TITLES = {"in": "Select Playback Destination", "out": "Select Source Audio"}
-NET_MENU_WORDS = {"target": "destination", "format": "format", "remove": "remove"}  # the status line's short words
+NET_MENU_WORDS = {"toggle": "on/off", "target": "destination", "format": "format", "rename": "rename", "remove": "remove"}  # the status line's short words
 PICK_NOTE = "↑↓ to choose · Enter picks · Esc cancels"
 NET_NOTES = {"addr": "what other machines send to: this address, and the incoming stream's port",
              "pw": "VBAN is built into PipeWire; from 1.4.2 it tells senders apart by IP, before that it takes a port each",
@@ -3086,7 +3086,7 @@ def net_entry(view, d, eid):
 def stream_menu(d, e):
     return (("Turn off" if e["on"] else "Turn on", "toggle"),
             ("Playback destination…" if d == "in" else "Source audio…", "target"),
-            ("Format…", "format"), ("Remove", "remove"))
+            ("Format…", "format"), ("Rename…", "rename"), ("Remove", "remove"))
 
 
 def target_pick(view, d, e):
@@ -3159,6 +3159,8 @@ def _key_pick(st, key):
         return open_pick(st, target_pick(st.net, d, e), e.get("target")), []
     if value == "format":
         return open_pick(st, ("format", d, eid, f"Format: {e['name']}", tuple(pv.FORMAT_CHOICES)), _format_value(e)), []
+    if value == "rename":
+        return st, [("vban_rename", d, eid)]
     st.popup, st.popup_button = ("vban_remove", d, eid, e["name"]), None
     return st, []
 
@@ -3219,12 +3221,12 @@ def _network_note(st):
     e = net_entry(v, *rid)
     if e is None:
         return None
-    enter = " · Enter: " + ", ".join(NET_MENU_WORDS[op] if op != "toggle" else label.lower()
-                                     for label, op in stream_menu(rid[0], e))
+    words = {**NET_MENU_WORDS, "target": "destination" if rid[0] == "in" else "source"}
+    enter = " · Enter: " + ", ".join(words[op] for _, op in stream_menu(rid[0], e))
     where = _target_label(v, rid[0], e)
     if rid[0] == "in":
         return f"From {e['name']} ({pv.point_here(e, v.address or 'this machine')}) to {where}{enter}"
-    return f"To {e['name']} ({e['ip']}:{e['port']}) from {where}, an output in Mixer{enter}"
+    return f"To {e['name']} ({e['ip']}:{e['port']}), fed from {where}{enter}"
 
 
 def _overlay_pick(cv, st, width, height):

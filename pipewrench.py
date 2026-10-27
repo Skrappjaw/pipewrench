@@ -10,7 +10,7 @@ watch pw-top, and save the clock for the next PipeWire start.
     pwrench devices [list] | default | volume | mute | profile | restore | label | hide | bus | apply …
     pwrench patch [list] | connect SRC DST | disconnect SRC DST
     pwrench realtime             is PipeWire's audio realtime? and the fix if not
-    pwrench vban [list] | detect [SECONDS] | add in|out NAME IP [--to|--from NODE] [--midi] | on | off | remove
+    pwrench vban [list] | detect [SECONDS] | add in|out NAME IP [--to|--from NODE] [--midi] | connect | on | off …
     pwrench theme list | export ID [FILE] | check [FILE]   themes as TOML files (docs/themes.md)
 """
 import array
@@ -683,6 +683,8 @@ VBAN_USAGE = """usage:
   pwrench vban [list]
   pwrench vban detect [SECONDS]            VBAN streams arriving on port 6980
   pwrench vban add in|out NAME IP [--to NODE | --from NODE] [--midi]
+  pwrench vban connect in|out NAME NODE    where it plays (in) or what feeds it (out)
+  pwrench vban disconnect in|out NAME
   pwrench vban on|off|remove in|out NAME"""
 
 
@@ -827,7 +829,7 @@ def _vban(args, runner, out):
     try:
         if sub == "add" and len(rest) >= 3 and rest[0] in ("in", "out"):
             d, name, ip, opts = rest[0], rest[1], rest[2], rest[3:]
-            e = pv.new_entry(d, name, ip)
+            e = pv.new_entry(d, name, ip, socket.gethostname())
             if "--midi" in opts:
                 e["media"] = "midi"
                 opts = [o for o in opts if o != "--midi"]
@@ -839,6 +841,16 @@ def _vban(args, runner, out):
             e = c["incoming" if d == "in" else "outgoing"][-1]
             msg = f"added {e['name']}" + (f"; {e['name']} {pv.point_here(e, _local_address() or 'this machine')}"
                                           if d == "in" else "")
+        elif sub in ("connect", "disconnect") and len(rest) == (3 if sub == "connect" else 2) and rest[0] in ("in", "out"):
+            d, key = rest[0], rest[1]
+            e = pv.find(c, d, key)
+            g = _graph(runner)
+            target = _vban_target(g, d, rest[2], e["media"]) if sub == "connect" else None
+            for cmd in pv.unlink_cmds(d, e, g):  # the old one goes
+                _run(runner, cmd)
+            c = pv.update_entry(c, d, key, target=target)
+            ep = pv.target_endpoint(g, d, pv.find(c, d, key))
+            msg = f"{e['name']}: " + (f"{'→' if d == 'in' else '←'} {ep.label if ep else rest[2]}" if target else "not connected")
         elif sub in ("on", "off", "remove") and len(rest) == 2 and rest[0] in ("in", "out"):
             d, key = rest
             e = pv.find(c, d, key)
@@ -1568,15 +1580,16 @@ class Tui:
             return
         if kind in ("vban_manual", "vban_heard"):
             if kind == "vban_manual":
+                self._draw(scr)  # the popover's gone: show that before the prompts (Skrappjaw, 2026-10-26)
                 name = self._prompt(scr, "device name (empty cancels):")
                 ip = self._prompt(scr, f"{name}'s IP address (empty cancels):") if name else ""
                 if not (name and ip):
                     self.st.message = "cancelled"
                     return
-                e = pv.new_entry(d, name, ip)
+                e = pv.new_entry(d, name, ip, socket.gethostname())
             else:
                 ip, heard = action[2]
-                e = pv.from_heard(d, heard, ip)
+                e = pv.from_heard(d, heard, ip, socket.gethostname())
             c = pv.add_entry(c, d, e, rules)
             e = c["incoming" if d == "in" else "outgoing"][-1]
             self._vban_apply(c, rules, f"added {e['name']}")
@@ -1594,6 +1607,14 @@ class Tui:
                    f"{e['name']}: not connected" if not ch.get("target") else
                    f"{e['name']} {'→' if d == 'in' else '←'} {pc._target_label(self.st.net, d, pv.find(c, d, action[2]))}"
                    if self.st.net else f"{e['name']} connected")
+        elif kind == "vban_rename":
+            self._draw(scr)
+            name = self._prompt(scr, f"new name for {e['name']} (empty keeps it):", e["name"])
+            if name == e["name"]:
+                self.st.message = "name unchanged"
+                return
+            c = pv.update_entry(c, d, action[2], name=name.strip())
+            msg = f"renamed {e['name']} to {name.strip()}"
         elif kind == "vban_format":
             c = pv.set_format(c, d, action[2], action[3])
             msg = f"{e['name']}: {pv.format_label(pv.find(c, d, action[2]))}"

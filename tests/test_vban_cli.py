@@ -181,3 +181,19 @@ def test_detect_refused_while_the_port_is_held(monkeypatch):
     monkeypatch.setattr(pipewrench.socket, "socket", Sock)
     rc, _, err, _ = run("detect")
     assert rc == 1 and "port 6980 is in use" in err
+
+
+def test_connect_and_disconnect(xdg):
+    run("add", "in", "Studio", "192.168.1.86")
+    rc, out, err, _ = run("connect", "in", "Studio", GCS8_CH4)
+    assert rc == 0, err
+    assert out == f"Studio: → {GCS8_CH4}\n" and saved()["incoming"][0]["target"].startswith("alsa_output.usb-BOSS")
+    assert "target.object" in (xdg / "pipewrench" / "vban" / "in-studio.conf").read_text()
+    rc, out, _, _ = run("disconnect", "in", "Studio")
+    assert out == "Studio: not connected\n" and saved()["incoming"][0]["target"] is None
+
+
+def test_outgoing_stream_name_is_this_host(monkeypatch):
+    monkeypatch.setattr(pipewrench.socket, "gethostname", lambda: "studio-pc")
+    run("add", "out", "desktop", "192.168.1.99")
+    assert saved()["outgoing"][0]["stream"] == "studio-pc"

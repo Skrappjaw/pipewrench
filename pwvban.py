@@ -110,17 +110,27 @@ def _slug(name):
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "stream"
 
 
-def new_entry(direction, name, ip):
-    """A stream with the defaults most senders use (48 kHz, 16-bit, stereo: Voicemeeter's too)."""
+def new_entry(direction, name, ip, host=None):
+    """A stream with the defaults most senders use (48 kHz, 16-bit, stereo: Voicemeeter's too). name is the other
+    machine. An outgoing stream is named after this one (host), so the far end sees who's sending; an incoming
+    one matches the sender by IP alone until a stream name is heard (from_heard)."""
     _key(direction)
     pcfg._check_text(name, "name")
     name = name.strip()
-    return {"id": _slug(name), "name": name, "ip": check_ip(ip), "port": PORT, "stream": name[:STREAM_MAX],
+    stream = _stream_name(host or name) if direction == "out" else ""
+    return {"id": _slug(name), "name": name, "ip": check_ip(ip), "port": PORT, "stream": stream,
             "media": "audio", "rate": 48000, "format": "S16LE", "channels": 2, "target": None, "on": True, "latency": 40}
 
 
-def from_heard(direction, heard, ip):
-    e = {**new_entry(direction, heard.stream or ip, ip), "stream": (heard.stream or "")[:STREAM_MAX], "media": heard.media}
+def _stream_name(text):
+    return re.sub(r'["\\]', "", text)[:STREAM_MAX]
+
+
+def from_heard(direction, heard, ip, host=None):
+    """A stream filled in from what Detect heard. Incoming matches that stream; outgoing sends back under host."""
+    e = {**new_entry(direction, heard.stream or ip, ip, host), "media": heard.media}
+    if direction == "in":
+        e["stream"] = _stream_name(heard.stream or "")
     if heard.media == "audio":
         e.update(rate=heard.rate, channels=heard.channels, format=heard.format)
     return e
