@@ -125,5 +125,6 @@ def test_a_message_still_wins_the_status_bar():
     assert "saved" in out[-1][0] and "the bar under" not in out[-1][0]
 
 
-def test_no_note_off_the_display_rows():
-    assert lines(prefs(cursor=pc.RESET_KEYS_ROW), 40)[-1][0].strip() == pc.HINTS.get("settings", "").strip()
+def test_every_preferences_row_has_a_note():
+    # Skrappjaw, 2026-10-26: "Everything gets an explainer and a defined set of actions."
+    assert "every key back" in lines(prefs(cursor=pc.RESET_KEYS_ROW), 40)[-1][0]

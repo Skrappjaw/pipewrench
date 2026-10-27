@@ -197,7 +197,7 @@ def test_rows_show_connections():
 def test_legend_leads_with_enter_and_fits_80():
     lines, _ = screen(pc.UIState(tab="devices", message="hello"), width=80)
     text = re.sub(r"[ │]+", " ", body(lines))  # chips pad keys with spaces
-    for k in ("↑↓ select", "Enter actions", "m monitors", "h show hidden", "q quit"):
+    for k in ("m monitors", "h show hidden", "q quit"):
         assert k in text, k
     for gone in ("←→ volume", "Space mute", "d default"):
         assert gone not in text, gone

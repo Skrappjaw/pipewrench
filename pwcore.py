@@ -373,9 +373,6 @@ class UIState:
     patch_port_col: int = 0      # destination port
     patch_menu: bool = False     # the slot menu under the destination
     patch_menu_cursor: int = 0
-    patch_head: bool = False     # the View line above the columns has the cursor (↑ from the first source)
-    patch_head_menu: bool = False
-    patch_head_cursor: int = 0
     popup: tuple = None          # the open popover: a kind tuple (POPUPS), answered with ←→ and Enter
     popup_button: int = None     # its selected button; None is the kind's default (Cancel, or the only one)
     message: str = ""
@@ -526,7 +523,7 @@ def _leave(st):
     dropped = bool(st.pending)
     st.pending, st.editing, st.edit_from, st.key_capture = {}, False, None, None
     st.mix_menu = st.dev_menu = None
-    st.patch_menu = st.patch_ports = st.patch_head = st.patch_head_menu = False
+    st.patch_menu = st.patch_ports = False
     st.settings_focus, st.cursor = "menu", 0
     if dropped:
         st.message = "unapplied changes dropped"
@@ -836,6 +833,12 @@ def _key_devices(st, key, devices):
     return st, []
 
 
+def _tap(event, selected):
+    """A tap on a row selects it; a tap on the row already selected is Enter (Skrappjaw, 2026-10-26: "Tap the row",
+    in place of Enter chips). A double-click is Enter either way, and only once."""
+    return ["enter"] if event == "double" or (event == "click" and selected) else []
+
+
 def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer=None):
     """Map a mouse event onto the same keys the keyboard uses."""
     if st.popup:  # only its buttons take clicks; a click elsewhere leaves it up
@@ -861,17 +864,19 @@ def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer
         st.tab = target[1]
         return st, actions
     if kind == "settings_cat":
+        open_ = st.settings_cat == target[1] and st.settings_focus == "menu"
         st, actions = _leave(dataclasses.replace(st))
         st.settings_cat = target[1]
-        for k in ["enter"] if event == "double" else []:
+        for k in _tap(event, open_):
             st, a = handle_key(st, k, current, devices, patch, mixer)
             actions += a
         return st, actions
     elif kind == "setting":
+        selected = st.settings_focus == "pane" and target[1] == st.cursor
         if st.editing and target[1] != st.cursor:
             st = _end_edit(dataclasses.replace(st))
         st = dataclasses.replace(st, cursor=target[1], settings_focus="pane")
-        keys = ["enter"] if event == "double" else []
+        keys = _tap(event, selected)
     elif kind == "arrow":  # a tap on ◀ ▶ is deliberate: it opens the row and steps it
         if not (st.editing and target[1] == st.cursor):
             st = _begin_edit(_end_edit(dataclasses.replace(st, cursor=target[1], settings_focus="pane")))
@@ -883,8 +888,9 @@ def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer
     elif kind == "key":  # a legend chip
         keys = [target[1]] if event in ("click", "double") else []
     elif kind == "mix_row":
+        selected = target[1] == st.mix_cursor and not st.mix_menu
         st = dataclasses.replace(st, mix_cursor=target[1], mix_menu=None)
-        keys = ["enter"] if event == "double" else []
+        keys = _tap(event, selected)
     elif kind == "mix_menu_item":
         st = dataclasses.replace(st, mix_menu_cursor=target[1])
         keys = ["enter"] if event in ("click", "double") else []
@@ -892,27 +898,25 @@ def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer
         st = dataclasses.replace(st, dev_menu_cursor=target[1])
         keys = ["enter"] if event in ("click", "double") else []
     elif kind == "device":
+        selected = target[1] == st.dev_cursor and not st.dev_menu
         st = dataclasses.replace(st, dev_cursor=target[1], dev_menu=None)
-        keys = ["enter"] if event == "double" else []
+        keys = _tap(event, selected)
     elif kind in ("patch_src", "patch_dst"):
         side = "src" if kind == "patch_src" else "dst"
+        selected = st.patch_side == side and getattr(st, f"patch_{side}") == target[1] and not st.patch_menu
         st = dataclasses.replace(st, patch_side=side, patch_menu=False, **{f"patch_{side}": target[1]})
-        keys = ["enter"] if event == "double" and side == "dst" else []
-    elif kind == "patch_head":  # a click on the View line opens its menu
-        st = dataclasses.replace(st, patch_head=True, patch_head_menu=False, patch_menu=False)
-        keys = ["enter"]
-    elif kind == "patch_head_item":
-        st = dataclasses.replace(st, patch_head_cursor=target[1])
-        keys = ["enter"]
+        keys = _tap(event, selected)
     elif kind == "patch_cell":
+        selected = (st.patch_src, st.patch_dst) == target[1:3] and not st.patch_menu
         st = dataclasses.replace(st, patch_src=target[1], patch_dst=target[2], patch_menu=False)
-        keys = ["enter"] if event == "double" else []
+        keys = _tap(event, selected)
     elif kind == "patch_slot":
         st = dataclasses.replace(st, patch_menu_cursor=target[1])
         keys = ["enter"] if event in ("click", "double") else []
     elif kind == "patch_pcell":
+        selected = (st.patch_port_row, st.patch_port_col) == target[1:3]
         st = dataclasses.replace(st, patch_port_row=target[1], patch_port_col=target[2])
-        keys = ["enter"] if event == "double" else []
+        keys = _tap(event, selected)
     actions = []
     for k in keys:
         st, a = handle_key(st, k, current, devices, patch, mixer)
@@ -922,34 +926,46 @@ def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer
 
 # --- rendering (view model) --------------------------------------------------
 
-TAB_KEYS = [(f"Tab/⇧Tab/1-{len(TABS)}", "tabs"), ("q", "quit")]
-# (key, slug) pairs; Enter first wherever it acts. Drawn as a box of chips by _key_box.
+# The key box shows only what you can't guess (Skrappjaw, 2026-10-26: arrows, Enter and the tab keys are known "on
+# instinct ... Main nav is also self explanatory with the numbers above"): letters, Esc, Space, q. What a row is
+# and what Enter does there is the status line's job (_row_note). Chips stay clickable; a tap on a row is Enter.
+TAB_KEYS = [("q", "quit")]
 LEGENDS = {
-    "mixer": [("Enter", "actions"), ("↑↓", "select"), ("←→", "volume"), ("Space", "mute"),
-              ("v", "meters")] + TAB_KEYS,
-    "settings": [("Enter", "edit"), ("↑↓", "select"), ("← Esc", "menu")] + TAB_KEYS,
-    "settings info": [("↑↓", "select"), ("← Esc", "menu")] + TAB_KEYS,  # an Audio row that only shows something
-    "settings buttons": [("Enter", "press"), ("←→", "pick"), ("↑↓", "select"), ("Esc", "menu")] + TAB_KEYS,
-    "settings edit": [("←→", "change"), ("Enter", "apply"), ("Esc", "cancel"), ("↑↓", "keep and move")],
-    "preferences edit": [("←→", "change"), ("Enter", "keep"), ("Esc", "cancel"), ("↑↓", "keep and move")],
-    "settings menu": [("Enter", "open"), ("↑↓", "category"), ("s", "save clock"),
-                      ("R", "restart WirePlumber")] + TAB_KEYS,
-    "preferences": [("Enter", "edit"), ("↑↓", "select"), ("← Esc", "menu")] + TAB_KEYS,
-    "top": [("↑↓ PgUp PgDn", "scroll")] + TAB_KEYS,
+    "mixer": [("Space", "mute"), ("v", "meters")] + TAB_KEYS,
+    "settings": [("Esc", "menu")] + TAB_KEYS,
+    "settings info": [("Esc", "menu")] + TAB_KEYS,  # an Audio row that only shows something
+    "settings buttons": [("Esc", "menu")] + TAB_KEYS,
+    "settings edit": [("Esc", "cancel")],
+    "preferences edit": [("Esc", "cancel")],
+    "settings menu": TAB_KEYS,
+    "preferences": [("Esc", "menu")] + TAB_KEYS,
+    "top": [("PgUp PgDn", "page")] + TAB_KEYS,
     "about": TAB_KEYS,
-    "devices": [("Enter", "actions"), ("↑↓", "select"), ("m", "monitors"), ("h", "show hidden")] + TAB_KEYS,
-    "keys": [("Enter", "rebind"), ("↑↓", "select"), ("Bksp", "unbind"), ("← Esc", "menu")] + TAB_KEYS,
+    "devices": [("a", "add bus"), ("m", "monitors"), ("h", "show hidden")] + TAB_KEYS,
+    "keys": [("Bksp", "unbind"), ("Esc", "menu")] + TAB_KEYS,
     "keys capture": [("Esc", "cancel"), ("Bksp", "unbind")],
-    "devices menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
-    "mixer menu": [("Enter", "pick"), ("↑↓", "choose"), ("Esc", "back")],
-    "patch cols": [("Enter", "connect/disconnect"), ("↑↓", "select"), ("←→", "column"), ("p", "ports"),
-                   ("g", "grid view"), ("m", "monitors")] + TAB_KEYS,
-    "patch grid": [("Enter", "connect/disconnect"), ("↑↓", "source"), ("←→", "destination"), ("p", "ports"),
-                   ("g", "column view"), ("m", "monitors")] + TAB_KEYS,
-    "patch menu": [("Enter", "connect/disconnect"), ("↑↓", "choose inputs"), ("Esc", "back")],
-    "patch ports": [("Enter", "link/unlink"), ("↑↓", "source port"), ("←→", "destination port"),
-                    ("p Esc", "back")] + TAB_KEYS,
+    "devices menu": [("Esc", "back")],
+    "mixer menu": [("Esc", "back")],
+    "patch cols": [("p", "ports"), ("g", "grid view"), ("m", "monitors")] + TAB_KEYS,
+    "patch grid": [("p", "ports"), ("g", "column view"), ("m", "monitors")] + TAB_KEYS,
+    "patch menu": [("Esc", "back")],
+    "patch ports": [("p Esc", "back")] + TAB_KEYS,
 }
+# Devices letters that act on the selected row, before the view's own (Skrappjaw, 2026-10-26: keep both ways, list them).
+DEV_ROW_KEYS = {"card": [("p", "card profile")], "pending": [("x", "delete bus")]}
+
+
+def _dev_row_keys(devices, st):
+    items = dev_selectable(devices, st) if devices else []
+    if not items:
+        return []
+    kind, obj = items[max(0, min(len(items) - 1, st.dev_cursor))]
+    if kind != "row":
+        return DEV_ROW_KEYS.get(kind, [])
+    test = [("t", "test noise")] if obj.kind != "monitor" and obj.direction in ("out", "duplex") else []
+    return test + ([("x", "delete bus")] if obj.kind == "virtual" else [])
+
+
 # What each Display row does, shown in the status line while it's selected (Skrappjaw, 2026-10-26).
 PREF_NOTES = {THEME_ROW: "applies at once", FPS_ROW: "how often Mixer meters redraw",
               FALL_ROW: "how fast a meter drops after a peak",
@@ -962,11 +978,11 @@ PREF_NOTES = {THEME_ROW: "applies at once", FPS_ROW: "how often Mixer meters red
 
 # The same for Audio's rows: what each one means, in plain words (Skrappjaw, 2026-10-26).
 AUDIO_NOTES = {
-    "clock.force-rate": "PipeWire's rate: every app and device meets here. Off: its default, or a rate an app asks for",
-    "clock.force-quantum": "PipeWire's buffer for everything. Off: the smallest an app asks for. Smaller = less delay, more CPU",
-    "clock.min-quantum": "the smallest buffer an app may ask PipeWire for",
+    "clock.force-rate": "PipeWire's rate for every app and device; off: its default or an app's request",
+    "clock.force-quantum": "PipeWire's buffer for everything; off: the smallest an app asks for",
+    "clock.min-quantum": "the smallest buffer an app may ask for; smaller = less delay, more CPU",
     "clock.max-quantum": "the largest buffer an app may ask PipeWire for",
-    "log.level": "how much PipeWire writes to its log (the journal); for chasing bugs, it never changes the sound"}
+    "log.level": "how much PipeWire writes to its log (the journal), for chasing bugs; never changes the sound"}
 
 
 # Audio's rows that only show something, explained (Skrappjaw, 2026-10-26: PipeWire is "server that manages the things").
@@ -985,12 +1001,140 @@ RT_NOTES = {"pipewire group": "the group allowed realtime priority; you need to 
             "portal refusals": "apps asking the desktop portal for realtime and refused; harmless while PipeWire is realtime"}
 
 
-def _row_note(st, current=None, realtime=None, rates=None, block=None):
-    """The status-line note for the Settings row under the cursor, if it has one."""
-    if st.tab != "settings" or st.settings_focus != "pane":
-        return None
+# Every row explains itself on the status line: what it is, then what you can do with it (Skrappjaw, 2026-10-26:
+# "Everything gets an explainer and a defined set of actions"). Enter's list is read off the row's own menu.
+SETTINGS_CAT_NOTES = {"audio": "PipeWire, your sound cards and the clock · Enter to open",
+                      "prefs": "how PipeWrench looks, and its key bindings · Enter to open"}
+MENU_NOTES = {"default": "every app that follows the default moves with it", "mute": "mutes or unmutes it",
+              "test": "plays a short test sound on it", "rename": "a name of your own; the device's id never changes",
+              "profile": "the card's profiles, on Devices", "boost": "lets the volume go past 100% (it can clip)",
+              "hide": "hides it from the lists; Show hidden (h) brings it back", "unhide": "shows it again",
+              "create": "makes the bus in PipeWire now", "delete": "removes the bus, after asking",
+              "back": "closes the menu"}
+TOP_NOTE = "S: R running, S suspended · QUANT buffer · WAIT/BUSY time per cycle · ERR dropouts (red)"
+
+
+def _row_note(st, current=None, realtime=None, rates=None, block=None, devices=None, patch=None, mixer=None):
+    """The status-line note for the row under the cursor, if it has one."""
+    try:
+        if st.tab == "settings":
+            return _settings_note(st, current, realtime, rates, block)
+        if st.tab == "mixer":
+            return _mixer_note(st, mixer)
+        if st.tab == "devices":
+            return _devices_note(st, devices)
+        if st.tab == "patch":
+            return _patch_note(st, patch)
+        if st.tab == "top":
+            return TOP_NOTE
+    except (IndexError, KeyError, ValueError, AttributeError, TypeError):
+        return None  # data mid-refresh: the tab's hint stands in for a moment
+    return None
+
+
+def _enter_list(items):
+    """ · Enter: a, b, c from a menu's [(label, op)]: Back left out, profiles counted, short words."""
+    profiles = sum(1 for _, op in items if op[0] == "profile" and len(op) > 1)
+    labels = [f"{profiles} profile{'' if profiles == 1 else 's'}"] if profiles else []
+    for label, op in items:
+        if op[0] == "back" or (op[0] == "profile" and len(op) > 1):
+            continue
+        word = label.split(":")[0].rstrip("…").replace("Set as system default", "set as default")
+        word = word.replace("Volume boost", "boost")
+        labels.append(word[0].lower() + word[1:])
+    return f" · Enter: {', '.join(labels)}" if labels else ""
+
+
+def _settings_note(st, current, realtime, rates, block):
+    if st.settings_focus != "pane":
+        return SETTINGS_CAT_NOTES.get(st.settings_cat)
     if st.settings_cat == "prefs":
-        return PREF_NOTES.get(st.cursor)
+        return _prefs_note(st)
+    if st.editing:
+        return "←→ to change · Enter applies · Esc puts it back"
+    note = _audio_note(st, current, realtime, rates, block)
+    if audio_setting(st.cursor, audio_rows(realtime, rates)):
+        note = f"{note} · Enter to change"
+    return note
+
+
+def _prefs_note(st):
+    if st.editing:
+        return "←→ to change · Enter keeps it · Esc puts it back"
+    if st.cursor in PREF_NOTES:
+        return f"{PREF_NOTES[st.cursor]} · Enter to change"
+    if KEYS_ROW <= st.cursor < RESET_KEYS_ROW:
+        kind, x = BINDING_ROWS[st.cursor - KEYS_ROW]
+        if kind == "fixed":
+            return "a fixed key: the tab keys can't be rebound"
+        return f"{pk.label(x)}: {pk.key_for(pk.bindings(st.keys), x.id) or 'no key'} · Enter, then the new key"
+    if st.cursor == RESET_KEYS_ROW:
+        return "puts every key back to its default · Enter"
+    return None
+
+
+def _mixer_note(st, mx):
+    if mx is None:
+        return None
+    if st.mix_menu:
+        items = mix_menu_items(mx, st)
+        return MENU_NOTES.get(items[st.mix_menu_cursor][1][0]) if items else None
+    kind, section, row = mixer_selectable(mx)[st.mix_cursor]
+    if kind == "app":  # the row shows its name; the note says what it is
+        what = f"an app {'playing' if section == 'playback' else 'recording'}"
+    else:
+        default = " · ★ the default" if _is_default(mx, section, row) else ""
+        what = f"{'playback' if section == 'playback' else 'recording'}{default}"
+    if row.volume is None:
+        return f"{what} · no volume here" + (" · connect it on Patch (3)" if row.media == "midi" else "")
+    return f"{what} · ←→ volume{_enter_list(_mix_items(mx, kind, section, row))}"
+
+
+def _devices_note(st, devices):
+    if devices is None:
+        return None
+    if st.dev_menu:
+        items = dev_menu_items(devices, st)
+        op = items[st.dev_menu_cursor][1] if items else ("",)
+        return "switches the card to this profile" if op[0] == "profile" else MENU_NOTES.get(op[0])
+    kind, obj = dev_selectable(devices, st)[st.dev_cursor]
+    if kind == "addbus":
+        return "a new bus: a virtual device apps can play into · Enter to name it"
+    probe = dataclasses.replace(st)
+    _open_menu(probe, kind, obj)
+    actions = _enter_list(dev_menu_items(devices, probe))
+    if kind == "card":
+        return f"sound card · profile {obj.active}{actions}"
+    if kind == "pending":
+        return f"a bus not made yet{actions}"
+    use = {"out": "apps can play into it", "in": "apps can record from it"}.get(obj.direction,
+                                                                             "apps can play into it and record from it")
+    return f"a bus: {use}{actions}"
+
+
+def _patch_note(st, g):
+    if g is None:
+        return None
+    srcs, s, d = _patch_pair(g, st)
+    if s is None:
+        return None
+    if st.patch_menu:
+        return "pick the inputs to connect · Enter connects them"
+    if st.patch_ports:
+        a, b = s.ports[st.patch_port_row], d.ports[st.patch_port_col]
+        on = any(x is a and y is b and linked for x, y, linked in pp.port_pairs(g, s, d))
+        return f"{a.channel} → {b.channel}: {'linked · Enter unlinks' if on else 'not linked · Enter links'}"
+    state = g.state(s, d)
+    if st.patch_view == "cols" and st.patch_side == "src":
+        n = len(g.targets(s))
+        return f"a source: {n} link{'' if n == 1 else 's'} · Enter or → to its destinations"
+    if state == "n/a":
+        return _pair_status(g, s, d).strip()
+    verb = "connects" if state == "none" else "disconnects"
+    return f"{_pair_status(g, s, d).strip()} · Enter {verb} · p port by port"
+
+
+def _audio_note(st, current, realtime, rates, block):
     ids = audio_rows(realtime, rates)
     rid = ids[st.cursor] if 0 <= st.cursor < len(ids) else None
     if rid is None:
@@ -1075,14 +1219,16 @@ def _bound(items, screen, keys):
     return out
 
 
-def legend(st):
+def legend(st, devices=None):
     items = _legend(st)
+    if st.tab == "devices" and not st.dev_menu and not st.popup:
+        items = _dev_row_keys(devices, st) + items
     return _bound(items, st.tab, st.keys) if st.tab in pk.SCREENS and st.keys else items
 
 
 def _legend(st):
     if st.popup:
-        return [("←→", "choose"), ("Enter", "pick"), ("Esc", "cancel")]
+        return [("Esc", "cancel")]
     if st.tab == "devices" and st.dev_menu:
         return LEGENDS["devices menu"]
     if st.tab == "mixer" and st.mix_menu:
@@ -1099,9 +1245,6 @@ def _legend(st):
         return LEGENDS["settings buttons"]
     if st.tab == "settings" and not audio_setting(st.cursor, st.audio_rows):
         return LEGENDS["settings info"]
-    if st.tab == "patch" and st.patch_head:
-        return ([("↑↓", "choose"), ("Enter", "pick"), ("Esc", "back")] if st.patch_head_menu
-                else [("Enter", "view options"), ("↓", "back to the list")])
     if st.tab == "patch" and st.patch_menu:
         return LEGENDS["patch menu"]
     if st.tab == "patch":
@@ -1262,7 +1405,7 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
         cv.hit(row, c0, c1, ("tab", tab))
     cv.add(f" {st.pw_down} ".center(width, "─")[:width] if st.pw_down else "─" * width,
            "alert" if st.pw_down else "dim")
-    footer, chips = _key_box(legend(st), width) if st.key_box else ([], [])  # hidden: the body gets its lines
+    footer, chips = _key_box(legend(st, devices), width) if st.key_box else ([], [])  # hidden: the body gets its lines
     body_h = height - len(cv.lines) - MEDIA_BOX_H - 1 - len(footer)  # the now-playing box and the status line
     if st.tab == "mixer":
         _render_mixer(cv, st, mixer, body_h)
@@ -1291,7 +1434,8 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
         bad = st.message == st.failed
         cv.add(f" {'✖' if bad else '✓'} {st.message}".ljust(width), "band_alert" if bad else "band_ok")
     else:
-        cv.add(f" {_row_note(st, current, realtime, rates, block) or HINTS.get(st.tab, '')}", "dim")
+        note = _row_note(st, current, realtime, rates, block, devices, patch, mixer)
+        cv.add(_fit(f" {note or HINTS.get(st.tab, '')}", width), "dim")
     if st.popup:
         _overlay_popup(cv, st, devices, width, height)
     return cv.lines, cv.hits
@@ -2308,49 +2452,12 @@ def _key_slot_menu(st, key, g, s, d):
     return st, [("patch_cmds", pp.slot_cmds(g, s, runs[st.patch_menu_cursor]))]
 
 
-def patch_head_items(st):
-    """[(label, op)] for the Patch View menu: what g, m and p do, by arrows and Enter (Skrappjaw, 2026-10-26)."""
-    return [("Column view" if st.patch_view == "grid" else "Grid view", ("grid",)),
-            (f"Monitors: {'on' if st.patch_monitors else 'off'}", ("monitors",)), ("Port by port", ("ports",)),
-            ("Back", ("back",))]
-
-
-def _key_patch_head(st, key):
-    if not st.patch_head_menu:
-        if key in ("down", "esc"):
-            st.patch_head = False
-        elif key == "enter":
-            st.patch_head_menu, st.patch_head_cursor = True, 0
-        return st, []
-    items = patch_head_items(st)
-    if key in ("up", "down"):
-        st.patch_head_cursor = max(0, min(len(items) - 1, st.patch_head_cursor + (1 if key == "down" else -1)))
-        return st, []
-    st.patch_head_menu = False
-    if key != "enter":
-        return st, []
-    op = items[st.patch_head_cursor][1][0]
-    if op == "grid":
-        st.patch_view, st.patch_ports = ("cols" if st.patch_view == "grid" else "grid"), False
-    elif op == "monitors":
-        st.patch_monitors = not st.patch_monitors
-    elif op == "ports":
-        st.patch_head, st.patch_ports, st.patch_port_row, st.patch_port_col = False, True, 0, 0
-    return st, []
-
-
 def _key_patch(st, key, g):
     if g is None:
         return st, []
     if st.patch_menu:
         _, s, d = _patch_pair(g, st)
         return _key_slot_menu(st, key, g, s, d)
-    if st.patch_head:
-        return _key_patch_head(st, key)
-    if (key == "up" and st.patch_src == 0 and not st.patch_ports
-            and (st.patch_view == "grid" or st.patch_side == "src")):
-        st.patch_head, st.patch_head_cursor = True, 0  # the View line: g m p by arrows and Enter
-        return st, []
     if key == "g":
         st.patch_view = "grid" if st.patch_view == "cols" else "cols"
         st.patch_ports = False
@@ -2443,18 +2550,7 @@ def _render_patch(cv, st, g, body_h):
         cv.add("  no audio sources or destinations", "dim")
         return
     room = max(1, body_h - 2)  # blank line and pair status sit below
-    head = (f"{'> ' if st.patch_head else '  '}View: {'grid' if st.patch_view == 'grid' else 'columns'}"
-            f" · monitors {'on' if st.patch_monitors else 'off'}{' · port by port' if st.patch_ports else ''}")
-    row = cv.add(head, "anchor" if st.patch_head_menu else "selected" if st.patch_head else "dim")
-    cv.hit(row, 0, len(head), ("patch_head",))
-    room -= 1
-    if st.patch_head_menu:
-        for i, (label, _) in enumerate(patch_head_items(st)):
-            line = f"    {'> ' if i == st.patch_head_cursor else '  '}{label}"
-            cv.hit(cv.add(line, "selected" if i == st.patch_head_cursor else "normal"), 0, len(line),
-                   ("patch_head_item", i))
-            room -= 1
-    room = max(1, room)
+    # No View line (Skrappjaw, 2026-10-26: "View menu can go away ... patch bay shortcuts on screen are enough").
     if st.patch_ports:
         _render_port_matrix(cv, st, g, s, d, room)
     elif st.patch_view == "grid":

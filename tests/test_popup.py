@@ -86,7 +86,7 @@ def test_the_box_is_drawn_over_the_screen_with_its_buttons(width):
 
 
 def test_the_keys_box_lists_the_popover_keys():
-    assert [k for k, _ in pc.legend(restart())] == ["←→", "Enter", "Esc"]
+    assert [k for k, _ in pc.legend(restart())] == ["Esc"]   # its buttons say the rest
 
 
 def test_a_click_on_a_button_picks_it_and_elsewhere_does_nothing():

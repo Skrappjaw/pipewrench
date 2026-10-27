@@ -30,8 +30,15 @@ STATES = {
     "patch grid": pc.UIState(tab="patch", patch_view="grid"),
     "patch ports": pc.UIState(tab="patch", patch_ports=True, patch_side="dst"),
 }
-ENTER = {"mixer": "actions", "mixer menu": "pick", "settings": "edit", "settings menu": "open", "devices": "actions", "devices menu": "pick",
-         "patch columns": "connect/disconnect", "patch grid": "connect/disconnect", "patch ports": "link/unlink"}
+# What each box offers now (Skrappjaw, 2026-10-26): only what you can't guess.
+EXPECT = {"settings": [("Esc", "menu"), ("q", "quit")], "settings menu": [("q", "quit")],
+          "preferences": [("Esc", "menu"), ("q", "quit")], "top": [("PgUp PgDn", "page"), ("q", "quit")],
+          "devices menu": [("Esc", "back")], "mixer": [("Space", "mute"), ("v", "meters"), ("q", "quit")],
+          "mixer menu": [("Esc", "back")],
+          "patch columns": [("p", "ports"), ("g", "grid view"), ("m", "monitors"), ("q", "quit")],
+          "patch grid": [("p", "ports"), ("g", "column view"), ("m", "monitors"), ("q", "quit")],
+          "patch ports": [("p Esc", "back"), ("q", "quit")]}
+OBVIOUS = ("↑↓", "←→", "Enter", "Tab")
 
 
 def render(st, width=80, height=30):
@@ -78,19 +85,26 @@ def test_box_fits_the_width_and_edges_line_up(name, width):
 @pytest.mark.parametrize("name", list(STATES))
 def test_keys_are_chips_with_their_slug(name):
     pairs = chips(render(STATES[name]))
-    assert ("Enter", ENTER[name]) in pairs if name in ENTER else pairs
+    assert pairs == EXPECT[name] if name in EXPECT else pairs
     assert all(k and s for k, s in pairs), pairs
 
 
+@pytest.mark.parametrize("name", list(STATES))
+def test_no_box_lists_what_you_know_on_instinct(name):
+    # Skrappjaw, 2026-10-26: arrows and Enter are known "on instinct"; the tab numbers are on the tab bar.
+    assert not [k for k, _ in chips(render(STATES[name])) if k.startswith(OBVIOUS)]
+
+
 @pytest.mark.parametrize("name", [n for n in STATES if not n.endswith(" menu")])
-def test_every_box_ends_with_tabs_and_quit(name):
-    pairs = chips(render(STATES[name]))
-    assert pairs[-2:] == [(f"Tab/⇧Tab/1-{len(pc.TABS)}", "tabs"), ("q", "quit")]
+def test_every_box_ends_with_quit(name):
+    assert chips(render(STATES[name]))[-1] == ("q", "quit")
 
 
-def test_enter_comes_first_where_it_acts():
-    for name in ENTER:
-        assert chips(render(STATES[name]))[0][0] == "Enter", name
+def test_devices_lists_the_letters_for_the_selected_row():
+    items = pc.dev_selectable(DEV, pc.UIState(tab="devices"))
+    card = next(i for i, (k, _) in enumerate(items) if k == "card")
+    keys = [k for k, _ in chips(render(pc.UIState(tab="devices", dev_cursor=card)))]
+    assert keys[0] == "p" and "t" not in keys and keys[-4:] == ["a", "m", "h", "q"]
 
 
 @pytest.mark.parametrize("name", list(STATES))
@@ -103,8 +117,8 @@ def test_one_box_and_a_status_line_for_messages(name):
 
 
 def test_legend_survives_a_message():
-    assert ("Enter", "edit") in chips(render(pc.UIState(tab="settings", settings_focus="pane", message="applied",
-                                                         cursor=pc.audio_index(("setting", 0)))))
+    assert ("Esc", "menu") in chips(render(pc.UIState(tab="settings", settings_focus="pane", message="applied",
+                                                      cursor=pc.audio_index(("setting", 0)))))
 
 
 def flat(lines):

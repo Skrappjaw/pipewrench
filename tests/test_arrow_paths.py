@@ -57,28 +57,21 @@ def patch(**kw):
     return pc.UIState(tab="patch", key_box=False, **kw)
 
 
-def head_menu(st):
-    return [label for label, _ in pc.patch_head_items(st)]
-
-
-def test_up_from_the_first_source_reaches_the_view_line():
+def test_patch_has_no_view_line_and_up_from_the_first_source_stays_put():
+    # Skrappjaw, 2026-10-26: "View menu can go away. not needed. patch bay shortcuts on screen are enough."
     st, _ = key(patch(), "up", patch=G)
-    assert st.patch_head and not st.patch_head_menu
+    assert st.patch_src == 0 and not hasattr(st, "patch_head")
     text = "\n".join(t for t, _ in pc.render_screen(st, CUR, "", 100, 40, patch=G)[0])
-    assert "View:" in text
-    assert not key(st, "down", patch=G)[0].patch_head
+    assert "View:" not in text
 
 
-def test_patch_view_menu_switches_grid_monitors_and_ports():
-    st, _ = key(patch(), "up", "enter", patch=G)
-    assert st.patch_head_menu and head_menu(st) == ["Grid view", "Monitors: off", "Port by port", "Back"]
-    grid, _ = pick(st, "Grid view", menu=head_menu, patch=G)
-    assert grid.patch_view == "grid" and not grid.patch_head_menu
-    mon, _ = pick(st, "Monitors", menu=head_menu, patch=G)
-    assert mon.patch_monitors
-    ports, _ = pick(st, "Port by port", menu=head_menu, patch=G)
-    assert ports.patch_ports and not ports.patch_head
-    assert key(st, "esc", patch=G)[0].patch_head_menu is False
+def test_patch_keys_grid_monitors_and_ports_are_on_screen():
+    st = pc.UIState(tab="patch")
+    keys = [k for k, _ in pc.legend(st)]
+    assert {"g", "m", "p"} <= set(keys)
+    grid, _ = key(st, "g", patch=G)
+    assert grid.patch_view == "grid"
+    assert key(st, "m", patch=G)[0].patch_monitors
 
 
 # --- Settings -----------------------------------------------------------------------------------------
@@ -89,3 +82,26 @@ def test_restart_is_a_clock_button():
     assert pc.CLOCK_BUTTONS[-1] == "Restart"
     st, _ = key(st, *["right"] * len(pc.CLOCK_BUTTONS), "enter")
     assert st.popup == ("restart",)
+
+
+# --- touch: tap the row (Skrappjaw, 2026-10-26) ----------------------------------------------------------------
+
+def tap(st, target, **kw):
+    lines, hits = pc.render_screen(st, CUR, "", 100, 40, devices=DV, patch=G, **kw)
+    row, c0, _ = next((r, a, b) for r, a, b, t in hits if t == target)
+    return pc.handle_mouse(st, hits, row, c0, "click", CUR, devices=DV, patch=G)
+
+
+def test_a_tap_selects_and_a_second_tap_is_enter():
+    card = dev_line("card")
+    st = devices(dev_cursor=card + 1)                       # start somewhere else
+    st, _ = tap(st, ("device", card))
+    assert st.dev_cursor == card and not st.dev_menu        # first tap: select
+    st, _ = tap(st, ("device", card))
+    assert st.dev_menu                                      # second tap: Enter opens its menu
+
+
+def test_a_tap_on_a_selected_patch_destination_connects():
+    st, _ = key(patch(), "right", patch=G)                  # into the destinations
+    _, a1 = tap(st, ("patch_dst", st.patch_dst))
+    assert a1 == key(st, "enter", patch=G)[1] and a1

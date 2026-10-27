@@ -231,9 +231,10 @@ def test_click_on_a_menu_item_picks_it():
 
 def test_legend_leads_with_enter_actions_and_the_menu_has_its_own():
     from test_legends import chips
-    assert chips(screen(pc.UIState())[0])[0] == ("Enter", "actions")
+    assert chips(screen(pc.UIState())[0])[0] == ("Space", "mute")   # Enter's actions are in the status note
+    assert "Enter: " in screen(pc.UIState())[0][-1][0]
     st, _ = key(at("GCS-8 CH 3-AUX"), "enter")
-    assert chips(screen(st)[0])[0] == ("Enter", "pick")
+    assert chips(screen(st)[0]) == [("Esc", "back")]
 
 
 def with_volume(dump, node_id, level):

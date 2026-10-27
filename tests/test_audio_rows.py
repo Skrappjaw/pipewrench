@@ -136,9 +136,9 @@ def test_enter_on_a_read_only_row_does_nothing():
     assert actions == [] and not st.editing
 
 
-def test_read_only_rows_have_no_edit_key_in_the_legend():
-    assert ("Enter", "edit") not in pc.legend(audio(rid=("server",)))
-    assert ("Enter", "edit") in pc.legend(audio(rid=("setting", 0)))
+def test_value_rows_say_enter_changes_them_and_read_only_rows_dont():
+    note = lambda rid: screen(audio(rid=rid), height=60)[-1][0]
+    assert "Enter" not in note(("server",)) and "Enter to change" in note(("setting", 0))
 
 
 def test_status_line_explains_the_row():

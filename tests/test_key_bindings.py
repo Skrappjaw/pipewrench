@@ -156,7 +156,7 @@ def test_hand_edited_clash_is_flagged_red():
 
 def test_keys_rows_have_their_own_legend():
     st = prefs(cursor=row_of("mixer.meters"))
-    assert [k for k, _ in pc.legend(st)][:3] == ["Enter", "↑↓", "Bksp"]
+    assert [k for k, _ in pc.legend(st)][:2] == ["Bksp", "Esc"]
     st, _ = skey(st, "enter")
     assert [k for k, _ in pc.legend(st)] == ["Esc", "Bksp"]
 

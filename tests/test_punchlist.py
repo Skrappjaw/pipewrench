@@ -88,7 +88,7 @@ def test_a_click_on_an_arrow_edits_at_once():
 def test_the_edited_row_says_how_to_finish():
     st, _ = key(S(cursor=FORCE_Q), "enter")
     assert ("Esc", "cancel") in pc.legend(st)
-    assert ("Enter", "edit") in pc.legend(S(cursor=FORCE_Q))
+    assert "Enter to change" in body(S(cursor=FORCE_Q)).splitlines()[-1]
 
 
 # --- 2. ← goes back to the Settings menu -----------------------------------------------------------

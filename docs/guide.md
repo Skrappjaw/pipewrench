@@ -17,8 +17,14 @@ guide is about using the screen.
 - **Tabs** along the top: Mixer, Devices, Patch, Settings, Top, About. Switch with `Tab` (`Shift+Tab`
   goes back), the number keys `1`–`6`, or a click. Leaving a tab resets it: open menus close and
   unapplied Settings changes are dropped, so a tab always opens clean.
-- **The keys box** at the bottom lists every key the current view takes. Each key is a chip, and
-  clicking a single-key chip presses it. Settings → Preferences → **Keys box** hides it; the keys still work.
+- **The status line** at the very bottom explains the selected row: what it is, then what you can do with
+  it. `Enter:` lists what Enter offers there, read off the row's own menu.
+- **The keys box** above it lists only the keys you can't guess: the view's letter shortcuts, `Esc` where
+  it goes back, `Space` (mute) on the Mixer, and `q` to quit. The arrows, Enter, Tab and the number keys
+  aren't listed: they always work, and the numbers are on the tabs. Each key is a chip, and clicking one
+  presses it. Settings → Preferences → **Keys box** hides it; the keys still work.
+- **Tap or click a row** to select it; tap or click it again (or double-click) to press Enter on it. That's
+  how a touchscreen opens a menu, edits a value or connects a pair.
 - **The status band** under it shows what just happened: `✓` on green when it worked, `✖` on red when it
   didn't. It stays until the next message.
 - **Questions and warnings** open in a box over the screen and stay until you answer: ←→ pick a
@@ -45,7 +51,7 @@ Every output and input, then the apps playing or recording under each. ★ marks
 | ← → | volume −5% / +5%. → stops at 100% and asks before going louder (up to 150%) |
 | mouse wheel | scroll the list (it never changes volume) |
 | Space | mute or unmute |
-| Enter (double-click) | the channel's menu |
+| Enter (or tap the selected row) | the channel's menu |
 | v (shortcut) | live meters on or off; or Settings → Preferences → Meters |
 
 The volume % sits inside the bar. Green is up to 100%, red past it, grey when muted. Past 100% can clip, so
@@ -170,13 +176,14 @@ buses). Select a source, then `→` into the destinations and press Enter to con
 | ↑ ↓ | select |
 | ← → | switch between sources and destinations |
 | Enter | connect or disconnect |
-| ↑ from the first source | the **View** line above the columns; Enter opens its menu |
 
-| Shortcut | Does | Without it |
-|---|---|---|
-| g | grid view | View → Grid view (Column view to go back) |
-| p | port matrix for the selected pair | View → Port by port |
-| m | show every monitor | View → Monitors |
+These three are shortcuts only, and always in Patch's keys box:
+
+| Shortcut | Does |
+|---|---|
+| g | grid view (`g` again for columns) |
+| p | port matrix for the selected pair |
+| m | show every monitor |
 
 ### Monitors (OBS desktop audio)
 

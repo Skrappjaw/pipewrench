@@ -174,7 +174,8 @@ def test_p_opens_a_port_matrix():
     text = body(screen(st, g=GR)[0])
     header = next(line for line in text.splitlines() if "in1" in line and "in8" in line)
     assert header.index("in1") < header.index("in8")
-    rows = [line for line in text.splitlines() if line.lstrip("> ").startswith(("FL", "FR")) and ("·" in line or "●" in line)]
+    rows = [line for line in text.splitlines()[:-1]  # the last line is the status note
+            if line.lstrip("> ").startswith(("FL", "FR")) and ("·" in line or "●" in line)]
     assert len(rows) == 2                      # one row per source port, not 16 lines
     assert "[·]" in rows[0]                    # cursor on FL × in1
 
@@ -192,7 +193,8 @@ def test_port_matrix_arrows_and_enter_toggle_one_link():
 def test_port_matrix_shows_existing_links():
     st, _ = key(at("Discord", "GCS-8 CH 4-AUX", patch_side="dst"), "p")
     text = body(screen(st)[0])
-    rows = [line for line in text.splitlines() if line.lstrip("> ").startswith(("FL", "FR")) and ("·" in line or "●" in line)]
+    rows = [line for line in text.splitlines()[:-1]  # the last line is the status note
+            if line.lstrip("> ").startswith(("FL", "FR")) and ("·" in line or "●" in line)]
     assert "●" in rows[0] and "●" in rows[1]   # FL→FL and FR→FR linked
     assert "Ports: Discord → GCS-8 CH 4-AUX" in text
 
@@ -225,7 +227,7 @@ def test_click_port_cell():
 def test_legend_fits_80(view):
     lines, _ = screen(pc.UIState(tab="patch", patch_view=view), width=80)
     text = re.sub(r"[ │]+", " ", body(lines))  # chips pad keys with spaces
-    for k in ("Enter connect/disconnect", "p ports", "m monitors", "q quit", "g "):
+    for k in ("p ports", "m monitors", "q quit", "g "):
         assert k in text, k
     assert all(len(t.rstrip()) <= 80 for t, _ in lines)
 

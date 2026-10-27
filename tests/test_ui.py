@@ -334,8 +334,8 @@ def test_hitmap_lands_on_drawn_glyphs(width):
         assert text_at(lines, r, c0) == "◀"
         r, c0, _ = hit_for(hits, ("arrow", i, +1))
         assert text_at(lines, r, c0) == "▶"
-    r, c0, c1 = hit_for(hits, ("key", "enter"))
-    assert lines[r][0][c0:c1] == " Enter "  # a chip's hit covers just the chip
+    r, c0, c1 = hit_for(hits, ("key", "esc"))
+    assert lines[r][0][c0:c1] == " Esc "  # a chip's hit covers just the chip
     r, c0, c1 = hit_for(hits, ("tab", "top"))
     assert "Top" in lines[r][0][c0:c1]
 
@@ -381,10 +381,10 @@ def test_wheel_works_anywhere_on_the_screen():
         assert st2.cursor == ROW(2) and st2.tab == "settings"
 
 
-def test_apply_and_revert_chips():
+def test_a_tap_on_the_open_row_applies_and_the_esc_chip_reverts():
     st, _ = key(UIState(), "down", "down", "down", "enter", "right")
     _, hits = screen(st)
-    _, actions = click(st, hits, ("key", "enter"))
+    _, actions = click(st, hits, ("setting", st.cursor))     # Skrappjaw, 2026-10-26: tap the row, no Enter chip
     assert actions == key(st, "enter")[1]
     st2, actions = click(st, hits, ("key", "esc"))
     assert st2.pending == {} and actions == []
@@ -572,7 +572,7 @@ def test_no_button_rows(tab):
 def test_multi_key_chips_have_no_hit():
     _, hits = screen(UIState())
     keys = {t[1] for *_, t in hits if t[0] == "key"}
-    assert keys == {"enter", "esc", "q"} | {"*", "<", ">", "-", "+"}  # not ↑↓, ←→ or Tab/1-n
+    assert keys == {"esc", "q"} | {"*", "<", ">", "-", "+"}  # no ↑↓, ←→, Enter or Tab/1-n chips at all
 
 
 def test_meter_frame_rate_steps_and_saves():
