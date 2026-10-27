@@ -10,11 +10,14 @@ watch pw-top, and save the clock for the next PipeWire start.
     pwrench devices [list] | default | volume | mute | profile | restore | label | hide | bus | apply …
     pwrench patch [list] | connect SRC DST | disconnect SRC DST
     pwrench realtime             is PipeWire's audio realtime? and the fix if not
+    pwrench vban [list] | detect [SECONDS] | add in|out NAME IP [--to|--from NODE] [--midi] | on | off | remove
     pwrench theme list | export ID [FILE] | check [FILE]   themes as TOML files (docs/themes.md)
 """
 import array
 import os
 import random
+import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -32,6 +35,7 @@ import pwpatch as pp  # noqa: E402
 import pwrates as prates  # noqa: E402
 import pwrealtime as prt  # noqa: E402
 import pwthemes as pt  # noqa: E402
+import pwvban as pv  # noqa: E402
 
 SETTERS = {"rate": "clock.force-rate", "buf": "clock.force-quantum", "min": "clock.min-quantum",
            "max": "clock.max-quantum", "log": "log.level"}
@@ -270,6 +274,8 @@ def _cli(argv, runner, out, err, execvp, ask):
         return _devices(args, runner, out, err, ask)
     if cmd == "patch":
         return _patch(args, runner, out)
+    if cmd == "vban":
+        return _vban(args, runner, out)
     if cmd == "realtime":
         s = prt.check(run=runner)
         for label, mark, text in prt.rows(s):
@@ -670,6 +676,188 @@ def _patch(args, runner, out):
     raise CliError(PATCH_USAGE, 2)
 
 
+# --- VBAN (Settings → Network) ---------------------------------------------------------------------------
+# Each stream is its own `pipewire -c` process under pipewrench-vban@<instance>; nothing restarts PipeWire.
+
+VBAN_USAGE = """usage:
+  pwrench vban [list]
+  pwrench vban detect [SECONDS]            VBAN streams arriving on port 6980
+  pwrench vban add in|out NAME IP [--to NODE | --from NODE] [--midi]
+  pwrench vban on|off|remove in|out NAME"""
+
+
+def _vban_version(runner):
+    try:
+        rc, text = runner(["pipewire", "--version"])
+    except FileNotFoundError:
+        return None
+    return pv.parse_version(text) if rc == 0 else None
+
+
+def _local_address():
+    """The IPv4 address this machine has on its LAN: the source of a route to a private address. A UDP connect
+    sends nothing."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.254.254.254", 1))
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
+def _vban_units(runner):
+    try:
+        rc, text = runner(pv.LIST_UNITS)
+    except FileNotFoundError:
+        return {}
+    return pv.parse_units(text) if rc == 0 else {}
+
+
+def _vban_have():
+    folder = pv.conf_dir()
+    return {f.stem: f.read_text() for f in sorted(folder.glob("*.conf"))} if folder.is_dir() else {}
+
+
+def _vban_sync(runner, c, rules):
+    """Bring the running streams in line with vban.json: the unit, each stream's conf, then start, restart and
+    stop. Links PipeWrench keeps (outgoing sources, MIDI) follow once the nodes are up (_vban_links)."""
+    unit_text = pv.render_unit(shutil.which("pipewire") or "/usr/bin/pipewire", pv.conf_dir())
+    if pcfg.write_generated(pv.unit_path(), unit_text):
+        _run(runner, pv.DAEMON_RELOAD)
+    units = _vban_units(runner)
+    plan = pv.plan(pv.instances(c, rules), _vban_have(), {i for i, s in units.items() if s in ("active", "activating")})
+    for inst, text in plan.write.items():
+        pcfg.write_generated(pv.conf_dir() / f"{inst}.conf", text)
+    for cmd in pv.plan_cmds(plan):
+        _run(runner, cmd)
+    for inst in plan.remove:  # stopped above, so nothing reads it any more
+        path = pv.conf_dir() / f"{inst}.conf"
+        pcfg.check_ours(path)
+        path.unlink(missing_ok=True)
+    return plan
+
+
+def _vban_links(runner, c, g):
+    """Make the links PipeWrench keeps; returns how many it made."""
+    cmds = pv.link_cmds(c, g)
+    for cmd in cmds:
+        _run(runner, cmd)
+    return len(cmds)
+
+
+def _vban_detect(port=pv.PORT, seconds=2.0):
+    """[(ip, Heard)] for VBAN streams arriving on the port. Refused while one of our listeners holds it."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.bind(("0.0.0.0", port))
+    except OSError:
+        s.close()
+        raise CliError(f"port {port} is in use (an incoming stream listens there); Manual still works", 1)
+    heard = {}
+    s.settimeout(0.2)
+    end = time.monotonic() + seconds
+    try:
+        while time.monotonic() < end:
+            try:
+                data, (ip, _) = s.recvfrom(2048)
+            except socket.timeout:
+                continue
+            h = pv.parse_header(data)
+            if h:
+                heard.setdefault((ip, h.stream, h.media), h)
+    finally:
+        s.close()
+    return [(ip, h) for (ip, _, _), h in heard.items()]
+
+
+def _vban_view(runner, version):
+    c = pv.load_config(pv.config_path())
+    try:
+        g = _graph(runner)
+    except CliError:
+        g = None
+    return pv.View(c, _vban_units(runner), _local_address(), socket.gethostname(), version, pv.supports_rules(version), g)
+
+
+def _vban_target(g, direction, key, media):
+    find = g.find_dest if direction == "in" else g.find_source
+    return pv.endpoint_key(_endpoint(find, key, "destination" if direction == "in" else "source", media))
+
+
+def _vban_settle(runner, c, tries=30):
+    """After a start: wait for the nodes, then make the kept links. Best effort; the UI keeps them later."""
+    if not pv.keeps_links(c):
+        return 0
+    made = 0
+    for _ in range(tries):
+        try:
+            made = _vban_links(runner, c, _graph(runner))
+        except CliError:
+            made = 0
+        if made:
+            return made
+        time.sleep(0.1)
+    return made
+
+
+def _vban(args, runner, out):
+    sub, rest = (args[0], args[1:]) if args else ("list", [])
+    version = _vban_version(runner)
+    rules = pv.supports_rules(version)
+    try:
+        c = pv.load_config(pv.config_path())
+    except ValueError as e:
+        raise CliError(str(e), 1)
+    if sub == "list" and not rest:
+        view = _vban_view(runner, version)
+        for d, key, title in pc.NET_BOXES:
+            out.write(f"{title}\n")
+            for e in c[key]:
+                text, _ = pc._stream_line(view, d, e)
+                out.write(f"  {text}\n")
+            if not c[key]:
+                out.write("  (none)\n")
+        return 0
+    if sub == "detect" and len(rest) <= 1:
+        for ip, h in _vban_detect(seconds=float(rest[0]) if rest else 2.0):
+            out.write(pv.heard_label(h, ip) + "\n")
+        return 0
+    try:
+        if sub == "add" and len(rest) >= 3 and rest[0] in ("in", "out"):
+            d, name, ip, opts = rest[0], rest[1], rest[2], rest[3:]
+            e = pv.new_entry(d, name, ip)
+            if "--midi" in opts:
+                e["media"] = "midi"
+                opts = [o for o in opts if o != "--midi"]
+            if opts:
+                if len(opts) != 2 or opts[0] != ("--to" if d == "in" else "--from"):
+                    raise CliError(VBAN_USAGE, 2)
+                e["target"] = _vban_target(_graph(runner), d, opts[1], e["media"])
+            c = pv.add_entry(c, d, e, rules)
+            e = c["incoming" if d == "in" else "outgoing"][-1]
+            msg = f"added {e['name']}" + (f"; {e['name']} {pv.point_here(e, _local_address() or 'this machine')}"
+                                          if d == "in" else "")
+        elif sub in ("on", "off", "remove") and len(rest) == 2 and rest[0] in ("in", "out"):
+            d, key = rest
+            e = pv.find(c, d, key)
+            c = pv.remove_entry(c, d, key) if sub == "remove" else pv.update_entry(c, d, key, on=sub == "on")
+            msg = f"{'removed' if sub == 'remove' else 'turned ' + sub} {e['name']}"
+        else:
+            raise CliError(VBAN_USAGE, 2)
+    except (ValueError, LookupError) as ex:
+        raise CliError(str(ex), 2)
+    try:
+        _vban_sync(runner, c, rules)  # before saving: a file that isn't ours stops it with nothing changed
+    except pcfg.ConfigError as ex:
+        raise CliError(str(ex), 1)
+    pv.save_config(pv.config_path(), c)
+    _vban_settle(runner, c)
+    out.write(msg + "\n")
+    return 0
+
+
 def main(argv, runner=None, out=None, err=None, execvp=None, ask=None):
     out, err = out or sys.stdout, err or sys.stderr
     ask = ask or input
@@ -863,6 +1051,8 @@ class Tui:
         self.meters = Meters()
         self.midi = MidiActivity()
         self.media, self.media_at = None, 0.0  # the player the bar shows, and when it was read
+        self.vban_version = None  # PipeWire's version, read when Settings → Network first shows
+        self.vban_linked = 0.0  # when the kept VBAN links were last checked
         self.lock = threading.Lock()
         self.proc = None
         self.hits = []
@@ -965,6 +1155,34 @@ class Tui:
         if self.st.tab == "settings":
             self.realtime = "fixtures" if os.environ.get("PIPEWRENCH_FIXTURES") else prt.check(run=self.runner)
             self.rates = _device_rates(self.runner)
+        if self.st.tab == "settings" and self.st.settings_cat == "network":
+            self._refresh_net()
+        elif time.monotonic() - self.vban_linked > 5:
+            self._keep_vban_links()
+
+    def _refresh_net(self):
+        """Settings → Network: vban.json, the units, this machine, the graph; and the links PipeWrench keeps."""
+        if self.vban_version is None:
+            self.vban_version = _vban_version(self.runner) or ()
+        try:
+            view = _vban_view(self.runner, self.vban_version or None)
+        except (ValueError, OSError) as e:
+            self.st.message = self.st.failed = f"vban.json problem: {e}"
+            return
+        self.st = pc.with_net(self.st, view)
+        if view.graph is not None:
+            self._keep_vban_links(view.config, view.graph)
+
+    def _keep_vban_links(self, c=None, g=None):
+        """Every few seconds anywhere, every refresh on Network: re-make an outgoing stream's source link (or an
+        incoming MIDI one) that went away, say when an app restarted. Quiet: problems show on Network."""
+        self.vban_linked = time.monotonic()
+        try:
+            c = c or pv.load_config(pv.config_path())
+            if pv.keeps_links(c):
+                _vban_links(self.runner, c, g or _graph(self.runner))
+        except (ValueError, OSError, CliError):
+            pass
 
     def _refresh_mixer(self):
         """Devices and app streams from one pw-dump; hidden rows come from devices.json."""
@@ -1233,6 +1451,8 @@ class Tui:
                                        f"peak hold {hold} · volume bar {'on' if self.st.volume_bar else 'off'}")
             elif kind.startswith("dev_"):
                 self._do_devices(scr, action)
+            elif kind.startswith("vban_"):
+                self._do_vban(scr, action)
             elif kind in ("media", "media_volume"):
                 with self.lock:
                     player = self.media
@@ -1328,6 +1548,65 @@ class Tui:
             self.st.message = _bus_delete(self.runner, c, inv, action[1])
         elif kind == "dev_test":
             self.st.message = _play_noise(self.runner, inv.find(action[1]))
+
+    def _do_vban(self, scr, action):
+        kind, d = action[0], action[1]
+        if self.vban_version is None:
+            self.vban_version = _vban_version(self.runner) or ()
+        rules = pv.supports_rules(self.vban_version)
+        c = pv.load_config(pv.config_path())
+        if kind == "vban_detect":
+            self.st.message, self.st.failed = f"listening for VBAN on port {pv.PORT}…", ""
+            self._draw(scr)
+            heard = _vban_detect()
+            if not heard:
+                self.st.message = self.st.failed = (f"heard nothing on port {pv.PORT} in 2 s (a firewall can block it); "
+                                                    "point a sender here, or use Manual")
+                return
+            self.st.message = ""
+            pc.open_pick(self.st, pc.heard_pick(d, heard))
+            return
+        if kind in ("vban_manual", "vban_heard"):
+            if kind == "vban_manual":
+                name = self._prompt(scr, "device name (empty cancels):")
+                ip = self._prompt(scr, f"{name}'s IP address (empty cancels):") if name else ""
+                if not (name and ip):
+                    self.st.message = "cancelled"
+                    return
+                e = pv.new_entry(d, name, ip)
+            else:
+                ip, heard = action[2]
+                e = pv.from_heard(d, heard, ip)
+            c = pv.add_entry(c, d, e, rules)
+            e = c["incoming" if d == "in" else "outgoing"][-1]
+            self._vban_apply(c, rules, f"added {e['name']}")
+            self._refresh_net()
+            pc.open_pick(self.st, pc.target_pick(self.st.net, d, e))  # the quick pick (Skrappjaw, 2026-10-26)
+            return
+        e = pv.find(c, d, action[2])
+        if kind == "vban_set":
+            c = pv.update_entry(c, d, action[2], **action[3])
+            ch = action[3]
+            msg = (f"{e['name']} {'on' if ch['on'] else 'off'}" if "on" in ch else
+                   f"{e['name']}: not connected" if not ch.get("target") else
+                   f"{e['name']} {'→' if d == 'in' else '←'} {pc._target_label(self.st.net, d, pv.find(c, d, action[2]))}"
+                   if self.st.net else f"{e['name']} connected")
+        elif kind == "vban_format":
+            c = pv.set_format(c, d, action[2], action[3])
+            msg = f"{e['name']}: {pv.format_label(pv.find(c, d, action[2]))}"
+        elif kind == "vban_remove":
+            c = pv.remove_entry(c, d, action[2])
+            msg = f"removed {e['name']}"
+        else:
+            return
+        self._vban_apply(c, rules, msg)
+
+    def _vban_apply(self, c, rules, message):
+        _vban_sync(self.runner, c, rules)  # before saving: a file that isn't ours stops it with nothing changed
+        pv.save_config(pv.config_path(), c)
+        self.vban_linked = 0.0  # the new nodes need a moment; the next refreshes link them
+        self.st.message = message
+        self._refresh_net()
 
     def _save_clock(self):
         """Settings → Save: the live clock into devices.json and PipeWrench's PipeWire drop-in. Never restarts;

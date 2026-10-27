@@ -20,6 +20,7 @@ import pwmedia as pm
 import pwpatch as pp
 import pwrealtime as prt
 import pwthemes as pt
+import pwvban as pv
 
 READ_CMD = ["pw-metadata", "-n", "settings", "0"]
 RESTART_CMD = ["systemctl", "--user", "restart", "wireplumber"]
@@ -389,6 +390,9 @@ class UIState:
     key_capture: str = None      # Settings → Keys: the action id waiting for its new key
     editing: bool = False        # Settings: Enter opened the row's value; ←→ change it (Skrappjaw, 2026-10-25)
     edit_from: tuple = None      # what Esc restores: (had pending, old pending) or (pref attr, old value)
+    net: object = None           # Settings → Network: a pwvban.View the Tui refreshes; None until read
+    pick: tuple = None           # an open list popover: (purpose, direction, stream id, title, ((label, value), …))
+    pick_cursor: int = 0
 
 
 # The now-playing bar's keys work on every tab; no tab uses these characters. * - + sit on the numpad.
@@ -411,6 +415,8 @@ def handle_key(st, key, current, devices=None, patch=None, mixer=None):
         return _capture_key(st, key)
     if st.popup:
         return _key_popup(st, key)
+    if st.pick:
+        return _key_pick(st, key)
     if key in NAV_KEYS or (key.isdigit() and 1 <= int(key) <= len(TABS)):
         st.message = st.failed = ""  # a message lasts until you move, then the row's note is back (Skrappjaw, 2026-10-26)
     if key == "q":
@@ -443,7 +449,7 @@ def handle_key(st, key, current, devices=None, patch=None, mixer=None):
 
 # Settings is a menu of categories on the left with the open one on the right (Skrappjaw, 2026-10-25).
 # Each category is its own list; st.cursor is the row in the open one.
-SETTINGS_CATS = [("audio", "Audio"), ("prefs", "Preferences")]
+SETTINGS_CATS = [("audio", "Audio"), ("network", "Network"), ("prefs", "Preferences")]
 MENU_W = 15                         # the menu column, its │ included
 
 
@@ -527,7 +533,7 @@ def _leave(st):
     actions = _restore_pref(st) if st.editing and st.settings_cat == "prefs" else []
     dropped = bool(st.pending)
     st.pending, st.editing, st.edit_from, st.key_capture = {}, False, None, None
-    st.mix_menu = st.dev_menu = None
+    st.mix_menu = st.dev_menu = st.pick = None
     st.patch_menu = st.patch_ports = False
     st.settings_focus, st.cursor = "menu", 0
     if dropped:
@@ -586,6 +592,8 @@ def _key_settings(st, key, current):
         return _key_settings_menu(st, key)
     if key == "esc" and not st.pending and not st.editing:
         return _leave(st)
+    if st.settings_cat == "network":
+        return _key_network(st, key)
     return (_key_prefs if st.settings_cat == "prefs" else _key_audio)(st, key, current)
 
 
@@ -854,6 +862,13 @@ def handle_mouse(st, hits, y, x, event, current, devices=None, patch=None, mixer
         if target and target[0] == "popup_btn" and event in ("click", "double"):
             return _key_popup(dataclasses.replace(st, popup_button=target[1]), "enter")
         return st, []
+    if st.pick:  # only its items take clicks; the wheel moves its cursor
+        target = next((t for row, c0, c1, t in hits if row == y and c0 <= x < c1), None)
+        if event in ("wheel_up", "wheel_down"):
+            return _key_pick(dataclasses.replace(st), "up" if event == "wheel_up" else "down")
+        if target and target[0] == "pick_item" and event in ("click", "double"):
+            return _key_pick(dataclasses.replace(st, pick_cursor=target[1]), "enter")
+        return st, []
     target = next((t for row, c0, c1, t in hits if row == y and c0 <= x < c1), None)
     if event in ("wheel_up", "wheel_down"):
         # The wheel scrolls everywhere (Skrappjaw, 2026-10-24): ↑/↓ on the list in focus, wherever the mouse is,
@@ -1014,6 +1029,7 @@ RT_NOTES = {"pipewire group": "the group allowed realtime priority; you need to 
 # Every row explains itself on the status line: what it is, then what you can do with it (Skrappjaw, 2026-10-26:
 # "Everything gets an explainer and a defined set of actions"). Enter's list is read off the row's own menu.
 SETTINGS_CAT_NOTES = {"audio": "PipeWire, your sound cards and the clock · Enter to open",
+                      "network": "VBAN: audio and MIDI to and from other machines · Enter to open",
                       "prefs": "how PipeWrench looks, and its key bindings · Enter to open"}
 MENU_NOTES = {"default": "every app that follows the default moves with it", "mute": "mutes or unmutes it",
               "test": "plays a short test sound on it", "rename": "a name of your own; the device's id never changes",
@@ -1026,6 +1042,8 @@ MENU_NOTES = {"default": "every app that follows the default moves with it", "mu
 def _row_note(st, current=None, realtime=None, rates=None, block=None, devices=None, patch=None, mixer=None):
     """The status-line note for the row under the cursor, if it has one."""
     try:
+        if st.pick:
+            return PICK_NOTE
         if st.tab == "settings":
             return _settings_note(st, current, realtime, rates, block)
         if st.tab == "mixer":
@@ -1059,6 +1077,8 @@ def _settings_note(st, current, realtime, rates, block):
         return SETTINGS_CAT_NOTES.get(st.settings_cat)
     if st.settings_cat == "prefs":
         return _prefs_note(st)
+    if st.settings_cat == "network":
+        return _network_note(st)
     if st.editing:
         return "←→ to change · Enter applies · Esc puts it back"
     note = _audio_note(st, current, realtime, rates, block)
@@ -1250,7 +1270,7 @@ def legend(st, devices=None):
 
 
 def _legend(st):
-    if st.popup:
+    if st.popup or st.pick:
         return [("Esc", "cancel")]
     if st.tab == "devices" and st.dev_menu:
         return LEGENDS["devices menu"]
@@ -1262,6 +1282,8 @@ def _legend(st):
         return LEGENDS["settings menu"]
     if st.tab == "settings" and st.editing:
         return LEGENDS["preferences edit" if st.settings_cat == "prefs" else "settings edit"]
+    if st.tab == "settings" and st.settings_cat == "network":
+        return LEGENDS["settings"]
     if st.tab == "settings" and st.settings_cat == "prefs":
         return LEGENDS["keys" if KEYS_ROW <= st.cursor < RESET_KEYS_ROW else "preferences"]
     if st.tab == "settings" and audio_row(st) == ("buttons",):
@@ -1317,7 +1339,11 @@ POPUPS = {
     "quit": ("Quit", [("Quit", "ok"), ("Cancel", "cancel")], 1),
     "pw_down": ("PipeWire not answering", [("OK", "close")], 0),
     "vol_boost": ("Volume past 100%", [("Go louder", "go"), ("Don't ask again", "always"), ("Cancel", "cancel")], 2),
+    "vban_add": ("Add stream", [("Detect on network", "detect"), ("Manual", "manual"), ("Cancel", "cancel")], 2),
+    "vban_remove": ("Remove stream", [("Remove", "ok"), ("Cancel", "cancel")], 1),
 }
+VBAN_ADD_TEXT = {"in": "Listen for VBAN senders on the network, or type one in.",
+                 "out": "Find machines sending VBAN to this one, or type one in."}
 PW_DOWN_TEXT = "PipeWire stopped answering. PipeWrench keeps the last screen and checks again every 5 s."
 
 
@@ -1325,6 +1351,8 @@ def popup_view(st, devices=None):
     """(title, text, [(button, op)]) for the open popover."""
     title, buttons, _ = POPUPS[st.popup[0]]
     kind = st.popup[0]
+    if kind == "vban_add":  # ("vban_add", direction)
+        return f"Add {'incoming' if st.popup[1] == 'in' else 'outgoing'} stream", VBAN_ADD_TEXT[st.popup[1]], buttons
     text = (PW_DOWN_TEXT if kind == "pw_down" else f"{st.popup[3]} is at 100%. Louder can clip." if kind == "vol_boost"
             else _confirm_question(st.popup, devices))
     return title, text, buttons
@@ -1354,6 +1382,8 @@ def _key_popup(st, key):
         _, nid, name, label, cmd = kind
         st.vol_unlocked = st.vol_unlocked | {nid}
         return st, [("mix_cmd", list(cmd))] + ([("boost", name, True, label)] if op == "always" else [])
+    if kind[0] == "vban_add":
+        return st, [("vban_detect" if op == "detect" else "vban_manual", kind[1])]
     if kind == ("reset_keys",):
         st.keys, st.message = {}, "keys reset to the defaults"
         return st, [("save_ui",)]
@@ -1409,6 +1439,7 @@ def _confirm_question(confirm, devices=None):
             "restart_labels": "Restart WirePlumber now to show it? Apps like Discord may lose their audio.",
             "dev_delete_bus": f"Delete bus {arg!r}? It disappears from apps now.",
             "reset_keys": "Reset every key to its default?",
+            "vban_remove": f"Remove {confirm[-1]}? Its stream stops now." if len(confirm) > 1 else "",
             "quit": "Quit PipeWrench?"}[kind]
 
 
@@ -1461,6 +1492,8 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
         cv.add(_fit(f" {note or HINTS.get(st.tab, '')}", width).ljust(width), "status_line")  # a calm full-width bar
     if st.popup:
         _overlay_popup(cv, st, devices, width, height)
+    elif st.pick:
+        _overlay_pick(cv, st, width, height)
     return cv.lines, cv.hits
 
 
@@ -1533,6 +1566,8 @@ def _render_settings(cv, st, current, body_h, realtime=None, rates=None, block=N
     pane = _Canvas(max(10, cv.width - MENU_W))
     if st.settings_cat == "prefs":
         _render_prefs(pane, view)
+    elif st.settings_cat == "network":
+        _render_network(pane, view)
     else:
         _render_audio(pane, view, current, realtime, rates, block)
     marked = [n for n, (_, style) in enumerate(pane.lines) if _has_cursor(style)]
@@ -3005,3 +3040,217 @@ def _menu_box(title, labels, cursor, bar="selected", edge="title"):
                       ("menu", k)))  # the bar stays inside the box
     lines.append(("    └" + "─" * width + "┘", edge, None))
     return lines
+
+
+# --- Settings → Network (VBAN) -----------------------------------------------------------
+# Skrappjaw, 2026-10-26: "This machine", then Incoming and Outgoing stream boxes. Add stream… opens a popover, Detect on
+# network or Manual (device name + IP), then a quick "Select Playback Destination" / "Select Source Audio".
+# Plan: notes/vban-plan.md; mockups: notes/vban-mockups.md. st.net is a pwvban.View the Tui refreshes.
+
+NET_BOXES = (("in", "incoming", "Incoming streams"), ("out", "outgoing", "Outgoing streams"))
+PICK_TITLES = {"in": "Select Playback Destination", "out": "Select Source Audio"}
+NET_MENU_WORDS = {"target": "destination", "format": "format", "remove": "remove"}  # the status line's short words
+PICK_NOTE = "↑↓ to choose · Enter picks · Esc cancels"
+NET_NOTES = {"addr": "what other machines send to: this address, and the incoming stream's port",
+             "pw": "VBAN is built into PipeWire; from 1.4.2 it tells senders apart by IP, before that it takes a port each",
+             "in_add": "a stream from another machine · Enter: detect on network, manual",
+             "out_add": "send audio or MIDI to another machine · Enter: detect on network, manual"}
+
+
+def net_rows(view):
+    """Network's row ids: This machine's two, then each box's streams and its Add row. st.cursor indexes them."""
+    rows = [("addr",), ("pw",)]
+    for d, key, _ in NET_BOXES:
+        rows += [(d, e["id"]) for e in (view.config[key] if view else [])] + [(d + "_add",)]
+    return tuple(rows)
+
+
+def with_net(st, view):
+    """New Network data: keep the cursor on the same row while streams come and go."""
+    old, rows = net_rows(st.net), net_rows(view)
+    rid = old[max(0, min(len(old) - 1, st.cursor))] if st.settings_cat == "network" else None
+    st = dataclasses.replace(st, net=view)
+    if rid in rows:
+        st.cursor = rows.index(rid)
+    elif st.settings_cat == "network":
+        st.cursor = max(0, min(len(rows) - 1, st.cursor))
+    return st
+
+
+def net_entry(view, d, eid):
+    if view is None:
+        return None
+    return next((e for e in view.config["incoming" if d == "in" else "outgoing"] if e["id"] == eid), None)
+
+
+def stream_menu(d, e):
+    return (("Turn off" if e["on"] else "Turn on", "toggle"),
+            ("Playback destination…" if d == "in" else "Source audio…", "target"),
+            ("Format…", "format"), ("Remove", "remove"))
+
+
+def target_pick(view, d, e):
+    """The quick pick after adding a stream, and its menu's destination/source item."""
+    eps = pv.endpoints_for(view.graph if view else None, d, e["media"])
+    items = (("Not connected", None),) + tuple((x.label, pv.endpoint_key(x)) for x in eps)
+    return ("target", d, e["id"], PICK_TITLES[d], items)
+
+
+def heard_pick(d, heard):
+    """heard: [(ip, pwvban.Heard)] from Detect."""
+    title = "Heard on the network"
+    return ("heard", d, None, title, tuple((pv.heard_label(h, ip), (ip, h)) for ip, h in heard))
+
+
+def open_pick(st, pick, current=None):
+    values = [v for _, v in pick[4]]
+    st.pick, st.pick_cursor = pick, values.index(current) if current in values else 0
+    return st
+
+
+def _format_value(e):
+    return "midi" if e["media"] == "midi" else (e["rate"], e["format"], e["channels"])
+
+
+def _key_network(st, key):
+    rows = net_rows(st.net)
+    st.cursor = max(0, min(len(rows) - 1, st.cursor))
+    if key in ("up", "down"):
+        st.cursor = max(0, min(len(rows) - 1, st.cursor + (1 if key == "down" else -1)))
+    elif key == "left":
+        return _leave(st)
+    elif key == "enter":
+        rid = rows[st.cursor]
+        if rid[0] in ("in_add", "out_add"):
+            st.popup, st.popup_button = ("vban_add", rid[0][:-4]), None
+        elif rid[0] in ("in", "out"):
+            e = net_entry(st.net, *rid)
+            if e is not None:
+                open_pick(st, ("menu", rid[0], e["id"], e["name"], stream_menu(rid[0], e)))
+    return st, []
+
+
+def _key_pick(st, key):
+    """A list popover: ↑↓ choose, Enter picks, Esc cancels; other keys leave it up."""
+    purpose, d, eid, _, items = st.pick
+    if key in ("up", "down"):
+        st.pick_cursor = max(0, min(len(items) - 1, st.pick_cursor + (1 if key == "down" else -1)))
+        return st, []
+    if key == "esc":
+        st.pick, st.message = None, "cancelled"
+        return st, []
+    if key != "enter" or not items:
+        return st, []
+    value = items[max(0, min(len(items) - 1, st.pick_cursor))][1]
+    st.pick = None
+    if purpose == "heard":
+        return st, [("vban_heard", d, value)]
+    e = net_entry(st.net, d, eid)
+    if e is None:
+        st.message = st.failed = "that stream has gone"
+        return st, []
+    if purpose == "target":
+        return st, [("vban_set", d, eid, {"target": value})]
+    if purpose == "format":
+        return st, [("vban_format", d, eid, value)]
+    if value == "toggle":
+        return st, [("vban_set", d, eid, {"on": not e["on"]})]
+    if value == "target":
+        return open_pick(st, target_pick(st.net, d, e), e.get("target")), []
+    if value == "format":
+        return open_pick(st, ("format", d, eid, f"Format: {e['name']}", tuple(pv.FORMAT_CHOICES)), _format_value(e)), []
+    st.popup, st.popup_button = ("vban_remove", d, eid, e["name"]), None
+    return st, []
+
+
+def _target_label(view, d, e):
+    if not e.get("target"):
+        return "not connected"
+    ep = pv.target_endpoint(view.graph, d, e)
+    return ep.label if ep else e["target"].removeprefix(pv.MONITOR) + " (not here)"
+
+
+def _stream_line(view, d, e):
+    status = pv.status_word(e, view.units, view.rules, d)
+    dot = "●" if status == "on" else "○"
+    text = (f"{dot} {_fit(e['name'], 14):<14} {e['ip']:<15} :{e['port']:<5} {'→' if d == 'in' else '←'} "
+            f"{_fit(_target_label(view, d, e), 20):<20} {pv.short_format(e)}")
+    if status != "on":
+        text += f"  {status}"
+    style = "dim" if status == "off" else "alert" if status == "failed" else "normal"
+    return text, style
+
+
+def _render_network(cv, st):
+    v, rows = st.net, net_rows(st.net)
+
+    def row(c, rid, text, style="normal"):
+        idx = rows.index(rid)
+        sel = st.cursor == idx
+        r = c.add(("> " if sel else "  ") + text, "selected" if sel else style)
+        c.hit(r, 0, c.width, ("setting", idx))
+
+    def machine(c):
+        if v is None:
+            row(c, ("addr",), "reading…", "dim")
+            row(c, ("pw",), "", "dim")
+            return
+        row(c, ("addr",), f"{'Address':<16} {v.address or 'no network'} · {v.host}")
+        version = ".".join(map(str, v.version)) if v.version else "unknown"
+        how = "senders matched by IP, one port" if v.rules else "one incoming stream per port"
+        row(c, ("pw",), f"{'PipeWire':<16} {version} · {how}")
+
+    def streams(c, d, key):
+        for e in (v.config[key] if v else []):
+            row(c, (d, e["id"]), *_stream_line(v, d, e))
+        row(c, (d + "_add",), "+ Add stream…", "dim")
+
+    _boxed(cv, "This machine", machine)
+    for d, key, title in NET_BOXES:
+        cv.add("")
+        _boxed(cv, title, lambda c, d=d, key=key: streams(c, d, key))
+
+
+def _network_note(st):
+    rows, v = net_rows(st.net), st.net
+    rid = rows[max(0, min(len(rows) - 1, st.cursor))]
+    if rid[0] in NET_NOTES:
+        return NET_NOTES[rid[0]]
+    e = net_entry(v, *rid)
+    if e is None:
+        return None
+    enter = " · Enter: " + ", ".join(NET_MENU_WORDS[op] if op != "toggle" else label.lower()
+                                     for label, op in stream_menu(rid[0], e))
+    where = _target_label(v, rid[0], e)
+    if rid[0] == "in":
+        return f"From {e['name']} ({pv.point_here(e, v.address or 'this machine')}) to {where}{enter}"
+    return f"To {e['name']} ({e['ip']}:{e['port']}) from {where}, an output in Mixer{enter}"
+
+
+def _overlay_pick(cv, st, width, height):
+    """The list popover, centred over the finished screen; only its items take clicks."""
+    _, _, _, title, items = st.pick
+    labels = [label for label, _ in items] or ["(nothing to pick)"]
+    bw = max(30, min(width - 4, max(len(title) + 8, max(len(x) for x in labels) + 8)))
+    inner = bw - 4
+    room = max(1, min(len(labels), height - 8))
+    top = max(0, min(st.pick_cursor - room + 1, len(labels) - room)) if st.pick_cursor >= room else 0
+    rows = [f"┌─ {title[:bw - 6]} ".ljust(bw - 1, "─") + "┐"]
+    rows += [f"│ {(('> ' if i == st.pick_cursor else '  ') + labels[i])[:inner].ljust(inner)} │" for i in range(top, top + room)]
+    rows.append("└" + "─" * (bw - 2) + "┘")
+    y0, x0 = max(0, (height - len(rows)) // 2), max(0, (width - bw) // 2)
+    cv.hits = []
+    for n, row in enumerate(rows):
+        y = y0 + n
+        if y >= len(cv.lines):
+            break
+        text0, style = cv.lines[y]
+        base, spans = style if isinstance(style, tuple) else (style, [])
+        spans = list(spans) + [(x0, x0 + bw, "popup")]
+        if 0 < n < len(rows) - 1 and items:
+            i = top + n - 1
+            if i == st.pick_cursor:
+                spans.append((x0 + 2, x0 + bw - 2, "popup_sel"))
+            cv.hit(y, x0 + 2, x0 + bw - 2, ("pick_item", i))
+        line = text0.ljust(width)[:width]
+        cv.lines[y] = (line[:x0] + row + line[x0 + bw:], (base, spans))

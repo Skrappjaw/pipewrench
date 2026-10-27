@@ -212,8 +212,10 @@ def test_settings_opens_on_the_menu_and_arrows_pick_a_category():
     st = pc.UIState(tab="settings")
     assert st.settings_focus == "menu" and st.settings_cat == "audio"
     st, actions = key(st, "down")
-    assert st.settings_cat == "prefs" and st.cursor == 0 and actions == []
-    st, _ = key(st, "down", "up")
+    assert st.settings_cat == "network" and st.cursor == 0 and actions == []
+    st, _ = key(st, "down")
+    assert st.settings_cat == "prefs"
+    st, _ = key(st, "down", "up", "up")
     assert st.settings_cat == "audio"
     st, _ = key(st, "right")
     assert st.settings_focus == "pane"

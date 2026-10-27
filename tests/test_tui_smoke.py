@@ -221,7 +221,7 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
     try:
         app.expect("Playback")
         app.send(tab("settings"))
-        app.send("\x1bOB")  # Preferences
+        app.send("\x1bOB" * 2)  # past Network to Preferences
         app.expect("light")
         app.send("\r" + "\x1bOB" * pc.THEME_ROW + "\r\x1bOD")  # into it, the theme row, open it, left: light → dark
         app.expect("theme: dark")
@@ -247,7 +247,7 @@ def test_crowbar_theme_starts(tmp_path, term):
     try:
         app.expect("needs 256 colours" if term == "xterm" else "Playback")
         app.send(tab("settings"))
-        app.send("\x1bOB")  # Preferences
+        app.send("\x1bOB" * 2)  # past Network to Preferences
         app.expect("crowbar")
         app.quit()
         assert app.wait_exit() == 0
@@ -273,7 +273,7 @@ def test_rebind_a_key_in_settings(app, tmp_path):
     app.send(tab("settings"))
     app.expect("Force sample rate")
     show_hidden = pc.KEYS_ROW + [x for _, x in pc.BINDING_ROWS].index(pc.pk.BY_ID["devices.show_hidden"])
-    app.send("\x1bOB\r" + "\x1bOB" * show_hidden)  # Preferences, then Devices → Show hidden in Key Bindings
+    app.send("\x1bOB\x1bOB\r" + "\x1bOB" * show_hidden)  # past Network to Preferences, then Devices → Show hidden in Key Bindings
     app.expect("Key Bindings")
     app.send("\r")
     app.expect("press a key for Devices · show hidden")
