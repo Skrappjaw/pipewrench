@@ -40,7 +40,7 @@ pwrench devices bus add NAME [LABEL] | bus delete NAME
 pwrench devices preview | apply [--restart] | rollback | restart
 pwrench patch [list] | connect SRC DST | disconnect SRC DST
 pwrench vban [list] | detect [SECONDS] | add in|out NAME IP [--to|--from NODE] [--midi]
-pwrench vban on|off|remove in|out NAME
+pwrench vban connect in|out NAME NODE | disconnect in|out NAME | on|off|remove in|out NAME
 pwrench theme list | export ID [FILE] | check [FILE]
 ```
 

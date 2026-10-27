@@ -372,12 +372,14 @@ The page has three boxes:
   sending to this one (one that sends VBAN usually receives it too).
 - **Manual**: type the device's name, then its IP address.
 
+An outgoing stream goes out under this machine's name, so Detect on the other end names it after you.
+
 Then a short list asks where it goes: **Select Playback Destination** for an incoming stream (a device, a
 bus or an app's input), **Select Source Audio** for an outgoing one (an input, a monitor of an output, or
 an app). **Not connected** leaves it for the Patch tab.
 
-**Enter on a stream**: Turn off / Turn on, Playback destination… (or Source audio…), Format…, Remove (it
-asks first). Format… has the common ones (48 kHz 16-bit stereo, which Voicemeeter uses, mono, 44.1 kHz,
+**Enter on a stream**: Turn off / Turn on, Playback destination… (or Source audio…), Format…, Rename…,
+Remove (it asks first). Format… has the common ones (48 kHz 16-bit stereo, which Voicemeeter uses, mono, 44.1 kHz,
 24-bit, 32-bit float) and MIDI.
 
 **Things to know**
@@ -557,6 +559,8 @@ Everything below works without opening the screen, for scripts and quick changes
 | `vban detect [SECONDS]` | VBAN streams arriving on port 6980 (default 2 s) |
 | `vban add in NAME IP [--to DST] [--midi]` | a stream from that machine, playing to DST (or not connected) |
 | `vban add out NAME IP [--from SRC] [--midi]` | a stream to that machine, fed from SRC (or nothing yet) |
+| `vban connect in\|out NAME NODE` | where an incoming stream plays, or what feeds an outgoing one |
+| `vban disconnect in\|out NAME` | leave it not connected |
 | `vban on\|off in\|out NAME` | start or stop it; it stays saved |
 | `vban remove in\|out NAME` | stop it and forget it |
 
