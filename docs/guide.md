@@ -369,9 +369,9 @@ The page has three boxes:
 
 - **Detect on network**: on Incoming it listens for 2 seconds and lists what's arriving ("Studio ·
   192.168.1.86 · 48 kHz · 2 ch"); pick one and its name, address and format are filled in. On Outgoing it
-  searches your network for computers (about 5 seconds): it lists only machines that answer like a
-  computer (SSH, Windows sharing, Remote Desktop, VNC), named by your router, with ones already sending
-  VBAN first ("studio-pc · 192.168.1.86 · sends VBAN"). Phones, TVs, cameras and the router are left out.
+  searches your network for computers (about 5 seconds) and lists each by name and address, named by your
+  router, with ones already sending VBAN first ("studio-pc · 192.168.1.86 · sends VBAN"). Phones, TVs,
+  cameras and the router are left out. It never shows what a machine runs, only that it's there.
   The search uses `nmap` when it's installed (`sudo apt install nmap`); without it it still finds the
   machines this one has talked to lately.
 - **Manual**: type the device's name, then its IP address.

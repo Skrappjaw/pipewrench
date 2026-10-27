@@ -214,12 +214,13 @@ def test_scan_lists_computers(monkeypatch):
             return super().__call__(argv)
 
     monkeypatch.setattr(pipewrench, "_local_address", lambda: "192.168.1.99")
-    monkeypatch.setattr(pipewrench, "_probe", lambda ip, ports, timeout=0.4: [22] if ip in ("192.168.1.23", "192.168.1.86") else [])
+    monkeypatch.setattr(pipewrench, "_probe", lambda ip, ports, timeout=0.4: ip in ("192.168.1.23", "192.168.1.86"))
     monkeypatch.setattr(pipewrench, "_vban_detect", lambda seconds=2.0: [])
     monkeypatch.setattr(pipewrench, "_reverse_name", lambda ip: "")
     rc, out, _, r = run("scan", runner=R())
     assert rc == 0
-    assert out.splitlines() == ["den-pc · 192.168.1.23 · SSH", "192.168.1.86 · SSH"]
+    assert out.splitlines() == ["den-pc · 192.168.1.23", "192.168.1.86"]
+    assert "SSH" not in out
     assert ["nmap", "-sn", "-oG", "-", "192.168.1.0/24"] in r.calls
 
 
@@ -235,8 +236,8 @@ def test_scan_without_nmap_still_uses_the_neighbours(monkeypatch):
             return super().__call__(argv)
 
     monkeypatch.setattr(pipewrench, "_local_address", lambda: "192.168.1.99")
-    monkeypatch.setattr(pipewrench, "_probe", lambda ip, ports, timeout=0.4: [22])
+    monkeypatch.setattr(pipewrench, "_probe", lambda ip, ports, timeout=0.4: True)
     monkeypatch.setattr(pipewrench, "_vban_detect", lambda seconds=2.0: [])
     monkeypatch.setattr(pipewrench, "_reverse_name", lambda ip: "studio-pc")
     rc, out, _, _ = run("scan", runner=R())
-    assert rc == 0 and out == "studio-pc · 192.168.1.86 · SSH\n"
+    assert rc == 0 and out == "studio-pc · 192.168.1.86\n"

@@ -72,7 +72,7 @@ def test_remove_then_add_back():
 
 
 def test_outgoing_detect_lists_machines_then_asks_for_the_source(monkeypatch):
-    f = pv.Found("192.168.1.86", "studio-pc", (22,), True)
+    f = pv.Found("192.168.1.86", "studio-pc", True)
     seen = {}
     monkeypatch.setattr(pipewrench, "_find_machines", lambda runner, address, known: (seen.update(known=known), [f])[1])
     t = tui(["Studio", "192.168.1.86"])

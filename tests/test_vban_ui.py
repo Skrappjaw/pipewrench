@@ -312,7 +312,7 @@ def test_outgoing_detect_searches_the_network():
 
 
 def test_found_pick_hands_back_the_machine():
-    f = pv.Found("192.168.1.86", "studio-pc", (22,), True)
+    f = pv.Found("192.168.1.86", "studio-pc", True)
     st = pc.open_pick(state(view()), pc.found_pick([f]))
     assert st.pick[3] == "Machines on the network" and st.pick[4][0][0] == "studio-pc · 192.168.1.86 · sends VBAN"
     _, actions = key(st, "enter")

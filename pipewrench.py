@@ -776,18 +776,18 @@ def _vban_detect(port=pv.PORT, seconds=2.0):
 
 
 def _probe(ip, ports, timeout=0.4):
-    found = []
+    """Does it answer like a computer on any of the ports? Only a yes or no: which ones isn't kept."""
     for port in ports:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(timeout)
         try:
             if s.connect_ex((ip, port)) == 0:
-                found.append(port)
+                return True
         except OSError:
             pass
         finally:
             s.close()
-    return found
+    return False
 
 
 def _find_machines(runner, address, known=None):

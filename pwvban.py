@@ -488,9 +488,8 @@ View = namedtuple("View", "config units address host version rules graph", defau
 # 2026-10-26: "other linux tools do. nmap"): hosts up (nmap -sn, plus the kernel's neighbours, since a sweep
 # without root misses some), kept only if they answer like a computer or were heard sending VBAN.
 
-SCAN_PORTS = {22: "SSH", 3389: "Remote Desktop", 5900: "VNC", 445: "Windows sharing", 139: "Windows sharing",
-              135: "Windows sharing"}
-Found = namedtuple("Found", "ip name ports vban")
+SCAN_PORTS = (22, 135, 139, 445, 3389, 5900)  # answers like a computer; only used to filter, never shown or kept
+Found = namedtuple("Found", "ip name vban")
 
 
 def nmap_cmd(subnet):
@@ -522,17 +521,17 @@ def subnet_of(addr_text, address):
 
 def machines(hosts, neighbours, heard, probes, self_ip):
     """Found machines, VBAN senders first. hosts: [(ip, name)] from nmap; neighbours: [ip]; heard: {ip: stream name}
-    sending VBAN here; probes: {ip: [open SCAN_PORTS]}. This machine is left out."""
+    sending VBAN here; probes: {ip: bool} whether it answered like a computer. This machine is left out. What it
+    answered on isn't kept: the list names machines, not their services (Skrappjaw, 2026-10-26)."""
     names = dict(hosts)
     ips = list(dict.fromkeys([ip for ip, _ in hosts] + list(neighbours) + list(heard)))
-    out = [Found(ip, names.get(ip) or heard.get(ip, ""), tuple(probes.get(ip, ())), ip in heard)
+    out = [Found(ip, names.get(ip) or heard.get(ip, ""), ip in heard)
            for ip in ips if ip != self_ip and (probes.get(ip) or ip in heard)]
     return sorted(out, key=lambda f: (not f.vban, tuple(int(x) for x in f.ip.split("."))))
 
 
 def found_label(f):
-    what = "sends VBAN" if f.vban else next((SCAN_PORTS[p] for p in SCAN_PORTS if p in f.ports), "")
-    return " · ".join(x for x in (f.name, f.ip, what) if x)
+    return " · ".join(x for x in (f.name, f.ip, "sends VBAN" if f.vban else "") if x)
 
 
 def from_found(f, host):

@@ -434,20 +434,22 @@ def test_wide_subnets_are_cut_to_a_24():
 
 
 def test_machines_keep_computers_and_vban_senders_only():
-    probes = {"192.168.1.1": [], "192.168.1.23": [22], "192.168.1.63": [], "192.168.1.99": [22, 445],
-              "192.168.1.119": [], "192.168.1.86": [22, 445]}
+    probes = {"192.168.1.1": False, "192.168.1.23": True, "192.168.1.63": False, "192.168.1.99": True,
+              "192.168.1.119": False, "192.168.1.86": True}
     found = pv.machines(pv.parse_nmap_hosts(NMAP), ["192.168.1.86"], {"192.168.1.86": "studio-pc"}, probes, "192.168.1.99")
     assert [(f.ip, f.name) for f in found] == [("192.168.1.86", "studio-pc"), ("192.168.1.23", "den-pc")]
     assert found[0].vban and not found[1].vban
 
 
 def test_found_label():
-    assert pv.found_label(pv.Found("192.168.1.86", "studio-pc", (22, 445), True)) == "studio-pc · 192.168.1.86 · sends VBAN"
-    assert pv.found_label(pv.Found("192.168.1.20", "", (3389,), False)) == "192.168.1.20 · Remote Desktop"
-    assert pv.found_label(pv.Found("192.168.1.23", "den-pc", (22,), False)) == "den-pc · 192.168.1.23 · SSH"
+    """Machines, never their services (Skrappjaw, 2026-10-26: "should not return exposing services like ssh")."""
+    assert pv.found_label(pv.Found("192.168.1.86", "studio-pc", True)) == "studio-pc · 192.168.1.86 · sends VBAN"
+    assert pv.found_label(pv.Found("192.168.1.20", "", False)) == "192.168.1.20"
+    assert pv.found_label(pv.Found("192.168.1.23", "den-pc", False)) == "den-pc · 192.168.1.23"
+    assert pv.Found._fields == ("ip", "name", "vban")
 
 
 def test_entry_from_found():
-    e = pv.from_found(pv.Found("192.168.1.86", "studio-pc", (22,), True), "desktop")
+    e = pv.from_found(pv.Found("192.168.1.86", "studio-pc", True), "desktop")
     assert (e["name"], e["ip"], e["stream"]) == ("studio-pc", "192.168.1.86", "desktop")
-    assert pv.from_found(pv.Found("192.168.1.20", "", (3389,), False), "desktop")["name"] == "192.168.1.20"
+    assert pv.from_found(pv.Found("192.168.1.20", "", False), "desktop")["name"] == "192.168.1.20"
