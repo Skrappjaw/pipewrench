@@ -66,10 +66,10 @@ def chips(lines):
 
 
 @pytest.mark.parametrize("name", list(STATES))
-def test_key_box_sits_just_above_the_status_line(name):
+def test_key_box_sits_above_the_now_playing_box_and_the_status_line(name):
     lines = render(STATES[name])
     top, bottom = box(lines)
-    assert bottom == len(lines) - 2
+    assert bottom == len(lines) - 2 - pc.MEDIA_BOX_H and lines[bottom + 1][0].startswith("┌─ Now playing")
     assert all(t.startswith("│") and t.rstrip().endswith("│") for t, _ in lines[top + 1:bottom])
 
 

@@ -530,7 +530,8 @@ def test_messages_are_a_full_width_band_green_with_a_tick_or_red_with_a_cross():
     assert screen(st)[0][-1][1] == "band_alert" and screen(st)[0][-1][0].startswith(" ✖ boom")
     st.message = "linked"  # a later message is not tarred by the old failure
     assert screen(st)[0][-1][1] == "band_ok"
-    assert screen(UIState())[0][-1][1] == "dim"  # no message: the dim tab hint
+    calm = screen(UIState())[0][-1]
+    assert calm[1] == "status_line" and len(calm[0]) == 80  # no message: the row's note on a calm full-width bar
     assert all({"band_ok", "band_alert"} <= set(theme) for theme in pc.THEMES.values())
 
 

@@ -122,3 +122,43 @@ def test_settings_warnings_wrap_instead_of_clipping(tmp_path):
     lines, _ = pc.render_screen(st, CUR, None, 60, 50, rates=rates)
     body = " ".join(t.strip(" │") for t, _ in lines)
     assert "PipeWire resamples" in body
+
+
+# --- onboard and HDMI (Intel HDA) cards: rates from codec#0 (punch list, 2026-10-26) ----------------------
+# Real files from desktop: a Realtek ALC892 (onboard) and an ATI R6xx HDMI.
+
+def test_parse_codec_keeps_only_rates_every_output_and_input_lists():
+    s = pr.parse_codec((FIX / "codec-alc892.txt").read_text())
+    assert s.rates == frozenset({44100, 48000, 96000, 192000})   # the digital out's 32k and 88.2k don't count
+    assert dict((d, r) for d, r, _ in s.dirs) == {"out": frozenset({44100, 48000, 96000, 192000}),
+                                                   "in": frozenset({44100, 48000, 96000, 192000})}
+    assert s.supports(48000) and not s.supports(88200) and s.running is None
+
+
+def test_parse_codec_nodes_without_their_own_rates_use_the_codec_default():
+    s = pr.parse_codec((FIX / "codec-ati-hdmi.txt").read_text())
+    assert s.rates == frozenset({32000, 44100, 48000}) and [d for d, _, _ in s.dirs] == ["out"]
+
+
+def test_parse_codec_with_no_rates_is_unknown():
+    assert pr.parse_codec("Codec: nothing here\n") is None
+
+
+def hda_tree(tmp_path, n, fixture):
+    d = tmp_path / f"card{n}"
+    d.mkdir()
+    (d / "codec#0").write_text((FIX / fixture).read_text())
+    return tmp_path
+
+
+def test_read_uses_the_codec_for_an_hda_card_and_names_it_in_warnings(tmp_path):
+    rates = pr.read([card("Built-in Audio", 0)], hda_tree(tmp_path, 0, "codec-alc892.txt"))
+    assert rates[0].known and rates[0].supports(88200) is False
+    warns = pr.warnings(88200, [48000, 88200], 48000, rates)
+    assert any("Built-in Audio can't run at 88.2k" in w for w in warns) and pr.GENERIC not in warns
+
+
+def test_a_usb_stream_file_wins_over_a_codec_file(tmp_path):
+    root = proc_tree(tmp_path, {1: "umc404hd-stream0.txt"})
+    (root / "card1" / "codec#0").write_text((FIX / "codec-ati-hdmi.txt").read_text())
+    assert pr.read([card("UMC404HD", 1)], root)[0].supports(192000)

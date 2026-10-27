@@ -17,20 +17,21 @@ guide is about using the screen.
 - **Tabs** along the top: Mixer, Devices, Patch, Settings, Top, About. Switch with `Tab` (`Shift+Tab`
   goes back), the number keys `1`–`6`, or a click. Leaving a tab resets it: open menus close and
   unapplied Settings changes are dropped, so a tab always opens clean.
-- **The status line** at the very bottom explains the selected row: what it is, then what you can do with
-  it. `Enter:` lists what Enter offers there, read off the row's own menu.
-- **The keys box** above it lists only the keys you can't guess: the view's letter shortcuts, `Esc` where
+- **The status line** at the very bottom, on its own colour bar, explains the selected row: what it is, then
+  what you can do with it. `Enter:` lists what Enter offers there, read off the row's own menu.
+- **The keys box** lists only the keys you can't guess: the view's letter shortcuts, `Esc` where
   it goes back, `Space` (mute) on the Mixer, and `q` to quit. The arrows, Enter, Tab and the number keys
   aren't listed: they always work, and the numbers are on the tabs. Each key is a chip, and clicking one
   presses it. Settings → Preferences → **Keys box** hides it; the keys still work.
 - **Tap or click a row** to select it; tap or click it again (or double-click) to press Enter on it. That's
   how a touchscreen opens a menu, edits a value or connects a pair.
-- **The status band** under it shows what just happened: `✓` on green when it worked, `✖` on red when it
-  didn't. It stays until the next message.
+- **The status band** takes the status line's place to show what just happened: `✓` on green when it
+  worked, `✖` on red when it didn't. It stays until you move (an arrow, Tab, a number key, paging or the
+  wheel); then the selected row's note is back.
 - **Questions and warnings** open in a box over the screen and stay until you answer: ←→ pick a
   button, Enter chooses it, Esc cancels. Other keys do nothing while it's open. A click or tap on a
   button works too. The cursor starts on Cancel, so a stray Enter never does the risky thing.
-- **The now-playing box** above the keys shows the media player that's playing: `*` play/pause,
+- **The now-playing box**, between the keys box and the status line, shows the media player that's playing: `*` play/pause,
   `-` `+` its volume, `<` `>` previous and next. There's no stop on purpose (Brave can't restart a
   stopped tab from outside).
 - **The mouse wheel scrolls** whatever list you're in, wherever the pointer is. It never changes a
@@ -297,7 +298,8 @@ Every sound card, on or off, one line each:
 - **vs PipeWire:** `✓ same as PipeWire`, or `⇄ resampled` when its rate differs from PipeWire's.
 
 Select a card and the status line says what that means for it and which rates it can run, as the kernel
-lists them. Only USB interfaces report rates; others say `not reported`. A device that plays and records
+lists them. USB interfaces report rates, and so do onboard and HDMI cards (Intel HDA: only the rates every part
+of the chip lists); others say `not reported`. A device that plays and records
 at different rates shows each (`out 32k · in 16k`).
 
 #### Clock

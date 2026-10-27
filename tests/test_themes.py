@@ -168,3 +168,14 @@ def test_opening_the_theme_row_is_the_reload_moment():
     assert pc.themes_message([]) == (f"{len(pc.THEME_NAMES)} themes", "")
     msg, failed = pc.themes_message(["themes/a.toml: x", "themes/b.toml: y"])
     assert msg == failed and msg.startswith("themes/a.toml: x") and "+1 more" in msg
+
+
+def test_message_bands_are_bold_and_never_bold_black():
+    # Skrappjaw, 2026-10-26: "Make the status bar a bold color highlight that is more obvious" → bold light text
+    # where the band's text was black (his 2026-10-24 rule: no bold on black).
+    for name, t in pt.load([pt.BUILTIN_DIR]).themes.items():
+        for role in ("band_ok", "band_alert"):
+            fg, _, attr = t[role]
+            assert "bold" in attr.split() and fg not in ("black", "#000000"), (name, role)
+    dark = pt.load([pt.BUILTIN_DIR]).themes["dark"]
+    assert dark["band_ok"][0] == "white" and dark["status_line"] == dark["anchor"]

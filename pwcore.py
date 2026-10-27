@@ -398,6 +398,9 @@ MEDIA_KEYS = {"*": ("media", "play/pause"), "<": ("media", "previous"),
               "=": ("media_volume", "+5%")}
 
 
+NAV_KEYS = ("up", "down", "left", "right", "tab", "btab", "pgup", "pgdn")
+
+
 def handle_key(st, key, current, devices=None, patch=None, mixer=None):
     """Return (new_state, actions). Nothing touches PipeWire until an action is executed.
 
@@ -408,6 +411,8 @@ def handle_key(st, key, current, devices=None, patch=None, mixer=None):
         return _capture_key(st, key)
     if st.popup:
         return _key_popup(st, key)
+    if key in NAV_KEYS or (key.isdigit() and 1 <= int(key) <= len(TABS)):
+        st.message = st.failed = ""  # a message lasts until you move, then the row's note is back (Skrappjaw, 2026-10-26)
     if key == "q":
         st.popup, st.popup_button = ("quit",), None
         return st, []
@@ -967,7 +972,7 @@ def _dev_row_keys(devices, st):
 # What each Display row does, shown in the status line while it's selected (Skrappjaw, 2026-10-26).
 PREF_NOTES = {THEME_ROW: "applies at once", FPS_ROW: "how often Mixer meters redraw",
               FALL_ROW: "how fast a meter drops after a peak",
-              HOLD_ROW: f"a peak marker hangs, then falls {PEAK_FALL} dB/s",
+              HOLD_ROW: "how long the peak marker stays at the loudest point before it falls",
               BAR_ROW: "the bar under each Mixer channel", METERS_ROW: "live levels on the Mixer",
               SHOW_HIDDEN_ROW: "hidden cards and buses on Devices, greyed",
               MONITORS_ROW: "each output's monitor on Devices, listed under it",
@@ -1422,18 +1427,18 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
     cv.hits = [h for h in cv.hits if h[0] < body_end]
     while len(cv.lines) < body_end:
         cv.add("")
-    _media_box(cv, media)
     top = len(cv.lines)
     for text, style in footer:
         cv.add(text, style)
     for n, c0, c1, k in chips:
         cv.hit(top + n, c0, c1, ("key", k))
+    _media_box(cv, media)  # under the Keys box, above the status line (Skrappjaw's punch list, 2026-10-26)
     if st.message:  # a full-width band; the symbol carries it on one-colour themes (Skrappjaw, 2026-10-26)
         bad = st.message == st.failed
         cv.add(f" {'✖' if bad else '✓'} {st.message}".ljust(width), "band_alert" if bad else "band_ok")
     else:
         note = _row_note(st, current, realtime, rates, block, devices, patch, mixer)
-        cv.add(_fit(f" {note or HINTS.get(st.tab, '')}", width), "dim")
+        cv.add(_fit(f" {note or HINTS.get(st.tab, '')}", width).ljust(width), "status_line")  # a calm full-width bar
     if st.popup:
         _overlay_popup(cv, st, devices, width, height)
     return cv.lines, cv.hits

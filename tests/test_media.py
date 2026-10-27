@@ -143,5 +143,6 @@ def test_the_player_has_its_own_box(key_box):
     assert lines[top][1] == lines[top + 2][1] == "dim"
     rows = {h[0] for h in hits if h[3][0] == "key" and h[3][1] in "*-+<>"}
     assert rows == {top + 1}                                       # the chips sit on the boxed line
-    if key_box:
-        assert lines[top + 3][0].startswith("┌─ Keys")
+    assert top + 3 == len(lines) - 1                               # then only the status line
+    if key_box:                                                    # under the Keys box (punch list, 2026-10-26)
+        assert lines[top - 1][0].startswith("└") and any(t.startswith("┌─ Keys") for t, _ in lines[:top])

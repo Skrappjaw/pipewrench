@@ -45,6 +45,7 @@ ROLES = {
     "meter_high": ("specific", "meters: past −6 dB", "alert"),
     "band_ok": ("specific", "the status band when something worked (✓)", "bar_ok"),
     "band_alert": ("specific", "the status band when something failed (✖)", "bar_alert"),
+    "status_line": ("specific", "the status line: what the selected row is and does (a calm bar)", "anchor"),
     "popup": ("specific", "popover boxes", "chip"),
     "popup_sel": ("specific", "the chosen button in a popover", "selected"),
 }
@@ -112,6 +113,27 @@ def _section(raw, name, allowed, palette):
     return out
 
 
+def _lum(colour):
+    """0 (black) to 1 (white) for a hex colour; None for a curses name or the terminal's default."""
+    if not colour or not colour.startswith("#"):
+        return None
+    r, g, b = (int(colour[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _louder_bands(t):
+    """The ✓/✖ bands in bold (Skrappjaw, 2026-10-26: "a bold color highlight that is more obvious"), never bold on
+    black: terminals draw bold black as grey, so black band text turns white first (Skrappjaw's pick). A dark hex colour
+    goes through a 256-colour slot, which bold doesn't brighten, so it keeps its colour and gets bold."""
+    for role in ("band_ok", "band_alert"):
+        fg, bg, attr = t[role]
+        if fg in ("black", "#000000"):
+            if bg == "white" or (_lum(bg) or 0) > 0.6:
+                continue  # light text on a light band would be unreadable; this one stays as it is
+            fg = "white" if fg == "black" else "#ffffff"
+        t[role] = (fg, bg, " ".join(dict.fromkeys(f"{attr} bold".split())))
+
+
 def derive(general, specific):
     """Every role from the general ones plus explicit specific ones, in the order the old dicts used."""
     t = {**general, **specific}
@@ -129,6 +151,7 @@ def derive(general, specific):
         t[f"dim@{bar}"] = (t["dim"][0], t[bar][1], t["dim"][2])
     for role in SPECIFIC:
         t.setdefault(role, t[ROLES[role][2]])
+    _louder_bands(t)
     if t["popup_sel"] == t["popup"]:  # pipeOS-dark: chip and selected match, so the choice was invisible
         fg, bg, _ = t["popup"]
         t["popup_sel"] = (bg, fg, "bold")

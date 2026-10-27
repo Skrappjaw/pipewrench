@@ -66,3 +66,42 @@ def test_volume_keys_on_devices_leave_the_status_line_alone(k):
     st = pc.UIState(tab="devices", dev_cursor=0)
     after, actions = pc.handle_key(st, k, CUR, DEV)
     assert after.message == "" and actions == [] and note(after) == note(st)
+
+
+# --- a message clears on the next move (Skrappjaw, 2026-10-26: approved the flagged pointers "as long as none of
+# these break the status line when navigating"; "Clear on the next move") ----------------------------------
+
+def handle(st, k):
+    return pc.handle_key(st, k, CUR, DEV, PATCH, MX)[0]
+
+
+def test_the_d_pointer_clears_when_you_move_on_devices():
+    st = handle(pc.UIState(tab="devices"), "d")
+    assert "Mixer" in st.message
+    st = handle(st, "down")
+    assert st.message == "" and note(st) and "Mixer (1)" not in note(st)
+
+
+@pytest.mark.parametrize("tab,k", [("mixer", "down"), ("settings", "down"), ("patch", "up"), ("devices", "up"),
+                                   ("top", "pgdn"), ("mixer", "tab")])
+def test_any_message_clears_on_a_navigation_key(tab, k):
+    st = pc.UIState(tab=tab, settings_focus="pane", message="applied")
+    assert handle(st, k).message == ""
+
+
+def test_a_message_the_key_itself_sets_still_shows():
+    st = pc.UIState(tab="settings", settings_focus="pane", cursor=pc.audio_index(("setting", 0)),
+                    pending={"clock.force-quantum": 256})
+    after = handle(st, "left")                 # ← leaves the pane and drops the pending change
+    assert after.message == "unapplied changes dropped"
+
+
+def test_other_keys_keep_the_message():
+    assert handle(pc.UIState(tab="mixer", message="applied"), "v").message.startswith("meters")
+    assert handle(pc.UIState(tab="devices", message="applied"), "enter").message == "applied"
+
+
+def test_peak_hold_note_explains_the_setting_and_nothing_else():
+    # Skrappjaw, 2026-10-26: "correct peak status line to reflect variable settings" → "Just explain the setting."
+    text = note(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane", cursor=pc.HOLD_ROW))
+    assert "peak" in text and "dB/s" not in text

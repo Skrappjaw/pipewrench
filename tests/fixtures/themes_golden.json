@@ -247,14 +247,14 @@
     "bold"
    ],
    "band_ok": [
-    "black",
+    "white",
     "green",
-    ""
+    "bold"
    ],
    "band_alert": [
-    "black",
+    "white",
     "red",
-    ""
+    "bold"
    ],
    "popup": [
     "black",
@@ -275,6 +275,11 @@
     null,
     "blue",
     "dim"
+   ],
+   "status_line": [
+    "white",
+    "blue",
+    ""
    ]
   },
   "light": {
@@ -526,12 +531,12 @@
    "band_ok": [
     "white",
     "green",
-    ""
+    "bold"
    ],
    "band_alert": [
     "white",
     "red",
-    ""
+    "bold"
    ],
    "popup": [
     "white",
@@ -552,6 +557,11 @@
     null,
     "blue",
     "dim"
+   ],
+   "status_line": [
+    "white",
+    "blue",
+    ""
    ]
   },
   "crowbar": {
@@ -803,12 +813,12 @@
    "band_ok": [
     "#2e2e33",
     "#73d216",
-    ""
+    "bold"
    ],
    "band_alert": [
     "#2e2e33",
     "#fc4138",
-    ""
+    "bold"
    ],
    "popup": [
     "#2e2e33",
@@ -829,6 +839,11 @@
     null,
     "#45454b",
     "dim"
+   ],
+   "status_line": [
+    "#ff7139",
+    "#45454b",
+    ""
    ]
   },
   "pipeboy": {
@@ -1080,12 +1095,12 @@
    "band_ok": [
     "#0b1a0d",
     "#1f8a35",
-    ""
+    "bold"
    ],
    "band_alert": [
     "#0b1a0d",
     "#b6ffc2",
-    ""
+    "bold"
    ],
    "popup": [
     "#b6ffc2",
@@ -1104,6 +1119,11 @@
    ],
    "dim@anchor": [
     "#1f8a35",
+    "#13401c",
+    ""
+   ],
+   "status_line": [
+    "#3cff62",
     "#13401c",
     ""
    ]
@@ -1357,12 +1377,12 @@
    "band_ok": [
     "#1a1000",
     "#9a6a00",
-    ""
+    "bold"
    ],
    "band_alert": [
     "#1a1000",
     "#ffe0a0",
-    ""
+    "bold"
    ],
    "popup": [
     "#ffe0a0",
@@ -1381,6 +1401,11 @@
    ],
    "dim@anchor": [
     "#9a6a00",
+    "#4a3300",
+    ""
+   ],
+   "status_line": [
+    "#ffb000",
     "#4a3300",
     ""
    ]
@@ -1634,12 +1659,12 @@
    "band_ok": [
     "#071a1c",
     "#1a8a94",
-    ""
+    "bold"
    ],
    "band_alert": [
     "#071a1c",
     "#b8f9ff",
-    ""
+    "bold"
    ],
    "popup": [
     "#b8f9ff",
@@ -1658,6 +1683,11 @@
    ],
    "dim@anchor": [
     "#1a8a94",
+    "#0d3f45",
+    ""
+   ],
+   "status_line": [
+    "#33f0ff",
     "#0d3f45",
     ""
    ]
@@ -1911,12 +1941,12 @@
    "band_ok": [
     "#121212",
     "#8c8c8c",
-    ""
+    "bold"
    ],
    "band_alert": [
     "#121212",
     "#ffffff",
-    ""
+    "bold"
    ],
    "popup": [
     "#ffffff",
@@ -1935,6 +1965,11 @@
    ],
    "dim@anchor": [
     "#8c8c8c",
+    "#3a3a3a",
+    ""
+   ],
+   "status_line": [
+    "#e6e6e6",
     "#3a3a3a",
     ""
    ]
@@ -2188,12 +2223,12 @@
    "band_ok": [
     "#1b0d33",
     "#05ffa1",
-    ""
+    "bold"
    ],
    "band_alert": [
     "#1b0d33",
     "#ff4f81",
-    ""
+    "bold"
    ],
    "popup": [
     "#1b0d33",
@@ -2212,6 +2247,11 @@
    ],
    "dim@anchor": [
     "#8a6fb3",
+    "#3a1d5c",
+    ""
+   ],
+   "status_line": [
+    "#01cdfe",
     "#3a1d5c",
     ""
    ]
@@ -2465,12 +2505,12 @@
    "band_ok": [
     "#ffffff",
     "#5d9632",
-    ""
+    "bold"
    ],
    "band_alert": [
     "#ffffff",
     "#aa0000",
-    ""
+    "bold"
    ],
    "popup": [
     "#ffffff",
@@ -2489,6 +2529,11 @@
    ],
    "dim@anchor": [
     "#aaaaaa",
+    "#4a4a4a",
+    ""
+   ],
+   "status_line": [
+    "#ffffff",
     "#4a4a4a",
     ""
    ]
@@ -2742,12 +2787,12 @@
    "band_ok": [
     "#ffffff",
     "#5b6770",
-    ""
+    "bold"
    ],
    "band_alert": [
     "#ffffff",
     "#ff7a00",
-    ""
+    "bold"
    ],
    "popup": [
     "#ffffff",
@@ -2766,6 +2811,11 @@
    ],
    "dim@anchor": [
     "#8a9399",
+    "#e3efff",
+    ""
+   ],
+   "status_line": [
+    "#2b2f33",
     "#e3efff",
     ""
    ]
@@ -3019,12 +3069,12 @@
    "band_ok": [
     "#14181b",
     "#b8c4cc",
-    ""
+    "bold"
    ],
    "band_alert": [
     "#14181b",
     "#ff9a1f",
-    ""
+    "bold"
    ],
    "popup": [
     "#ffffff",
@@ -3043,6 +3093,11 @@
    ],
    "dim@anchor": [
     "#5f6b73",
+    "#16283a",
+    ""
+   ],
+   "status_line": [
+    "#c9d1d6",
     "#16283a",
     ""
    ]

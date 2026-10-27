@@ -95,7 +95,8 @@ def png(lines, title="pwrench", theme="dark"):
     draw.text((img.width / 2, 12), title, fill=_hex("#9aa0a6"), font=FONT, anchor="mm")
     for y, (text, style) in enumerate(lines):
         text = text[:W]
-        cells = _cells(text if style in ("band_ok", "band_alert") else text.rstrip(), style, W, theme)  # the band is full width
+        cells = _cells(text if style in ("band_ok", "band_alert", "status_line") else text.rstrip(), style, W,
+                       theme)  # the band and the status line are full width
         by = top + y * CELL_H
         for x, ch in enumerate(text.ljust(W)):
             fg, bg, bold, dim, under = cells[x]

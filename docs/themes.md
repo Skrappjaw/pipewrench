@@ -105,6 +105,7 @@ The theme map (`tools/theme-map.toml`, a complete example theme) gives each gene
 | `meter_high` | specific | meters: past −6 dB | `alert` |
 | `band_ok` | specific | the status band when something worked (✓) | `bar_ok` |
 | `band_alert` | specific | the status band when something failed (✖) | `bar_alert` |
+| `status_line` | specific | the status line: what the selected row is and does (a calm bar) | `anchor` |
 | `popup` | specific | popover boxes | `chip` |
 | `popup_sel` | specific | the chosen button in a popover | `selected` |
 
@@ -122,6 +123,8 @@ Each role is `{ fg = "…", bg = "…", attr = "…" }`. Leave any part out.
 - **Hex needs a terminal with 256 colours or more.** On a smaller one the theme falls back to dark and says
   so. A theme that uses only the eight colour names works everywhere.
 - Bold on black text shows as grey in many terminals, so avoid `attr = "bold"` with `fg = "black"`.
+- The ✓/✖ bands (`band_ok`, `band_alert`) are always drawn bold. If a band's text is `black` (or `#000000`)
+  on a dark-enough background, PipeWrench draws it white instead, so it never turns grey.
 
 ## `extends` and `logo`
 

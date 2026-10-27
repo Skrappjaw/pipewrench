@@ -1081,7 +1081,8 @@ class Tui:
     _PLAIN = {"selected": "reverse bold", "anchor": "underline", "chip": "reverse", "title": "bold",
               "alert": "bold", "pending": "bold", "dim": "dim",
               "bar_ok": "reverse", "bar_alert": "reverse", "bar_dim": "reverse dim",
-              "band_ok": "reverse", "band_alert": "reverse bold", "popup": "reverse", "popup_sel": "bold"}
+              "band_ok": "reverse", "band_alert": "reverse bold", "status_line": "underline", "popup": "reverse",
+              "popup_sel": "bold"}
 
     def _reload_themes(self, scr):
         """Re-read the theme files, so an edited or new theme shows without a restart."""

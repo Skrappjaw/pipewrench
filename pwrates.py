@@ -1,7 +1,8 @@
 """Which sample rates each sound card supports, from the kernel, and the rate it runs at now.
 
 PipeWire only reports a node's current format, so the hardware's range comes from
-/proc/asound/cardN/stream* instead. Only USB audio (snd-usb-audio) writes those files; other cards
+/proc/asound/cardN/stream* instead. Only USB audio (snd-usb-audio) writes those files. Onboard and HDMI
+(Intel HDA) cards list theirs in /proc/asound/cardN/codec#0 (punch list, 2026-10-26). Cards with neither
 are "not reported" and get the generic warning. Background: Skrappjaw found, 2026-10-25, that forcing
 192000 ran the graph at 192k while the UMC404HD stayed at 48000 (allowed-rates was [48000]).
 """
@@ -75,6 +76,40 @@ def parse_stream(text):
     return Stream(rates=rates, ranges=ranges, running=running, dirs=named)
 
 
+def parse_codec(text):
+    """Rates from an HDA codec#0 file, or None if it lists none. Each Audio Output node is playback and each Audio
+    Input node capture; a node without its own rates line uses the codec's "Default PCM" ones. A rate counts only
+    if every node of every direction lists it (punch list: "only rates every part of the codec lists")."""
+    default, nodes, kind = None, {"out": [], "in": []}, None
+    for line in text.splitlines():
+        if line.startswith("Node "):
+            kind = "out" if "[Audio Output]" in line else "in" if "[Audio Input]" in line else None
+            if kind:
+                nodes[kind].append(None)
+            continue
+        m = re.match(r"\s+rates \[0x[0-9a-f]+\]:(.*)", line)
+        if not m:
+            continue
+        rates = frozenset(int(x) for x in m[1].split())
+        if kind is None and default is None and not any(nodes.values()):
+            default = rates  # the function group's Default PCM, before the first node
+        elif kind and nodes[kind] and nodes[kind][-1] is None:
+            nodes[kind][-1] = rates
+    per_dir = {d: [r if r is not None else default for r in ns] for d, ns in nodes.items() if ns}
+    per_dir = {d: ns for d, ns in per_dir.items() if all(r is not None for r in ns)}
+    if not per_dir:
+        return None
+    dirs = tuple((d, frozenset.intersection(*ns), ()) for d, ns in per_dir.items())
+    return Stream(rates=frozenset.intersection(*(r for _, r, _ in dirs)), dirs=dirs)
+
+
+def _codec(root, alsa_card):
+    try:
+        return parse_codec(Path(root, f"card{alsa_card}", "codec#0").read_text())
+    except OSError:
+        return None
+
+
 def _status(card):
     states = {r.state for r in card.rows}
     return next((s for s in ("running", "idle", "suspended") if s in states), "suspended" if card.rows else "idle")
@@ -95,8 +130,8 @@ def read(cards, root=PROC):
                 texts.append(f.read_text())
             except OSError:
                 pass
-        out.append(CardRates(c.label, parse_stream("\n".join(texts)) if texts else None, _status(c), live,
-                             tuple((r.name, r.label) for r in c.rows)))
+        stream = parse_stream("\n".join(texts)) if texts else _codec(root, c.alsa_card) if c.alsa_card is not None else None
+        out.append(CardRates(c.label, stream, _status(c), live, tuple((r.name, r.label) for r in c.rows)))
     return out
 
 
