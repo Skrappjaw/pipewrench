@@ -54,7 +54,7 @@ it's running. Any channel can be muted with a key or made the system default fro
 mic needs more than 100%, you can boost it up to 150%; PipeWrench checks with you the first time, since
 anything past 100% can clip.
 
-![A channel's menu in the Mixer](docs/guide/mixer-menu.png)
+![The Mixer: every output, input and app with its volume and live meter](docs/guide/mixer.png)
 
 **Devices.** The Devices tab shows each sound card in its own box, with every channel it provides and the
 profile it's running. This is where you rename "GCS-8 CH 2" to "Mic" and hide the HDMI outputs you never
