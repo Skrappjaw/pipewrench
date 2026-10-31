@@ -1,5 +1,5 @@
 """pipeOS themes (Skrappjaw, 2026-10-24; Portal): pipeOS-lite, a clean test chamber, and pipeOS-dark, Portal 2. On Patch, source dots are
-portal blue and destination dots portal orange; every other theme keeps its ok/pending colours for them."""
+portal blue and destination dots portal orange; every other theme keeps its ok/pending colors for them."""
 import json
 from pathlib import Path
 
@@ -41,7 +41,7 @@ def test_every_theme_has_the_dot_roles():
 
 
 @pytest.mark.parametrize("name", ["dark", "light", "crowbar", "pipeboy", "vaporware", "pipecraft"])
-def test_other_themes_keep_their_dot_colours(name):
+def test_other_themes_keep_their_dot_colors(name):
     t = pc.THEMES[name]
     assert t["src"] == t["ok"] and t["dst"] == t["ok"] and t["dst_partial"] == t["pending"]
 
@@ -54,7 +54,7 @@ def test_portal_dots_are_blue_and_orange(name):
     r, g, b = pc.hex_rgb(t["dst"][0])
     assert r > g > b and r > 200                  # orange portal
     assert t["dst_partial"][0] == t["dst"][0]     # partial is the same orange; the half dot shows it
-    assert pc.THEME_MIN_COLOURS[name] == 256
+    assert pc.THEME_MIN_COLORS[name] == 256
 
 
 def test_portal_light_is_light_and_portal_dark_is_dark():
@@ -82,7 +82,7 @@ def test_source_dot_is_src_off_the_cursor():
     assert linked and all(role_at(s, t.index("●")) == "src" for t, s in linked)
 
 
-def test_dot_under_a_bar_keeps_its_colour():
+def test_dot_under_a_bar_keeps_its_color():
     # Skrappjaw: the dots were white when highlighted; they keep blue/orange on the bar's background
     lines = patch_lines()
     text, style = next((t, s) for t, s in lines if cols(t)[0].startswith("> "))
@@ -100,7 +100,7 @@ def test_dot_under_a_bar_keeps_its_colour():
 
 
 @pytest.mark.parametrize("name", ["pipeos-lite", "pipeos-dark"])
-def test_pipeos_bars_are_blue_and_orange_and_dots_keep_their_colour(name):
+def test_pipeos_bars_are_blue_and_orange_and_dots_keep_their_color(name):
     t = pc.THEMES[name]
     r, g, b = pc.hex_rgb(t["bar_src"][1])
     assert b > r and b > g                         # a blue bar on the sources
@@ -108,7 +108,7 @@ def test_pipeos_bars_are_blue_and_orange_and_dots_keep_their_colour(name):
     assert r > g > b                               # an orange bar on the destinations
     for dot, bar in (("src", "bar_src"), ("src", "anchor_src"), ("dst", "bar_dst"), ("dst", "anchor_dst"),
                      ("dst_partial", "bar_dst"), ("dst_partial", "anchor_dst")):
-        assert t[f"{dot}@{bar}"][:2] == (t[dot][0], t[bar][1])   # the dot's colour on the bar's background
+        assert t[f"{dot}@{bar}"][:2] == (t[dot][0], t[bar][1])   # the dot's color on the bar's background
 
 
 @pytest.mark.parametrize("name", ["dark", "crowbar", "pipecraft"])
@@ -160,7 +160,7 @@ NEW_ROLES = {"head_src": "title", "head_dst": "title", "vol": "ok", "vol_over": 
 
 
 @pytest.mark.parametrize("name", ["dark", "light", "crowbar", "pipeboy", "vaporware", "pipecraft"])
-def test_other_themes_keep_their_header_and_bar_colours(name):
+def test_other_themes_keep_their_header_and_bar_colors(name):
     t = pc.THEMES[name]
     assert all(t[new] == t[old] for new, old in NEW_ROLES.items())
 
@@ -288,7 +288,7 @@ def test_patch_slot_menu_edges_are_orange():
     assert role_at(style, text.index("┌")) == "head_dst"
 
 
-def test_realtime_dots_show_status_not_portal_colours():
+def test_realtime_dots_show_status_not_portal_colors():
     import pwrealtime as prt
     status = prt.Status(user="u", groups={"pipewire": 95}, member=True)  # a member, PipeWire not found: ● and ◐
     lines = pc.render_screen(pc.UIState(tab="settings", theme="pipeos-dark"), {}, None, 100, 50,

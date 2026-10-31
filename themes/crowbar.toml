@@ -1,4 +1,4 @@
-# Linux Mint's Mint-Y-Dark-Orange (gtk-3.0 colours); exact hex where the terminal allows.
+# Linux Mint's Mint-Y-Dark-Orange (gtk-3.0 colors); exact hex where the terminal allows.
 name = "crowbar"
 order = 2
 extends = "dark"

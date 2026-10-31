@@ -14,7 +14,7 @@ NAME = "org.mpris.MediaPlayer2.brave.instance366124"
 
 
 def getall(status="Playing", position=50898601, length=258899773, title="Morph", artist=("Twenty One Pilots",)):
-    """GetAll as Brave answered it on desktop (trimmed)."""
+    """GetAll as Brave answered it on a real machine (trimmed)."""
     meta = {"mpris:length": {"type": "x", "data": length}, "xesam:title": {"type": "s", "data": title},
             "xesam:artist": {"type": "as", "data": list(artist)}, "xesam:album": {"type": "s", "data": "Trench"}}
     return json.dumps({"type": "a{sv}", "data": [{

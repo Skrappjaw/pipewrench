@@ -17,7 +17,7 @@ Start it with `pwrench`. Every command-line option is under [Command line](#comm
 - **Tabs** along the top: Mixer, Devices, Patch, Settings, Top, About. Switch with `Tab` (`Shift+Tab`
   goes back), the number keys `1`–`6`, or a click. Leaving a tab resets it: open menus close and
   unapplied Settings changes are dropped, so a tab always opens clean.
-- **The status line** at the very bottom, on its own colour bar, explains the selected row: what it is, then
+- **The status line** at the very bottom, on its own color bar, explains the selected row: what it is, then
   what you can do with it. `Enter:` lists what Enter offers there, read off the row's own menu.
 - **The keys box** lists only the keys you can't guess: the view's letter shortcuts, `Esc` where
   it goes back, `Space` (mute) on the Mixer, and `q` to quit. The arrows, Enter, Tab and the number keys
@@ -369,12 +369,12 @@ The page has three boxes:
 
 **Add a stream.** Enter on **+ Add stream…** in either box, then pick:
 
-- **Detect on network**: on Incoming it listens for 2 seconds and lists what's arriving first ("Studio ·
-  192.168.1.86 · 48 kHz · 2 ch"; pick one and its name, address and format are filled in), then the
+- **Detect on network**: on Incoming it listens for 2 seconds and lists what's arriving first ("Studio PC ·
+  192.0.2.20 · 48 kHz · 2 ch"; pick one and its name, address and format are filled in), then the
   computers the network search finds (pick one and set Format… to match its sender). The search covers
   the times listening can't: PipeWire before 1.4.2 holds port 6980 once you have an incoming stream, and a
   sender that isn't sending yet can't be heard. On Outgoing it searches your network for computers (about 5 seconds) and lists each by name and address, named by your
-  router, with ones already sending VBAN first ("studio-pc · 192.168.1.86 · sends VBAN"). Phones, TVs,
+  router, with ones already sending VBAN first ("Laptop · 192.0.2.31 · sends VBAN"). Phones, TVs,
   cameras and the router are left out. It never shows what a machine runs, only that it's there.
   The search uses `nmap` when it's installed (`sudo apt install nmap`); without it it still finds the
   machines this one has talked to lately.
@@ -396,7 +396,7 @@ Remove (it asks first). Format… has the common ones (48 kHz 16-bit stereo, whi
   stereo stream sounds wrong. Detect fills it in for you; with Manual, check Format… against the sender.
 - **PipeWire before 1.4.2** (Linux Mint 22 has 1.0.5) takes one incoming stream per port, so each incoming
   stream gets its own port: 6980, then 6981 and so on. The status line says what to point the sender at
-  ("sends to 192.168.1.99:6981"). From 1.4.2 they all share 6980 and PipeWrench tells senders apart by
+  ("sends to 192.0.2.10:6981"). From 1.4.2 they all share 6980 and PipeWrench tells senders apart by
   their address. Outgoing works the same way round: a second stream to the same machine goes to 6981, a
   third to 6982, so a receiver before 1.4.2 can take each one. Streams to different machines all use 6980.
 - **An incoming stream plays where you picked every time it starts**, even with PipeWrench closed. An
@@ -445,8 +445,8 @@ the bottom says what the selected row does. With the
 Keys box off, the key list at the bottom of the screen is gone and the view gets those lines. Every key,
 letter shortcuts included, still works.
 
-**Pipe Boy** is one phosphor colour, after Fallout's Pip-Boy: green, amber, cyan or white. With no other
-colours, status shows by style: good is bold, waiting is underlined, and a problem is a pale block.
+**Pipe Boy** is one phosphor color, after Fallout's Pip-Boy: green, amber, cyan or white. With no other
+colors, status shows by style: good is bold, waiting is underlined, and a problem is a pale block.
 
 ![Pipe Boy](guide/mixer-pipeboy.png)
 
@@ -454,12 +454,12 @@ colours, status shows by style: good is bold, waiting is underlined, and a probl
 
 ![Vaporware](guide/mixer-vaporware.png)
 
-**Pipecraft** uses Minecraft's text colours on dark dirt, and its About tab says PIPECRAFT.
+**Pipecraft** uses Minecraft's text colors on dark dirt, and its About tab says PIPECRAFT.
 
 ![Pipecraft](guide/about-pipecraft.png)
 
 **pipeOS-lite** (a clean test chamber) and **pipeOS-dark** (Portal 2's moody chambers) follow one rule:
-anything with a direction is a portal colour, blue for playback, outputs and sources and orange for
+anything with a direction is a portal color, blue for playback, outputs and sources and orange for
 recording, inputs and destinations. Everything else uses blue.
 
 - **Patch:** blue dots and cursor bar on the sources, orange on the destinations. The slot menu is orange.
@@ -468,11 +468,11 @@ recording, inputs and destinations. Everything else uses blue.
 - **Devices:** each channel's `out` is blue and `in` orange.
 - **Everything else:** the cursor bar, tabs, titles, key chips and the Settings menu are blue.
 - **Status dots stay plain.** Realtime's dots, and the ● and ○ marking a card's profile, show their status in
-  white, yellow or red, never a portal colour. There's no green anywhere.
+  white, yellow or red, never a portal color. There's no green anywhere.
 
 ![pipeOS-dark](guide/patch-portal.png)
 
-Every theme except dark and light needs a 256-colour terminal; on a basic one PipeWrench shows dark instead.
+Every theme except dark and light needs a 256-color terminal; on a basic one PipeWrench shows dark instead.
 
 **Your own themes.** Every theme is a small TOML file you can copy and change: `pwrench theme export
 pipeos-dark`, edit a line, then open the Theme row again to pick it. Opening the row re-reads the files, and the

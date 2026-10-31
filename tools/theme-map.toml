@@ -1,4 +1,4 @@
-# The theme map: every general role in its own colour, so docs/themes.md can show which role paints what.
+# The theme map: every general role in its own color, so docs/themes.md can show which role paints what.
 # tools/screenshots.py draws docs/guide/theme-map.png with it. It's also a complete example theme.
 name = "Theme map"
 logo = "ansi"

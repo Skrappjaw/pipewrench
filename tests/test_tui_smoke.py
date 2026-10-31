@@ -213,7 +213,7 @@ def test_mixer_rename_empty_restores_the_default(app, tmp_path):
     assert saved["labels"] == {}
 
 
-@pytest.mark.parametrize("term", ["xterm-256color", "xterm", "vt100"])  # 16+ colours, 8 colours, none
+@pytest.mark.parametrize("term", ["xterm-256color", "xterm", "vt100"])  # 16+ colors, 8 colors, none
 def test_theme_switches_live_and_is_saved(tmp_path, term):
     (tmp_path / "pipewrench").mkdir()
     (tmp_path / "pipewrench" / "ui.json").write_text('{"theme": "light"}')
@@ -239,13 +239,13 @@ def test_theme_switches_live_and_is_saved(tmp_path, term):
             pass
 
 
-@pytest.mark.parametrize("term", ["xterm-256color", "xterm"])  # exact or nearest colours; dark fallback
+@pytest.mark.parametrize("term", ["xterm-256color", "xterm"])  # exact or nearest colors; dark fallback
 def test_crowbar_theme_starts(tmp_path, term):
     (tmp_path / "pipewrench").mkdir()
     (tmp_path / "pipewrench" / "ui.json").write_text('{"theme": "orange"}')  # the old name still loads
     app = Pty(tmp_path, term)
     try:
-        app.expect("needs 256 colours" if term == "xterm" else "Playback")
+        app.expect("needs 256 colors" if term == "xterm" else "Playback")
         app.send(tab("settings"))
         app.send("\x1bOB" * 2)  # past Network to Preferences
         app.expect("crowbar")

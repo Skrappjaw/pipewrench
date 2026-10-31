@@ -147,7 +147,7 @@ def test_graph_tolerates_junk():
 # --- JACK clients (e.g. REAPER via pw-jack): no media.class, ports without channel names -----
 
 def with_reaper(d):
-    """REAPER as pipewire-jack shows it on desktop: media.type Audio, client.api jack, mono ports."""
+    """REAPER as pipewire-jack shows it on a real machine: media.type Audio, client.api jack, mono ports."""
     d = list(d)
     d.append({"id": 700, "type": "PipeWire:Interface:Node", "info": {"state": "running", "props": {
         "media.type": "Audio", "node.name": "REAPER", "node.description": "REAPER", "client.api": "jack",

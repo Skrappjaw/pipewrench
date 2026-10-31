@@ -87,7 +87,7 @@ def test_lines_fit_height():
 
 
 def test_top_render_styles():
-    def role(style):  # inside a box the row's colour is the span under its text (QA pass, 2026-10-26)
+    def role(style):  # inside a box the row's color is the span under its text (QA pass, 2026-10-26)
         base, spans = style if isinstance(style, tuple) else (style, [])
         return next((r for a, b, r in reversed(spans) if a <= 4 < b), base)
     lines, _ = pc.render_screen(UIState(tab="top"), CUR, block(), 200, 40)
@@ -440,16 +440,16 @@ def test_theme_row_switches_at_once_and_reports_it():
                               "pipeboy-white", "vaporware", "pipecraft", "pipeos-lite", "pipeos-dark"]
 
 
-def _rgb(colour):
-    return pc.hex_rgb(colour)
+def _rgb(color):
+    return pc.hex_rgb(color)
 
 
 def test_pipe_boy_is_monochrome_green():
     t = pc.THEMES["pipeboy"]
-    assert "pipeboy" in pc.THEME_NAMES and pc.THEME_MIN_COLOURS["pipeboy"] == 256
+    assert "pipeboy" in pc.THEME_NAMES and pc.THEME_MIN_COLORS["pipeboy"] == 256
     hexes = {c for fg, bg, _ in t.values() for c in (fg, bg) if c}
     assert hexes and all(c.startswith("#") for c in hexes)
-    for c in hexes:  # every colour is a green: green channel leads, red and blue trail it
+    for c in hexes:  # every color is a green: green channel leads, red and blue trail it
         r, g, b = _rgb(c)
         assert g >= r and g >= b and g > 0, c
     # without hue, status reads by style: ok bold, pending underlined, alert a block
@@ -466,7 +466,7 @@ def _hsv(c):
                                       ("pipeboy-white", None)])
 def test_each_pipe_boy_is_one_hue(name, hue):
     t = pc.THEMES[name]
-    assert pc.THEME_MIN_COLOURS[name] == 256
+    assert pc.THEME_MIN_COLORS[name] == 256
     hexes = {c for fg, bg, _ in t.values() for c in (fg, bg) if c}
     for c in hexes:
         h, sat, _ = _hsv(c)
@@ -479,9 +479,9 @@ def test_each_pipe_boy_is_one_hue(name, hue):
            {r: (fg is None, bg is None, a) for r, (fg, bg, a) in pc.THEMES["pipeboy"].items()}
 
 
-def test_vaporware_has_vaporwave_colours():
+def test_vaporware_has_vaporwave_colors():
     t = pc.THEMES["vaporware"]
-    assert pc.THEME_MIN_COLOURS["vaporware"] == 256 and pc.theme_label("vaporware") == "Vaporware"
+    assert pc.THEME_MIN_COLORS["vaporware"] == 256 and pc.theme_label("vaporware") == "Vaporware"
     assert t["title"][0] == "#ff71ce" and t["selected"][1] == "#01cdfe" and t["ok"][0] == "#05ffa1"
     assert len({t["ok"][0], t["pending"][0], t["alert"][0]}) == 3
 
@@ -492,10 +492,10 @@ def test_theme_labels():
                                                            "Pipecraft", "pipeOS-lite", "pipeOS-dark"]
 
 
-def test_pipecraft_uses_minecraft_text_colours():
+def test_pipecraft_uses_minecraft_text_colors():
     t = pc.THEMES["pipecraft"]
-    assert pc.THEME_MIN_COLOURS["pipecraft"] == 256
-    # Minecraft's formatting-code colours: yellow, green, gold, red, grey
+    assert pc.THEME_MIN_COLORS["pipecraft"] == 256
+    # Minecraft's formatting-code colors: yellow, green, gold, red, grey
     assert (t["title"][0], t["ok"][0], t["pending"][0], t["alert"][0], t["dim"][0]) == \
            ("#ffff55", "#55ff55", "#ffaa00", "#ff5555", "#aaaaaa")
 
@@ -529,7 +529,7 @@ def test_ui_file_round_trips_and_tolerates_junk(tmp_path):
 
 
 def test_messages_are_a_full_width_band_green_with_a_tick_or_red_with_a_cross():
-    # Skrappjaw, 2026-10-26: make the status bar more obvious. The symbol carries it on one-colour themes.
+    # Skrappjaw, 2026-10-26: make the status bar more obvious. The symbol carries it on one-color themes.
     lines = screen(UIState(message="linked"))[0]
     assert lines[-1][1] == "band_ok" and lines[-1][0].startswith(" ✓ linked") and len(lines[-1][0]) == 80
     st = UIState(message="boom", failed="boom")

@@ -7,53 +7,81 @@ desktop at all.
 
 ![PipeWrench's Mixer: every output, input and app with its level and meter](docs/guide/mixer.png)
 
-[Why it exists](#why-it-exists) · [What it does](#what-it-does) · [Screens](#screens) ·
+[Why it exists](#why-it-exists) · [Overview](#overview) ·
 [Where it fits](#where-it-fits) · [Install](#install) · [Run](#run) · [Command line](#command-line) ·
 [Where it keeps things](#where-it-keeps-things) · [Licence](#licence) · **[User guide](docs/guide.md)**
 
 ## Why it exists
 
-> **Draft for Skrappjaw to rewrite in his own words. Remove this line when done.**
+I've been using Linux as my daily driver since 2017. I've run most flavors of Ubuntu, Fedora, openSUSE, and
+even dabbled in Arch. I'm a musician, podcaster, and an amateur audio engineer. Over the years one thing
+was always the common issue with Linux and audio. Linux could always do the job, but getting under the hood
+was the only way. Few apps could easily and intuitively expose the capabilities of ALSA, Pulse, or JACK.
+Then came PipeWire. The one server to rule them all. Still missing a good way to get under the hood. My work around was a script. But who wants that?
 
-I record on Linux through a BOSS GCS-8, which PipeWire shows as separate stereo channels, ten in and seven
-out. Getting a session ready meant running a script that restarted PipeWire and forced the sample rate,
-and the restart dropped Discord every time. The graphical tools each handled one piece: pavucontrol for
-levels, qpwgraph for patching, nothing for the clock. None of them would run over SSH or sit in a tmux
-pane beside REAPER. I wanted one tool that did all of it from the terminal and never restarted anything
-without asking, so I wrote it.
+Here it is. This is almost 10 years of Linux audio experience and frustration poured into one terminal app
+where the first thing you see is everything playing or recording. The ability to choose your default audio
+interface and check levels to make sure your gain stages are right. Need to boost your mic when your squad
+can't hear you? Check. Need to put music on a separate bus for a live stream? Check. Want to set up a
+network intercom system across PCs? We got VBAN settings for that. Everything from just getting things plugged in,
+to setting up a live stream.
+
+Here's the crazy part. All this is already baked into your Linux box and you shouldn't have to rely on a
+stack of 3rd party apps to manage it. It's in the system. Now it's in one app. 
+
+More to come.
 
 — Skrappjaw
 
-## What it does
+## Overview
 
-- **Mixer.** Volume, mute and live meters for every output, input and app. Make any channel the system
-  default from its menu. Going past 100% asks first.
-- **Devices.** Every sound card with its channels and profiles. Rename channels, hide the ones you never
-  use, and add virtual buses (one for OBS, one for Discord) that survive a reboot.
-- **Patch.** A patch bay for audio and MIDI. Connect any output to any input, as a whole device or port by
-  port. REAPER and other JACK apps show up alongside everything else.
-- **Audio settings.** Sample rate and buffer size, changed live, with the latency in milliseconds, the
-  rates each card supports, and a realtime check that shows the exact fix when it's off.
-- **Network audio.** Send and receive audio and MIDI between machines over VBAN, the protocol Voicemeeter
-  uses. Streams you turn on come back at login.
-- **Command line.** Everything above is also a `pwrench` command, for scripts and remote machines.
-- **Themes.** Eleven built in, and your own as small text files.
+**Mixer.** The Mixer is the first thing you see when PipeWrench opens. Every output, input and app on the
+system is listed with its volume and a live meter, so you can tell at a glance what's playing and how hot
+it's running. Any channel can be muted with a key or made the system default from its menu. When a quiet
+mic needs more than 100%, you can boost it up to 150%; PipeWrench checks with you the first time, since
+anything past 100% can clip.
+
+![A channel's menu in the Mixer](docs/guide/mixer-menu.png)
+
+**Devices.** The Devices tab shows each sound card in its own box, with every channel it provides and the
+profile it's running. This is where you rename "GCS-8 CH 2" to "Mic" and hide the HDMI outputs you never
+use. It's also where you create virtual buses, such as a Music bus for a live stream or a separate one for
+Discord. Buses are saved to PipeWire's own configuration, so they're still there after a reboot.
+
+![The Devices tab](docs/guide/devices.png)
+
+**Patch.** Patch is a patch bay for audio and MIDI. Sources sit on one side and destinations on the other,
+and connecting a mic to OBS or a game to a recording bus comes down to picking the two and pressing Enter.
+When you need finer control you can wire individual ports, for example one channel of your interface into
+input 3 of REAPER. JACK apps like REAPER show up in the list next to everything else.
+
+![The Patch tab](docs/guide/patch.png)
+
+**Audio settings.** Settings → Audio controls PipeWire's clock: the sample rate and the buffer size, which
+together set your latency. Changes take effect live, and PipeWrench shows the resulting latency in
+milliseconds next to the rates each of your cards supports. A realtime check tells you whether PipeWire is
+getting the scheduling priority that low-latency work needs, and when it isn't, it gives you the exact
+command that fixes it.
+
+![Settings → Audio](docs/guide/settings.png)
+
+**Network audio.** Settings → Network sends and receives audio and MIDI between machines over VBAN, the
+open protocol Voicemeeter uses and PipeWire already has built in. You can stream a desktop's output to a
+laptop, run an intercom between two rooms, or bring a second PC into your recording rig. Detect can find
+the other machines on your network for you, and every stream you turn on comes back at login.
+
+![Settings → Network](docs/guide/network.png)
+
+**Command line.** Everything in the app is also a `pwrench` command. That makes it easy to script the setup
+for a session, adjust a machine over SSH, or bind a desktop shortcut that switches your default output.
+
+**Themes.** PipeWrench ships with eleven color themes, and each one is a short text file. Copy one, change
+the colors you want, and it appears in Settings with the rest.
+
+![The Mixer cycling through the eleven built-in themes](docs/guide/themes.gif)
 
 PipeWrench never restarts PipeWire or WirePlumber unless you ask, because a restart drops Discord, OBS and
 anything else connected at the time. When a change needs one, it tells you and lets you pick the moment.
-
-## Screens
-
-<table>
-<tr>
-<td width="50%"><img src="docs/guide/patch.png" alt="The Patch tab"><br><b>Patch</b>: what plays into what, audio and MIDI.</td>
-<td width="50%"><img src="docs/guide/settings.png" alt="Settings, Audio"><br><b>Settings → Audio</b>: rate, buffer, realtime.</td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/guide/network.png" alt="Settings, Network"><br><b>Settings → Network</b>: VBAN streams in and out.</td>
-<td width="50%"><img src="docs/guide/devices.png" alt="The Devices tab"><br><b>Devices</b>: cards, profiles and buses.</td>
-</tr>
-</table>
 
 ## Where it fits
 
@@ -61,8 +89,8 @@ anything else connected at the time. When a change needs one, it tells you and l
 - **There are no effects.** PipeWrench sets levels and routes audio. For EQ, compression and the like, use
   EasyEffects or a plugin host.
 - **Tested on Linux Mint 22** (PipeWire 1.0.5, WirePlumber 0.4) with a BOSS GCS-8, a Behringer UMC404HD
-  and onboard audio. WirePlumber 0.5 is supported in the code but hasn't been run on real hardware yet.
-  Other distributions should work and haven't been tested.
+  and onboard audio. WirePlumber 0.5 is supported in the code but hasn't been run on a 0.5 system at this time.
+  Other distributions should work but they haven't been tested. Please file any bugs or pull requests with your findings should you run into issues on your system.
 - **Network audio has limits on PipeWire before 1.4.2**, which Mint 22 ships. The guide's
   [Network](docs/guide.md#network) section explains them.
 
@@ -109,7 +137,7 @@ pwrench theme list | export ID [FILE] | check [FILE]
 ```
 
 Every option is explained in the guide's [Command line](docs/guide.md#command-line) section. To make your
-own colours, see the [theme guide](docs/themes.md).
+own colors, see the [theme guide](docs/themes.md).
 
 ## Where it keeps things
 

@@ -27,14 +27,14 @@ them, change a line or two, and pick the result in Settings.
 A theme has three layers. You only fill in the ones you need.
 
 ```
-[palette]    named colours           sky = "#00bfff"
+[palette]    named colors           sky = "#00bfff"
      │
 [general]    13 base roles           title = { fg = "sky", attr = "bold" }
      │
 [specific]   one role per element    head_play, head_src, … follow title unless you set them
 ```
 
-- **Palette:** names for colours, so you can write `sky` instead of `#00bfff` everywhere.
+- **Palette:** names for colors, so you can write `sky` instead of `#00bfff` everywhere.
 - **General:** the base roles: text, the cursor, titles, ok/pending/alert, key chips, bars. Change these
   and the whole screen follows.
 - **Specific:** one role for each element, like the Mixer's Playback heading or the chosen popover button.
@@ -50,13 +50,13 @@ extends = "pipeos-dark"   # start from this theme; everything you don't set come
 title = { fg = "#ff9a1f", attr = "bold" }
 ```
 
-## What each colour paints
+## What each color paints
 
 ![The theme map](guide/theme-map.png)
 
-The theme map (`tools/theme-map.toml`, a complete example theme) gives each general role its own colour:
+The theme map (`tools/theme-map.toml`, a complete example theme) gives each general role its own color:
 
-| Colour in the picture | Role | Where |
+| Color in the picture | Role | Where |
 |---|---|---|
 | brown | `anchor` | the current tab |
 | sky blue | `title` | tab names and the Playback / Recording headings |
@@ -109,19 +109,19 @@ The theme map (`tools/theme-map.toml`, a complete example theme) gives each gene
 | `popup` | specific | popover boxes | `chip` |
 | `popup_sel` | specific | the chosen button in a popover | `selected` |
 
-`src` and `dst` are optional. Set them when you want outputs and inputs in their own colours (the pipeOS
-themes do: blue and orange). A theme that sets `src` also keeps the dots' colour when the cursor passes over
+`src` and `dst` are optional. Set them when you want outputs and inputs in their own colors (the pipeOS
+themes do: blue and orange). A theme that sets `src` also keeps the dots' color when the cursor passes over
 them.
 
-## Colours and styles
+## Colors and styles
 
 Each role is `{ fg = "…", bg = "…", attr = "…" }`. Leave any part out.
 
-- **Colours:** `#rrggbb`; one of the eight terminal colours (`black red green yellow blue magenta cyan white`),
-  or a bright one (`brightwhite`…); or a name from `[palette]`. Leaving a colour out uses the terminal's own.
+- **Colors:** `#rrggbb`; one of the eight terminal colors (`black red green yellow blue magenta cyan white`),
+  or a bright one (`brightwhite`…); or a name from `[palette]`. Leaving a color out uses the terminal's own.
 - **`attr`:** any of `bold dim underline reverse`, separated by spaces.
-- **Hex needs a terminal with 256 colours or more.** On a smaller one the theme falls back to dark and says
-  so. A theme that uses only the eight colour names works everywhere.
+- **Hex needs a terminal with 256 colors or more.** On a smaller one the theme falls back to dark and says
+  so. A theme that uses only the eight color names works everywhere.
 - Bold on black text shows as grey in many terminals, so avoid `attr = "bold"` with `fg = "black"`.
 - The ✓/✖ bands (`band_ok`, `band_alert`) are always drawn bold. If a band's text is `black` (or `#000000`)
   on a dark-enough background, PipeWrench draws it white instead, so it never turns grey.
@@ -135,7 +135,7 @@ Each role is `{ fg = "…", bg = "…", attr = "…" }`. Leave any part out.
 
 ## Recipes
 
-**Recolour the cursor and nothing else**
+**Recolor the cursor and nothing else**
 
 ```toml
 extends = "dark"
@@ -152,7 +152,7 @@ popup = { fg = "#000000", bg = "#ffd700" }
 popup_sel = { fg = "#ffffff", bg = "#c00000", attr = "bold" }
 ```
 
-**One colour, read by style** (how the Pipe Boy themes work)
+**One color, read by style** (how the Pipe Boy themes work)
 
 ```toml
 extends = "dark"
@@ -169,14 +169,14 @@ alert = { fg = "back", bg = "text" }
 ## Checking a theme
 
 ```
-pwrench theme list            every theme: built-in or yours, and the colours it needs
+pwrench theme list            every theme: built-in or yours, and the colors it needs
 pwrench theme check           problems in your themes folder
 pwrench theme check FILE      problems in one file
 ```
 
 A theme with a problem is left out whole, and the rest still load. Messages name the file and the line:
 
-- `themes/studio.toml: general.chip.bg "blu" is not a colour`: a typo, or a palette name that isn't in
+- `themes/studio.toml: general.chip.bg "blu" is not a color`: a typo, or a palette name that isn't in
   `[palette]`.
 - `themes/studio.toml: general.chips is not a general role`: see the table above for the names.
 - `themes/dark.toml: "dark" is a built-in theme`: your file has a built-in's name. Name it something else and

@@ -410,7 +410,7 @@ def test_meter_level_jumps_up_and_falls_20_db_a_second():
     assert abs(pc.meter_level(1.0, 0.0, 0.5, fall=80) - 0.01) < 1e-9   # 80 dB/s: 40 dB in half
 
 
-def test_meter_cells_colour_by_level():
+def test_meter_cells_color_by_level():
     text, spans = pc._meter_cells(1.0)
     assert text == "█" * 16 and {"meter_low", "meter_mid", "meter_high"} <= {r for *_, r in spans}
     text, spans = pc._meter_cells(0.0)
@@ -463,7 +463,7 @@ def test_a_new_peak_restarts_the_hold_and_a_lower_one_does_not():
     assert pc.hold_peak(0.5, 10.0, 0.3, 20.0, 1.5) == (0.3, 20.0)         # the marker has fallen below it
 
 
-def test_marker_sits_above_the_bar_in_its_zone_colour():
+def test_marker_sits_above_the_bar_in_its_zone_color():
     text, spans = pc._meter_cells(10 ** (-30 / 20), hold=10 ** (-3 / 20))  # bar at -30 dB, peak at -3 dB
     m = text.index("▌")
     assert m == 14 and text.count("█") == 6 and (m, m + 1, "meter_high") in spans

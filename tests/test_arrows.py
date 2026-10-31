@@ -46,7 +46,7 @@ def test_the_cursor_row_keeps_its_bar_with_grey_arrows():
 
 def test_an_open_row_has_its_arrows_back():
     for st, label in ((prefs(cursor=pc.THEME_ROW, editing=True), "Theme"), (audio(cursor=ROW0, editing=True), pc.SETTINGS[0].label)):
-        assert not any(r and r.startswith("dim") for r in arrow_roles(st, label))  # the row's own anchor colour
+        assert not any(r and r.startswith("dim") for r in arrow_roles(st, label))  # the row's own anchor color
 
 
 def test_every_theme_has_the_grey_arrow_roles():

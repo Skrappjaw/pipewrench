@@ -1,7 +1,7 @@
-"""Themes as TOML files: a palette of named colours, general roles, and specific roles that derive from them.
+"""Themes as TOML files: a palette of named colors, general roles, and specific roles that derive from them.
 
 Built-ins live in themes/ beside this file; the user's in ~/.config/pipewrench/themes/. Each role is
-(fg, bg, attr), where None is the terminal's own colour. No curses here. Guide: docs/themes.md.
+(fg, bg, attr), where None is the terminal's own color. No curses here. Guide: docs/themes.md.
 """
 import re
 import tomllib
@@ -76,12 +76,12 @@ class Library:
     def logo(self, name):
         return self.meta.get(name, {}).get("logo") or "ansi"
 
-    def min_colours(self, name):
-        """256 when the theme uses exact hex, else the 8 basic colours."""
+    def min_colors(self, name):
+        """256 when the theme uses exact hex, else the 8 basic colors."""
         return 256 if any(str(c).startswith("#") for v in self.themes[name].values() for c in v[:2]) else 8
 
 
-def _colour(value, palette, where):
+def _color(value, palette, where):
     if value is None:
         return None
     if not isinstance(value, str):
@@ -89,7 +89,7 @@ def _colour(value, palette, where):
     value = palette.get(value, value)
     if _HEX.fullmatch(value) or value in CURSES or (value.startswith("bright") and value[6:] in CURSES):
         return value
-    raise ThemeError(f'{where} "{value}" is not a colour (#rrggbb, a colour name, or a [palette] name)')
+    raise ThemeError(f'{where} "{value}" is not a color (#rrggbb, a color name, or a [palette] name)')
 
 
 def _role(value, palette, where):
@@ -98,7 +98,7 @@ def _role(value, palette, where):
     attr = value.get("attr", "")
     if not isinstance(attr, str) or set(attr.split()) - ATTRS:
         raise ThemeError(f'{where}.attr "{attr}": use {", ".join(sorted(ATTRS))}')
-    return (_colour(value.get("fg"), palette, f"{where}.fg"), _colour(value.get("bg"), palette, f"{where}.bg"), attr)
+    return (_color(value.get("fg"), palette, f"{where}.fg"), _color(value.get("bg"), palette, f"{where}.bg"), attr)
 
 
 def _section(raw, name, allowed, palette):
@@ -113,18 +113,18 @@ def _section(raw, name, allowed, palette):
     return out
 
 
-def _lum(colour):
-    """0 (black) to 1 (white) for a hex colour; None for a curses name or the terminal's default."""
-    if not colour or not colour.startswith("#"):
+def _lum(color):
+    """0 (black) to 1 (white) for a hex color; None for a curses name or the terminal's default."""
+    if not color or not color.startswith("#"):
         return None
-    r, g, b = (int(colour[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    r, g, b = (int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 
 def _louder_bands(t):
     """The ✓/✖ bands in bold (Skrappjaw, 2026-10-26: "a bold color highlight that is more obvious"), never bold on
-    black: terminals draw bold black as grey, so black band text turns white first (Skrappjaw's pick). A dark hex colour
-    goes through a 256-colour slot, which bold doesn't brighten, so it keeps its colour and gets bold."""
+    black: terminals draw bold black as grey, so black band text turns white first (Skrappjaw's pick). A dark hex color
+    goes through a 256-color slot, which bold doesn't brighten, so it keeps its color and gets bold."""
     for role in ("band_ok", "band_alert"):
         fg, bg, attr = t[role]
         if fg in ("black", "#000000"):
@@ -137,7 +137,7 @@ def _louder_bands(t):
 def derive(general, specific):
     """Every role from the general ones plus explicit specific ones, in the order the old dicts used."""
     t = {**general, **specific}
-    own = "src" in general  # a theme with its own in/out colours keeps its dots' colour on the bars
+    own = "src" in general  # a theme with its own in/out colors keeps its dots' color on the bars
     t.setdefault("src", t["ok"])
     t.setdefault("dst", t["ok"])
     t.setdefault("dst_partial", t["pending"])
@@ -203,7 +203,7 @@ def load(dirs):
                 raise ThemeError(f'extends "{parent}", which has a problem')
             palette = {**(base["palette"] if base else {}), **raw.get("palette", {})}
             if not all(isinstance(v, str) for v in palette.values()):
-                raise ThemeError("[palette] values must be colours")
+                raise ThemeError("[palette] values must be colors")
             logo = raw.get("logo", base["logo"] if base else "ansi")
             if logo not in LOGOS:
                 raise ThemeError(f'logo "{logo}": use {", ".join(LOGOS)}')
@@ -245,7 +245,7 @@ def export(lib, source, new_id):
     out = [f"# PipeWrench theme \"{new_id}\", made from {lib.label(source)}. Guide: docs/themes.md",
            "# Edit, save, then open Settings → Display → Theme and pick it.",
            f'name = "{new_id}"', f'extends = "{source}"', f'logo = "{meta["logo"]}"', "",
-           "[palette]  # optional: name colours here and use the names below",
+           "[palette]  # optional: name colors here and use the names below",
            '# accent = "#0a84ff"', "",
            "[general]  # the base roles; the specific ones follow them unless you set them"]
     out += [f"{role} = {_inline(meta['general'][role])}  # {ROLES[role][1]}" for role in GENERAL

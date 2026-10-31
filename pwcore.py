@@ -25,18 +25,18 @@ import pwvban as pv
 READ_CMD = ["pw-metadata", "-n", "settings", "0"]
 RESTART_CMD = ["systemctl", "--user", "restart", "wireplumber"]
 
-# Colour roles as (fg, bg, attr) per theme, loaded from TOML: built-ins in themes/, the user's in
+# Color roles as (fg, bg, attr) per theme, loaded from TOML: built-ins in themes/, the user's in
 # ~/.config/pipewrench/themes/ (pwthemes; guide docs/themes.md). install_themes refills these names.
-THEMES, THEME_NAMES, THEME_LABELS, THEME_MIN_COLOURS, THEME_LOGOS, THEME_USER = {}, [], {}, {}, {}, []
+THEMES, THEME_NAMES, THEME_LABELS, THEME_MIN_COLORS, THEME_LOGOS, THEME_USER = {}, [], {}, {}, {}, []
 
 
 def install_themes(user_dir=None):
     """Load the built-in themes, plus the user's when given; returns the problems found."""
-    global THEMES, THEME_NAMES, THEME_LABELS, THEME_MIN_COLOURS, THEME_LOGOS, THEME_USER
+    global THEMES, THEME_NAMES, THEME_LABELS, THEME_MIN_COLORS, THEME_LOGOS, THEME_USER
     lib = pt.load([pt.BUILTIN_DIR] + ([user_dir] if user_dir else []))
     THEMES, THEME_NAMES, THEME_USER = lib.themes, lib.names, lib.user
     THEME_LABELS = {n: lib.label(n) for n in lib.names}
-    THEME_MIN_COLOURS = {n: lib.min_colours(n) for n in lib.names}
+    THEME_MIN_COLORS = {n: lib.min_colors(n) for n in lib.names}
     THEME_LOGOS = {n: lib.logo(n) for n in lib.names}
     return lib.problems
 
@@ -68,13 +68,13 @@ PEAK_FALL = 20  # dB a second, once the hold is over
 METER_FPS = [5, 10, 15, 20, 30, 45, 60]  # new audio lands once per graph cycle (21 ms at 1024/48k); falls redraw every frame
 
 
-def hex_rgb(colour):
-    return tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))
+def hex_rgb(color):
+    return tuple(int(color[i:i + 2], 16) for i in (1, 3, 5))
 
 
-def nearest_256(colour):
-    """The xterm-256 index closest to a #rrggbb colour (the 6×6×6 cube or the grey ramp)."""
-    r, g, b = hex_rgb(colour)
+def nearest_256(color):
+    """The xterm-256 index closest to a #rrggbb color (the 6×6×6 cube or the grey ramp)."""
+    r, g, b = hex_rgb(color)
     steps = [0, 95, 135, 175, 215, 255]
     near = lambda v: min(range(6), key=lambda i: abs(steps[i] - v))  # noqa: E731
     cube = 16 + 36 * near(r) + 6 * near(g) + near(b)
@@ -1315,7 +1315,7 @@ class _Canvas:
         marks = [(n, n + 1, _MARK_ROLE[ch]) for n, ch in enumerate(text) if ch in _MARK_ROLE and n not in chosen]
         if marks:
             spans = list(spans)
-            for c0, c1, role in marks:  # a dot under a bar keeps its colour on the bar's background
+            for c0, c1, role in marks:  # a dot under a bar keeps its color on the bar's background
                 under = next((r for a, b, r in reversed(spans) if a <= c0 < b), base if base in _BARS else None)
                 if under in _BARS:
                     spans.append((c0, c1, f"{role}@{under}"))
@@ -1396,7 +1396,7 @@ def _overlay_popup(cv, st, devices, width, height):
     one row, or one per row when the screen is too narrow for that."""
     title, text, buttons = popup_view(st, devices)
     chosen = popup_cursor(st)
-    labels = [f"> {b} <" if i == chosen else f"[ {b} ]" for i, (b, _) in enumerate(buttons)]  # marked, not only coloured
+    labels = [f"> {b} <" if i == chosen else f"[ {b} ]" for i, (b, _) in enumerate(buttons)]  # marked, not only colored
     one_row = "  ".join(labels)
     bw = max(8, min(width - 4, max(48, len(title) + 8, len(one_row) + 6)))
     inner = bw - 4
@@ -1484,7 +1484,7 @@ def render_screen(st, current, block, width, height, devices=None, patch=None, m
     for n, c0, c1, k in chips:
         cv.hit(top + n, c0, c1, ("key", k))
     _media_box(cv, media)  # under the Keys box, above the status line (Skrappjaw's punch list, 2026-10-26)
-    if st.message:  # a full-width band; the symbol carries it on one-colour themes (Skrappjaw, 2026-10-26)
+    if st.message:  # a full-width band; the symbol carries it on one-color themes (Skrappjaw, 2026-10-26)
         bad = st.message == st.failed
         cv.add(f" {'✖' if bad else '✓'} {st.message}".ljust(width), "band_alert" if bad else "band_ok")
     else:
@@ -1675,7 +1675,7 @@ def _mix_rate(current, now):
 
 def _info_row(cv, st, idx, label, value, role="normal", mark=None, more=()):
     """A row that shows something: the label, then its status (Skrappjaw, 2026-10-26: "its the what then status").
-    mark colours the value's first character (● ◐ ✖ ✓ ⇄). A value too wide wraps under itself; more is extra
+    mark colors the value's first character (● ◐ ✖ ✓ ⇄). A value too wide wraps under itself; more is extra
     lines of the same row. Every line is part of the row: the cursor bar covers them all and a click selects it."""
     head = f"{'> ' if idx == st.cursor else '  '}{label:<20} "
     room = max(10, cv.width - len(head))
@@ -1707,7 +1707,7 @@ def _render_pipewire(cv, st, current, now, realtime, at):
         ok = realtime.ok
         _info_row(cv, st, at[("realtime",)], "Realtime", "● realtime" if ok else "◐ not realtime",
                   mark="ok" if ok else "pending")
-        for label, mark, text in prt.rows(realtime):  # the dot is a status (ok or a problem), never a portal colour
+        for label, mark, text in prt.rows(realtime):  # the dot is a status (ok or a problem), never a portal color
             _info_row(cv, st, at[("rt", label)], "  " + label, f"{mark} {text}" if mark else text,
                       "normal" if mark else "dim", mark="ok" if mark == "●" else "pending" if mark else None)
         if not ok:
@@ -2175,7 +2175,7 @@ def _render_devices(cv, st, devices, body_h):
             text, style = f"{prefix}{'Profile':<20} {obj.active or '?'}", "normal"
         else:
             text, style = _device_line_text("row" if kind == "chan" else kind, obj, devices, sel)
-            if kind == "chan":  # in pipeOS its direction word is the portal colour
+            if kind == "chan":  # in pipeOS its direction word is the portal color
                 role = {"out": "dir_out", "in": "dir_in"}.get(obj.direction)
                 hidden = obj.name in devices["config"]["hidden"]
                 style = ("dim" if hidden else "normal", [(4, 4 + len(obj.direction), role)] if role else [])
@@ -2421,7 +2421,7 @@ def _zone(cell):
 
 def _meter_cells(level, hold=None):
     """(text, spans): lit cells green to -18 dB, yellow to -6 dB, red above; unlit cells dim.
-    hold, when given, puts a marker (▌) in its zone's colour on the cell it reaches, above the bar."""
+    hold, when given, puts a marker (▌) in its zone's color on the cell it reaches, above the bar."""
     n = _lit(level)
     text = list("█" * n + "·" * (_METER - n))
     spans = [(c, c + 1, _zone(c)) for c in range(n)] + [(n, _METER, "dim")]
@@ -2452,7 +2452,7 @@ def _volume_bar(row, show_bar=True):
         spans = [(0, _BAR, "dim")]
     else:
         spans = [(0, min(n, _BAR_FULL), "vol")] + ([(_BAR_FULL, n, "vol_over")] if n > _BAR_FULL else []) + [(n, _BAR, "dim")]
-    for col in range(len(word)):  # the overlay last, so it draws over the bar's colours
+    for col in range(len(word)):  # the overlay last, so it draws over the bar's colors
         role = "bar_dim" if row.mute or col >= n else "bar_alert" if col >= _BAR_FULL else "bar_ok"
         if spans[-1][2] == role and spans[-1][1] == col:
             spans[-1] = (spans[-1][0], col + 1, role)
@@ -2510,7 +2510,7 @@ def _render_mixer(cv, st, mx, body_h):
             bar += "  " + cells
             spans += [(m0 + a, m0 + b, r) for a, b, r in cell_spans]
         side = "src" if section == "playback" else "dst"  # playback blue, recording orange (pipeOS)
-        if sel:  # the cursor bar covers the name; the volume keeps its colours
+        if sel:  # the cursor bar covers the name; the volume keeps its colors
             spans = [(0, c0 - 1, f"anchor_{side}" if target else f"bar_{side}")] + spans
         box.append((head + bar, ("normal", spans), n_sel))
         if sel and target:
@@ -2820,7 +2820,7 @@ def _render_patch_cols(cv, st, g, srcs, s, room):
             lt = f"{mark}{_fit(srcs[i].label, li - 6):<{li - 6}} {('●' + str(count)) if count else '':>3}"
             bar = ("anchor_src" if on_dst else "bar_src") if i == st.patch_src else None
             spans = [(0, li, bar)] if bar else []
-            if count:  # the source's dot, drawn over its bar (src@bar_src) so it keeps its colour
+            if count:  # the source's dot, drawn over its bar (src@bar_src) so it keeps its color
                 spans.append((lt.index("●"), lt.index("●") + 1, f"src@{bar}" if bar else "src"))
             left.append((lt, spans, [(-2, li + 2, ("patch_src", i))], i == st.patch_src and not on_dst))
         right = []
@@ -3034,7 +3034,7 @@ def _menu_box(title, labels, cursor, bar="selected", edge="title"):
     for k, label in enumerate(labels):
         sel = k == cursor
         role = bar if sel else "normal"
-        sides = [(4, 5, edge), (5 + width, 6 + width, edge)]  # the box's edges, in the edge colour
+        sides = [(4, 5, edge), (5 + width, 6 + width, edge)]  # the box's edges, in the edge color
         lines.append(("    │" + f" {'> ' if sel else '  '}{label}".ljust(width) + "│",
                       ("normal", [(5, 5 + width, role)] + sides + ([(8, 9, role)] if label[:1] in "●○" else [])),
                       ("menu", k)))  # the bar stays inside the box

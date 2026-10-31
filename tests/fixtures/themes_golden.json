@@ -3129,7 +3129,7 @@
   "pipeos-lite": "pipeOS-lite",
   "pipeos-dark": "pipeOS-dark"
  },
- "min_colours": {
+ "min_colors": {
   "dark": 8,
   "light": 8,
   "crowbar": 256,

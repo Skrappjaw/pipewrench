@@ -1,4 +1,4 @@
-# Vaporware: vaporwave colours on dark purple.
+# Vaporware: vaporwave colors on dark purple.
 name = "Vaporware"
 order = 7
 extends = "dark"

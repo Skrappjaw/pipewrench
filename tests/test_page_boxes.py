@@ -33,7 +33,7 @@ def test_mixer_is_a_playback_box_and_a_recording_box():
     assert all(t.startswith(("┌", "│", "└")) for t, _ in body(lines) if t.strip())
 
 
-def test_mixer_apps_heading_is_title_coloured_inside_its_box():
+def test_mixer_apps_heading_is_title_colored_inside_its_box():
     lines, _ = screen(pc.UIState(tab="mixer"))
     apps = [(t, s) for t, s in body(lines) if t.startswith("│") and t[1:].strip().startswith("Apps")]
     assert apps and all(role_at(s, t.index("Apps")) == "title" for t, s in apps)

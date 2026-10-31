@@ -1,4 +1,4 @@
-# The default: the terminal's own colours with cyan and blue accents.
+# The default: the terminal's own colors with cyan and blue accents.
 name = "dark"
 order = 0
 logo = "wrench"

@@ -115,8 +115,8 @@ def test_a_narrow_screen_stacks_the_buttons():
 
 
 def test_the_selected_button_shows_in_every_theme():
-    # Skrappjaw on the Studio (pipeOS-dark), 2026-10-26: "no arrow nav on the popover". The arrows moved it, but that
-    # theme's chip and selected colours are the same, so nothing changed on screen.
+    # Skrappjaw on a touchscreen laptop (pipeOS-dark), 2026-10-26: "no arrow nav on the popover". The arrows moved it, but that
+    # theme's chip and selected colors are the same, so nothing changed on screen.
     for name, theme in pc.THEMES.items():
         assert theme["popup_sel"] != theme["popup"], name
     st, _ = key(restart(), "left")

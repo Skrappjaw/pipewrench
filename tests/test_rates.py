@@ -125,7 +125,7 @@ def test_settings_warnings_wrap_instead_of_clipping(tmp_path):
 
 
 # --- onboard and HDMI (Intel HDA) cards: rates from codec#0 (punch list, 2026-10-26) ----------------------
-# Real files from desktop: a Realtek ALC892 (onboard) and an ATI R6xx HDMI.
+# Real files from a test machine: a Realtek ALC892 (onboard) and an ATI R6xx HDMI.
 
 def test_parse_codec_keeps_only_rates_every_output_and_input_lists():
     s = pr.parse_codec((FIX / "codec-alc892.txt").read_text())

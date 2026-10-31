@@ -30,7 +30,7 @@ def test_built_ins_match_the_old_dicts_exactly():
     assert lib.names == GOLDEN["names"]
     assert {n: tup(t) for n, t in lib.themes.items()} == GOLDEN["themes"]
     assert {n: lib.label(n) for n in lib.names} == GOLDEN["labels"]
-    assert {n: lib.min_colours(n) for n in lib.names} == GOLDEN["min_colours"]
+    assert {n: lib.min_colors(n) for n in lib.names} == GOLDEN["min_colors"]
 
 
 def test_pwcore_still_offers_them():
@@ -60,14 +60,14 @@ popup_sel = { fg = "#ffffff", bg = "#ff0000", attr = "bold" }
     assert t["bar_src"] == t["selected"]                     # specific derives from general
     assert t["popup_sel"] == ("#ffffff", "#ff0000", "bold")  # an override wins
     assert t["chip"] == lib.themes["dark"]["chip"]           # the rest comes from extends
-    assert lib.min_colours("studio") == 256 and lib.user == ["studio"]
+    assert lib.min_colors("studio") == 256 and lib.user == ["studio"]
 
 
 def test_a_theme_without_extends_fills_gaps_from_dark(tmp_path):
     d = write(tmp_path, "tiny", '[general]\ntitle = { fg = "magenta", attr = "bold" }\n')
     lib = pt.load([pt.BUILTIN_DIR, d])
     assert lib.themes["tiny"]["title"] == ("magenta", None, "bold")
-    assert lib.themes["tiny"]["chip"] == lib.themes["dark"]["chip"] and lib.min_colours("tiny") == 8
+    assert lib.themes["tiny"]["chip"] == lib.themes["dark"]["chip"] and lib.min_colors("tiny") == 8
 
 
 def test_extends_a_user_theme_and_inherits_the_logo(tmp_path):
@@ -78,7 +78,7 @@ def test_extends_a_user_theme_and_inherits_the_logo(tmp_path):
 
 
 @pytest.mark.parametrize("text, says", [
-    ('[general]\nchip = { fg = "blu" }\n', 'general.chip.fg "blu" is not a colour'),
+    ('[general]\nchip = { fg = "blu" }\n', 'general.chip.fg "blu" is not a color'),
     ('[general]\nchipz = { fg = "red" }\n', 'general.chipz is not a general role'),
     ('[specific]\nselected = { fg = "red" }\n', 'specific.selected is not a specific role'),
     ('[general]\nchip = { fg = "red", attr = "blink" }\n', 'general.chip.attr "blink"'),

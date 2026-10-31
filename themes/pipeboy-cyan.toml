@@ -1,4 +1,4 @@
-# Pipe Boy, after Fallout's Pip-Boy: one phosphor colour at five brightnesses. Without hue, status
+# Pipe Boy, after Fallout's Pip-Boy: one phosphor color at five brightnesses. Without hue, status
 # reads by style: ok bold, pending underlined, alert a pale block.
 name = "Pipe Boy Cyan"
 order = 5

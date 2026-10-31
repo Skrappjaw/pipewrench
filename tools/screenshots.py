@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draw the user guide's screenshots (docs/guide.md) from the test fixtures.
 
-Each picture is the frame pwrench paints: pwcore.render_screen gives the same lines and colour roles the
+Each picture is the frame pwrench paints: pwcore.render_screen gives the same lines and color roles the
 curses UI draws, and this script paints them as PNG in the dark theme, one character per cell in DejaVu
 Sans Mono (a few shots show the other themes). Fixtures only, so nothing from a live machine ends up in the docs, and the pictures can be
 redrawn whenever the UI changes:
@@ -38,7 +38,7 @@ FIX = ROOT / "tests" / "fixtures"
 OUT = ROOT / "docs" / "guide"
 W, H = 100, 30
 
-# --- the dark theme, as a typical dark terminal shows its eight colours --------------------------
+# --- the dark theme, as a typical dark terminal shows its eight colors --------------------------
 PALETTE = {"black": "#1d1f21", "red": "#e05252", "green": "#7cc243", "yellow": "#e5c07b", "blue": "#3e6fb5",
            "magenta": "#c678dd", "cyan": "#4fb6c6", "white": "#d0d0d0", "brightwhite": "#ffffff"}
 SCREEN_BG, SCREEN_FG = "#1d1f21", "#d0d0d0"
@@ -48,7 +48,7 @@ CELL_W, CELL_H = round(FONT.getlength("M")), 19
 
 
 def _screen(theme):
-    """(fg, bg) of the window: the theme's own screen colours when it names hex, else the dark terminal's."""
+    """(fg, bg) of the window: the theme's own screen colors when it names hex, else the dark terminal's."""
     fg, bg, _ = pc.THEMES[theme]["screen"]
     return (fg if fg and fg.startswith("#") else SCREEN_FG), (bg if bg and bg.startswith("#") else SCREEN_BG)
 
@@ -56,8 +56,8 @@ def _screen(theme):
 def _role(name, theme="dark"):
     fg, bg, attrs = pc.THEMES[theme][name]
     screen_fg, screen_bg = _screen(theme)
-    colour = lambda c: c if c.startswith("#") else PALETTE.get(c)  # noqa: E731
-    fg, bg = colour(fg) if fg else screen_fg, colour(bg) if bg else None
+    color = lambda c: c if c.startswith("#") else PALETTE.get(c)  # noqa: E731
+    fg, bg = color(fg) if fg else screen_fg, color(bg) if bg else None
     attrs = attrs.split()
     if "reverse" in attrs:
         fg, bg = bg or screen_bg, fg
@@ -106,17 +106,17 @@ def png(lines, title="pwrench", theme="dark"):
             if bg:
                 draw.rectangle((px, by, px + CELL_W - 1, by + CELL_H - 1), fill=back)
             if ch.strip():
-                colour = _hex(fg)
+                color = _hex(fg)
                 if dim:
-                    colour = _blend(colour, back)
+                    color = _blend(color, back)
                 if ch in "█▀▄░▐▌":  # block glyphs fill the whole cell, like a terminal draws them
-                    _block(draw, ch, px, by, colour, back)
+                    _block(draw, ch, px, by, color, back)
                 elif ch in _BOX:  # box lines join their neighbours across cells
-                    _box(draw, ch, px, by, colour)
+                    _box(draw, ch, px, by, color)
                 else:
-                    draw.text((px, by + 2), ch, fill=colour, font=FONT_BOLD if bold else FONT)
+                    draw.text((px, by + 2), ch, fill=color, font=FONT_BOLD if bold else FONT)
                 if under:
-                    draw.line((px, by + CELL_H - 2, px + CELL_W - 1, by + CELL_H - 2), fill=colour)
+                    draw.line((px, by + CELL_H - 2, px + CELL_W - 1, by + CELL_H - 2), fill=color)
     return img
 
 
@@ -125,23 +125,23 @@ _BOX = {"─": "lr", "│": "ud", "┌": "dr", "┐": "dl", "└": "ur", "┘": 
         "┬": "dlr", "┴": "ulr", "┼": "udlr"}
 
 
-def _box(draw, ch, x, y, colour):
+def _box(draw, ch, x, y, color):
     """Each stroke a 2-pixel rectangle from the cell's centre to the side it reaches."""
     cx, cy = x + CELL_W // 2, y + CELL_H // 2
     rects = {"u": (cx, y, cx + 1, cy + 1), "d": (cx, cy, cx + 1, y + CELL_H - 1),
              "l": (x, cy, cx + 1, cy + 1), "r": (cx, cy, x + CELL_W - 1, cy + 1)}
     for side in _BOX[ch]:
-        draw.rectangle(rects[side], fill=colour)
+        draw.rectangle(rects[side], fill=color)
 
 
-def _block(draw, ch, x, y, colour, back):
+def _block(draw, ch, x, y, color, back):
     w, h = CELL_W, CELL_H
     box = {"█": (0, 0, w, h), "▀": (0, 0, w, h // 2), "▄": (0, h // 2, w, h),
            "▐": (w // 2, 0, w, h), "▌": (0, 0, w // 2, h)}.get(ch)
     if box:
-        draw.rectangle((x + box[0], y + box[1], x + box[2] - 1, y + box[3] - 1), fill=colour)
+        draw.rectangle((x + box[0], y + box[1], x + box[2] - 1, y + box[3] - 1), fill=color)
     else:  # ░: a light shade
-        draw.rectangle((x, y, x + w - 1, y + h - 1), fill=_blend(colour, back, 0.3))
+        draw.rectangle((x, y, x + w - 1, y + h - 1), fill=_blend(color, back, 0.3))
 
 
 # --- fixture data, with OBS, Brave and REAPER added the way PipeWire reports them ----------------
@@ -196,7 +196,7 @@ def frame(st, height=H, **kw):
 
 
 def prompt(lines, question):
-    """A text prompt as Tui._prompt draws it: over the status line, in the alert colour."""
+    """A text prompt as Tui._prompt draws it: over the status line, in the alert color."""
     return lines[:-1] + [(f" {question} ", "alert")]
 
 
@@ -353,12 +353,25 @@ SHOT_THEMES = {"mixer-pipeboy": "pipeboy", "mixer-vaporware": "vaporware", "abou
 
 
 def _install_map():
-    """tools/theme-map.toml, every general role in its own colour, for docs/themes.md."""
+    """tools/theme-map.toml, every general role in its own color, for docs/themes.md."""
     with tempfile.TemporaryDirectory() as d:
         shutil.copy(Path(__file__).parent / "theme-map.toml", d)
         lib = pt.load([pt.BUILTIN_DIR, d])
     assert not lib.problems, lib.problems
     pc.THEMES["theme-map"] = lib.themes["theme-map"]
+
+
+def theme_frames():
+    """The Mixer in every built-in theme, the theme named in the title bar, for the README's themes GIF."""
+    m = mixer()
+    for name in [n for n in pc.THEMES if n != "theme-map"]:
+        st = pc.UIState(tab="mixer", theme=name, mix_cursor=mix_at(m, "GCS-8 CH USB"))
+        yield png(frame(st, mixer=m, media=MEDIA), title=f"pwrench · {pc.theme_label(name)}", theme=name)
+
+
+def themes_gif(path):
+    first, *rest = theme_frames()
+    first.save(path, save_all=True, append_images=rest, duration=1500, loop=0, optimize=True)
 
 
 def main(out=OUT):
@@ -368,10 +381,11 @@ def main(out=OUT):
     names = []
     for name, lines in shots():
         png(lines, theme=SHOT_THEMES.get(name, "dark")).save(out / f"{name}.png", optimize=True)
-        names.append(name)
-    return names
+        names.append(f"{name}.png")
+    themes_gif(out / "themes.gif")
+    return names + ["themes.gif"]
 
 
 if __name__ == "__main__":
     for n in main(*sys.argv[1:]):
-        print(f"docs/guide/{n}.png")
+        print(f"docs/guide/{n}")

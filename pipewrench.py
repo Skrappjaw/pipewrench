@@ -202,7 +202,7 @@ def _theme_cli(args, out):
         problems = pc.install_themes(user)
         for n in pc.THEME_NAMES:
             where = "yours" if n in pc.THEME_USER else "built-in"
-            out.write(f"{n:<22} {pc.theme_label(n):<18} {where:<9} {pc.THEME_MIN_COLOURS[n]} colours\n")
+            out.write(f"{n:<22} {pc.theme_label(n):<18} {where:<9} {pc.THEME_MIN_COLORS[n]} colors\n")
         for p in problems:
             out.write(f"skipped: {p}\n")
         return 0
@@ -1371,7 +1371,7 @@ class Tui:
             if self.st.tab == "mixer" and self.mixer is None:
                 self._refresh_mixer()
 
-    # Without colour the roles fall back to attributes; the > and * markers carry the rest.
+    # Without color the roles fall back to attributes; the > and * markers carry the rest.
     _PLAIN = {"selected": "reverse bold", "anchor": "underline", "chip": "reverse", "title": "bold",
               "alert": "bold", "pending": "bold", "dim": "dim",
               "bar_ok": "reverse", "bar_alert": "reverse", "bar_dim": "reverse dim",
@@ -1386,7 +1386,7 @@ class Tui:
         self._apply_theme(scr)
 
     def _apply_theme(self, scr):
-        """Curses attributes for each colour role of the current theme (pc.THEMES)."""
+        """Curses attributes for each color role of the current theme (pc.THEMES)."""
         c = self.curses
         attr = lambda names: sum(getattr(c, f"A_{n.upper()}") for n in names.split())  # noqa: E731
         if not c.has_colors():
@@ -1395,13 +1395,13 @@ class Tui:
         c.use_default_colors()
         bright = c.COLORS >= 16
         theme = self.st.theme
-        if c.COLORS < pc.THEME_MIN_COLOURS.get(theme, 8):
+        if c.COLORS < pc.THEME_MIN_COLORS.get(theme, 8):
             theme = "dark"
-            self.st.message = self.st.failed = f"{pc.theme_label(self.st.theme)} needs {pc.THEME_MIN_COLOURS[self.st.theme]} colours; showing dark"
+            self.st.message = self.st.failed = f"{pc.theme_label(self.st.theme)} needs {pc.THEME_MIN_COLORS[self.st.theme]} colors; showing dark"
         exact = c.can_change_color() and c.COLORS >= 256
         slots = iter(range(min(c.COLORS, 256) - 1, 15, -1))  # palette slots for exact hex; reset when PipeWrench exits
 
-        def colour(name, default):
+        def color(name, default):
             if name is None:
                 return default
             if name.startswith("#"):
@@ -1416,10 +1416,10 @@ class Tui:
 
         roles = pc.THEMES[theme]
         sfg, sbg, _ = roles["screen"]
-        sfg, sbg = colour(sfg, -1), colour(sbg, -1)
+        sfg, sbg = color(sfg, -1), color(sbg, -1)
         self.styles = {}
         for i, (role, (fg, bg, names)) in enumerate(roles.items(), start=1):
-            c.init_pair(i, colour(fg, sfg), colour(bg, sbg))
+            c.init_pair(i, color(fg, sfg), color(bg, sbg))
             self.styles[role] = c.color_pair(i) | attr(names)
         scr.bkgd(" ", self.styles["screen"])
 

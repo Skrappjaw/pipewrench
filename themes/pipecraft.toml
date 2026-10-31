@@ -1,4 +1,4 @@
-# Pipecraft: Minecraft's text-colour codes (yellow, green, gold, red, grey) on dark dirt, grey buttons.
+# Pipecraft: Minecraft's text-color codes (yellow, green, gold, red, grey) on dark dirt, grey buttons.
 name = "Pipecraft"
 order = 8
 extends = "dark"

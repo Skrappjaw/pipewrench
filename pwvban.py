@@ -28,7 +28,7 @@ FORMAT_CHOICES = [("48 kHz · 16-bit · stereo", (48000, "S16LE", 2)), ("48 kHz 
 UNIT_PREFIX = "pipewrench-vban@"
 STREAM_MAX = 16  # VBAN stream names are 16 bytes
 
-# VBAN header (VB-Audio spec; checked against the Studio's packets, 2026-10-26): "VBAN", then
+# VBAN header (VB-Audio spec; checked against a real sender's packets, 2026-10-26): "VBAN", then
 # byte 4 = sub-protocol (top 3 bits) | rate index (low 5); 5 = samples - 1; 6 = channels - 1; 7 = data type;
 # 8..23 = stream name; 24..27 = frame counter.
 RATES = [6000, 12000, 24000, 48000, 96000, 192000, 384000, 8000, 16000, 32000, 64000, 128000, 256000, 512000,
