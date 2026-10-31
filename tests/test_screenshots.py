@@ -16,12 +16,12 @@ SHOTS = dict(screenshots.shots())
 
 
 def test_every_picture_in_the_guide_is_drawn():
-    used = set(re.findall(r"\]\(guide/([\w-]+)\.png\)", GUIDE))
+    used = set(re.findall(r"(?:\]\(|src=\")guide/([\w-]+)\.png", GUIDE))
     assert used and used <= set(SHOTS), used - set(SHOTS)
 
 
 def test_every_drawn_picture_is_used():
-    used = set(re.findall(r"\]\(guide/([\w-]+)\.png\)", GUIDE))
+    used = set(re.findall(r"(?:\]\(|src=\")guide/([\w-]+)\.png", GUIDE))
     assert set(SHOTS) <= used, set(SHOTS) - used
 
 

@@ -97,7 +97,8 @@ Open the **Mixer** and use `↑` and `↓` to select your interface's output, fo
 the default, and every app that follows the default moves to it. (On a channel that's already the default,
 that item reads ★ System default instead.)
 
-![The Mixer with an output selected and its menu open on Set as system default|755](guide/task-default.png)
+<img src="guide/task-default.png" alt="The Mixer with an output selected and its menu open on Set as system default" width="755">
+
 Do the same in the Recording box for your
 mic. The ★ moves to show the new defaults.
 
@@ -107,7 +108,7 @@ On a multi-channel interface the names PipeWire picks, like "GCS-8 CH 2", say li
 in. Select the channel on the **Mixer**, press `Enter` and choose **Rename…**. Type a name such as "Mic"
 and press `Enter`.
 
-![A channel's menu with Rename… selected|743](guide/task-rename.png)
+<img src="guide/task-rename.png" alt="A channel's menu with Rename… selected" width="743">
 
 WirePlumber reads names when it starts, so PipeWrench offers to restart it so that the new name shows right
 away. If you're on a call, choose Cancel: a restart can drop apps like Discord. Your name is saved either
@@ -120,14 +121,16 @@ Press `→` to move into **Destinations**, select `OBS · Mic/Aux` and press `En
 select Discord and press `Enter` again. A ● next to each destination shows that the mic goes there, and the
 number next to the mic counts its destinations: `●3` in the picture, where REAPER records it too.
 
-![Patch with GCS-8 CH 2 selected, feeding Discord, OBS and REAPER](guide/task-mic.png)
+<img src="guide/task-mic.png" alt="Patch with GCS-8 CH 2 selected, feeding Discord, OBS and REAPER" width="900">
 
 ### Put music on its own bus for a stream
 
 On **Devices**, press `a` (or select **+ Add bus…** and press `Enter`) and name the bus "Music". It's
 created immediately, with no restart.
 
-![The Buses box on Devices with + Add bus… selected](guide/task-bus.png) Then go to **Patch**, select your music player in **Sources**, and
+<img src="guide/task-bus.png" alt="The Buses box on Devices with + Add bus… selected" width="656">
+
+Then go to **Patch**, select your music player in **Sources**, and
 connect it to the Music bus in **Destinations**. In OBS, add an audio capture of the Music bus. The music
 now reaches the stream on its own fader, separate from your game and your mic, so you can balance them in
 OBS. To keep hearing the music yourself, connect the Music bus's monitor to your headphones on Patch as well.
@@ -139,7 +142,7 @@ that something is already recording from appear under their own **Monitors** hea
 shows all of them. If OBS is capturing the wrong thing, select the monitor of the output you listen on,
 for example "GCS-8 CH USB (monitor)", and connect it to `OBS · Desktop Audio`.
 
-![Patch with an output's monitor feeding OBS Desktop Audio](guide/patch-monitors.png)
+<img src="guide/patch-monitors.png" alt="Patch with an output's monitor feeding OBS Desktop Audio" width="900">
 
 ### Record into REAPER's inputs
 
@@ -148,7 +151,7 @@ select the source you want to record, press `→`, select REAPER and press `Ente
 input pairs, starting with the next free one. Pick **In 3-4**, for example, and the source records into
 REAPER's inputs 3 and 4. For single channels, see [Port by port](#port-by-port).
 
-![The REAPER input menu open on In 3-4](guide/patch-slots.png)
+<img src="guide/patch-slots.png" alt="The REAPER input menu open on In 3-4" width="900">
 
 ### Lower your latency for recording
 
@@ -159,7 +162,9 @@ you do.
 Then go down to the **Clock** box, select **Force buffer size**, press `Enter` to open the row, and use `←`
 and `→` to pick 128. Press `Enter` to apply it live.
 
-![The Clock box with Force buffer size open at 128](guide/task-latency.png) The row shows the latency each buffer adds in
+<img src="guide/task-latency.png" alt="The Clock box with Force buffer size open at 128" width="900">
+
+The row shows the latency each buffer adds in
 milliseconds; 128 samples at 48 kHz is 2.67 ms. Go lower if your machine keeps up without dropouts, and
 back up to 1024 or so when you're mixing and latency no longer matters. **Save** keeps the setting for the
 next time PipeWire starts.
@@ -169,8 +174,9 @@ next time PipeWire starts.
 Both machines need PipeWrench, or any VBAN app on the other end. Start on the machine that **sends**. Open
 **Settings → Network**, select **+ Add stream…** in the Outgoing box and choose **Detect on network**.
 
-![The Add outgoing stream question: Detect on network or Manual](guide/task-vban.png) Pick
-the receiving computer from the list, then pick the source to send, such as your mic or the monitor of the
+<img src="guide/task-vban.png" alt="The Add outgoing stream question: Detect on network or Manual" width="426">
+
+Pick the receiving computer from the list, then pick the source to send, such as your mic or the monitor of the
 output you listen on.
 
 Then go to the machine that **receives**, open the same page, and add a stream in the Incoming box with
@@ -197,7 +203,7 @@ The volume percentage sits inside each bar. The bar is green up to 100%, red pas
 channel is muted. Going past 100% can clip, so when a channel reaches 100% and you press `→` again,
 PipeWrench asks before going further:
 
-![The question at 100%](guide/mixer-boost.png)
+<img src="guide/mixer-boost.png" alt="The question at 100%" width="359">
 
 **Go louder** unlocks that channel until it drops back under 100%. **Don't ask again** unlocks it for good,
 and **Cancel**, where the cursor starts, leaves it at 100%. The channel menu's **Volume boost** item locks
@@ -218,7 +224,7 @@ moves the meter in beside it:
 
 ### The channel menu
 
-![A channel's menu](guide/mixer-menu.png)
+<img src="guide/mixer-menu.png" alt="A channel's menu" width="455">
 
 - **Set as system default** moves every app that follows the default to this channel. It's the first
   item, so `Enter`, `Enter` does it.
@@ -231,7 +237,7 @@ moves the meter in beside it:
 
 Renaming asks one more question:
 
-![Renaming a channel](guide/mixer-rename.png)
+<img src="guide/mixer-rename.png" alt="Renaming a channel" width="786">
 
 WirePlumber only reads names when it starts, so a new name appears after WirePlumber restarts. PipeWrench
 asks "Restart WirePlumber now to show it?" If you're on a call, choose Cancel, because a restart drops apps
@@ -278,7 +284,7 @@ on them here; you connect them on Patch.
 
 ### Switch a card's profile
 
-![A card's profile menu](guide/devices-profile.png)
+<img src="guide/devices-profile.png" alt="A card's profile menu" width="656">
 
 A profile decides which inputs and outputs a card offers. The active one is marked ●. Picking another asks
 first, because audio on that card drops for a moment while it switches. For the GCS-8, **HiFi** is the
@@ -298,11 +304,11 @@ A bus is a virtual device. Apps can play into it and record from it, so it works
 bus that OBS records and your music plays into is a typical use. Press `a`, or select **+ Add bus…** and
 press `Enter`, and give it a name:
 
-![Adding a bus](guide/devices-add-bus.png)
+<img src="guide/devices-add-bus.png" alt="Adding a bus" width="786">
 
 The bus is created at once, with no restart. Its own menu hides or deletes it:
 
-![A bus's menu](guide/devices-bus.png)
+<img src="guide/devices-bus.png" alt="A bus's menu" width="643">
 
 You can rename a bus on the Mixer like any other channel. A bus shows its new name after the next login.
 
@@ -345,7 +351,7 @@ A **monitor** is a copy of what an output is playing. OBS's Desktop Audio record
 rather than the output itself, which is why it can look as if nothing is connected. Monitors that
 something records from always appear under their own heading, and `m` adds the rest.
 
-![A monitor feeding OBS](guide/patch-monitors.png)
+<img src="guide/patch-monitors.png" alt="A monitor feeding OBS" width="900">
 
 So if OBS is set to GCS-8 CH USB but that output shows no connection, look under **Monitors**:
 `GCS-8 CH USB (monitor) ●1` is the one OBS is taking. App streams carry their own names when the app gives
@@ -378,7 +384,7 @@ across the top, and `←` and `→` stay within one kind. The numbers across the
 REAPER, running through `pw-jack`, shows its inputs as plain `in1`, `in2` and so on. Pressing `Enter` on
 REAPER as a destination opens a menu of input pairs, starting at the next free one:
 
-![Choosing REAPER's inputs](guide/patch-slots.png)
+<img src="guide/patch-slots.png" alt="Choosing REAPER's inputs" width="900">
 
 Pick **In 3-4** and the selected source records into REAPER's inputs 3 and 4.
 
@@ -388,7 +394,7 @@ Sometimes you want a single channel, like only the left side of CH 2 going into 
 to open a port matrix for the selected pair, in a box titled with both names. `Enter` links or unlinks the
 port under the cursor.
 
-![The port matrix](guide/patch-ports.png)
+<img src="guide/patch-ports.png" alt="The port matrix" width="575">
 
 ## Settings
 
@@ -442,7 +448,7 @@ is usually inaudible.
 
 When realtime is working, the Realtime line and its checks turn green and there's no fix to show:
 
-![Settings with realtime working](guide/settings-realtime-ok.png)
+<img src="guide/settings-realtime-ok.png" alt="Settings with realtime working" width="900">
 
 `pwrench realtime` prints the same check in a terminal, and exits with status 0 when everything is right.
 
