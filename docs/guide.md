@@ -355,6 +355,8 @@ Voicemeeter, VBAN apps and PipeWire all speak. PipeWire has it built in, so ther
 Each stream runs on its own, so adding, changing or turning one off never restarts PipeWire, and the ones
 that are on come back at login.
 
+![Settings → Network](guide/network.png)
+
 The page has three boxes:
 
 - **This machine**: the address other machines send to, and which PipeWire you have.

@@ -29,6 +29,7 @@ import pwpatch as pp  # noqa: E402
 import pwrates as pr  # noqa: E402
 import pwrealtime as prt  # noqa: E402
 import pwthemes as pt  # noqa: E402
+import pwvban as pv  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "tests"))
 from test_patch import with_reaper  # noqa: E402  (REAPER as pipewire-jack shows it)
@@ -250,6 +251,22 @@ def realtime_status(ok):
     return prt.Status("user", {"pipewire": 95}, True, (proc, pulse), 0 if ok else 12)
 
 
+def network(g):
+    """Settings → Network on PipeWire 1.0.5, with documentation addresses (192.0.2.x), never a real network."""
+    usb = next(d.name for d in g.dests if d.label == "GCS-8 CH USB")
+    ch2 = next(x.name for x in g.sources if x.label == "GCS-8 CH 2")
+    c = pv.default_config()
+    c = pv.add_entry(c, "in", {**pv.new_entry("in", "Studio PC", "192.0.2.20"), "target": usb}, rules=False)
+    c = pv.add_entry(c, "in", {**pv.new_entry("in", "Laptop", "192.0.2.31"), "target": None, "on": False}, rules=False)
+    c = pv.add_entry(c, "out", {**pv.new_entry("out", "Studio PC", "192.0.2.20"), "target": ch2}, rules=False)
+    units = {pv.instance_of(d, e, False): "active" for d, k in (("in", "incoming"), ("out", "outgoing"))
+             for e in c[k] if e["on"]}
+    v = pv.View(c, units, "192.0.2.10", "studio", (1, 0, 5), False, g)
+    st = pc.with_net(pc.UIState(tab="settings", settings_cat="network", settings_focus="pane"), v)
+    st.cursor = pc.net_rows(v).index(("in", c["incoming"][0]["id"]))
+    return st
+
+
 def shots():
     m = mixer()
     g = pp.graph(DUMP)
@@ -323,6 +340,7 @@ def shots():
                                                 pc.pk.BY_ID["devices.show_hidden"]),
                                             keys={"devices.show_hidden": "z", "mixer.meters": None}),
                                  height=50, media=MEDIA)
+    yield "network", frame(network(g), media=MEDIA)
     yield "about-pipecraft", frame(pc.UIState(tab="about", theme="pipecraft"), media=MEDIA,
                                    about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"})
     yield "top", frame(pc.UIState(tab="top"), block=block, media=MEDIA)
