@@ -36,15 +36,18 @@ from test_patch import with_reaper  # noqa: E402  (REAPER as pipewire-jack shows
 
 FIX = ROOT / "tests" / "fixtures"
 OUT = ROOT / "docs" / "guide"
-W, H = 100, 30
+W, H = 140, 55   # a maximized terminal on an HD screen, like Skrappjaw's (about 140×55)
+SCALE = 2        # drawn at twice the pixel density, so text stays sharp when a page scales the picture down
 
 # --- the dark theme, as a typical dark terminal shows its eight colors --------------------------
 PALETTE = {"black": "#1d1f21", "red": "#e05252", "green": "#7cc243", "yellow": "#e5c07b", "blue": "#3e6fb5",
            "magenta": "#c678dd", "cyan": "#4fb6c6", "white": "#d0d0d0", "brightwhite": "#ffffff"}
 SCREEN_BG, SCREEN_FG = "#1d1f21", "#d0d0d0"
 FONT_DIR = Path("/usr/share/fonts/truetype/dejavu")
-FONT, FONT_BOLD = (ImageFont.truetype(str(FONT_DIR / f), 15) for f in ("DejaVuSansMono.ttf", "DejaVuSansMono-Bold.ttf"))
-CELL_W, CELL_H = round(FONT.getlength("M")), 19
+FONT, FONT_BOLD = (ImageFont.truetype(str(FONT_DIR / f), 15 * SCALE)
+                   for f in ("DejaVuSansMono.ttf", "DejaVuSansMono-Bold.ttf"))
+CELL_W, CELL_H = round(FONT.getlength("M")), 19 * SCALE
+TOP, PAD = 30 * SCALE, 10 * SCALE  # the window's title bar and its margin
 
 
 def _screen(theme):
@@ -86,14 +89,15 @@ def _blend(fg, bg, k=0.55):
 
 def png(lines, title="pwrench", theme="dark"):
     """A terminal window around the frame, every character placed on its cell so box lines meet."""
-    top, pad = 30, 10
+    top, pad = TOP, PAD
     screen_bg = _screen(theme)[1]
     img = Image.new("RGB", (W * CELL_W + 2 * pad, len(lines) * CELL_H + top + pad), _hex(screen_bg))
     draw = ImageDraw.Draw(img)
-    draw.rectangle((0, 0, img.width, top - 6), fill=_hex("#2c2f33"))
+    s = SCALE
+    draw.rectangle((0, 0, img.width, top - 6 * s), fill=_hex("#2c2f33"))
     for k, c in enumerate(("#e05252", "#e5c07b", "#7cc243")):
-        draw.ellipse((12 + 18 * k, 7, 22 + 18 * k, 17), fill=_hex(c))
-    draw.text((img.width / 2, 12), title, fill=_hex("#9aa0a6"), font=FONT, anchor="mm")
+        draw.ellipse(((12 + 18 * k) * s, 7 * s, (22 + 18 * k) * s, 17 * s), fill=_hex(c))
+    draw.text((img.width / 2, 12 * s), title, fill=_hex("#9aa0a6"), font=FONT, anchor="mm")
     for y, (text, style) in enumerate(lines):
         text = text[:W]
         cells = _cells(text if style in ("band_ok", "band_alert", "status_line") else text.rstrip(), style, W,
@@ -114,10 +118,28 @@ def png(lines, title="pwrench", theme="dark"):
                 elif ch in _BOX:  # box lines join their neighbours across cells
                     _box(draw, ch, px, by, color)
                 else:
-                    draw.text((px, by + 2), ch, fill=color, font=FONT_BOLD if bold else FONT)
+                    draw.text((px, by + 2 * SCALE), ch, fill=color, font=FONT_BOLD if bold else FONT)
                 if under:
-                    draw.line((px, by + CELL_H - 2, px + CELL_W - 1, by + CELL_H - 2), fill=color)
+                    draw.line((px, by + CELL_H - 2 * SCALE, px + CELL_W - 1, by + CELL_H - 2 * SCALE), fill=color,
+                              width=SCALE)
     return img
+
+
+def crop(img, rows, cols=(0, None)):
+    """A detail of a drawn frame: terminal rows [r0, r1) and columns [c0, c1), with half a cell of margin at the
+    sides (none above or below, where it would catch the next row's bars) and no window chrome, so a guide step
+    can show just the part it talks about."""
+    (r0, r1), (c0, c1) = rows, cols
+    c1 = W if c1 is None else c1
+    m = CELL_W // 2
+    return img.crop((PAD + c0 * CELL_W - m, TOP + r0 * CELL_H, PAD + c1 * CELL_W + m, TOP + r1 * CELL_H))
+
+
+def rows_between(lines, first, last, after=0):
+    """(r0, r1): from the first line at or after `after` containing `first`, through the next containing `last`."""
+    r0 = next(k for k in range(after, len(lines)) if first in lines[k][0])
+    r1 = next(k for k in range(r0, len(lines)) if last in lines[k][0]) + 1
+    return r0, r1
 
 
 # Box-drawing characters as the sides of the cell they reach: up, down, left, right.
@@ -127,9 +149,9 @@ _BOX = {"─": "lr", "│": "ud", "┌": "dr", "┐": "dl", "└": "ur", "┘": 
 
 def _box(draw, ch, x, y, color):
     """Each stroke a 2-pixel rectangle from the cell's centre to the side it reaches."""
-    cx, cy = x + CELL_W // 2, y + CELL_H // 2
-    rects = {"u": (cx, y, cx + 1, cy + 1), "d": (cx, cy, cx + 1, y + CELL_H - 1),
-             "l": (x, cy, cx + 1, cy + 1), "r": (cx, cy, x + CELL_W - 1, cy + 1)}
+    cx, cy, t = x + CELL_W // 2, y + CELL_H // 2, 2 * SCALE - 1  # strokes 2 pixels wide at 1×
+    rects = {"u": (cx, y, cx + t, cy + t), "d": (cx, cy, cx + t, y + CELL_H - 1),
+             "l": (x, cy, cx + t, cy + t), "r": (cx, cy, x + CELL_W - 1, cy + t)}
     for side in _BOX[ch]:
         draw.rectangle(rects[side], fill=color)
 
@@ -267,6 +289,35 @@ def network(g):
     return st
 
 
+CROPS = {}  # name -> (rows, cols): a detail shot, cut out of its frame by main()
+
+
+def _at(lines, text, after=0):
+    return next(k for k in range(after, len(lines)) if text in lines[k][0])
+
+
+def _framed(lines, first, last, before=0, cols=(0, None)):
+    """Rows from `before` lines above the one with `first` through the box border under the one with `last`."""
+    r0 = _at(lines, first) - before
+    return (r0, _at(lines, last, r0) + 2), cols
+
+
+def _popover(lines, title, last):
+    """A popover's own box: from its title row to its bottom border, its left corner to its right one."""
+    r0 = _at(lines, title)
+    c0 = lines[r0][0].index("┌")
+    return (r0, _at(lines, last, r0) + 3), (c0, lines[r0][0].index("┐", c0) + 1)
+
+
+def _prompt(lines):
+    return (len(lines) - 1, len(lines)), (0, 96)
+
+
+def detail(name, lines, rows_cols):
+    CROPS[name] = rows_cols
+    return name, lines
+
+
 def shots():
     m = mixer()
     g = pp.graph(DUMP)
@@ -283,36 +334,56 @@ def shots():
     yield "mixer-bar-off", frame(pc.UIState(tab="mixer", volume_bar=False, mix_cursor=mix_at(m, "GCS-8 CH USB")),
                                  mixer=m, media=MEDIA)
     st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH 2", "recording")), "enter", CUR, mixer=m)
-    yield "mixer-menu", frame(st, mixer=m, media=MEDIA)
+    lines = frame(st, mixer=m, media=MEDIA)
+    yield detail("mixer-menu", lines, _framed(lines, "┌─ GCS-8 CH 2 ", "Back", before=3, cols=(0, 80)))
+    for _ in range(2):  # down to Rename… (an input's menu has no Test sound)
+        st, _ = pc.handle_key(st, "down", CUR, mixer=m)
+    lines = frame(st, mixer=m, media=MEDIA)
+    yield detail("task-rename", lines, _framed(lines, "┌─ GCS-8 CH 2 ", "Back", before=3, cols=(0, 80)))
+    st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 MAIN-AUX")), "enter", CUR, mixer=m)
+    lines = frame(st, mixer=m, media=MEDIA)
+    yield detail("task-default", lines, _framed(lines, "┌─ Playback", "Back", cols=(0, 80)))
     st, _ = pc.handle_key(pc.UIState(tab="mixer", mix_cursor=mix_at(m, "GCS-8 CH 2", "recording")), "right", CUR, mixer=m)
-    yield "mixer-boost", frame(st, mixer=m, media=MEDIA)  # → at 100%: the volume popover
+    lines = frame(st, mixer=m, media=MEDIA)  # → at 100%: the volume popover
+    yield detail("mixer-boost", lines, _popover(lines, "Volume past 100%", "Go louder"))
     st.message = "volume"  # the theme map: popover, ✓ band, tabs, cursor, bars and meters in one frame
     yield "theme-map", frame(st, mixer=m, media=MEDIA)
     st.mix_menu = None
-    yield "mixer-rename", prompt(frame(st, mixer=m, media=MEDIA), "new name for GCS-8 CH 2 (empty restores the default): Mic")
+    lines = prompt(frame(st, mixer=m, media=MEDIA), "new name for GCS-8 CH 2 (empty restores the default): Mic")
+    yield detail("mixer-rename", lines, _prompt(lines))
 
     d = devices()
     yield "devices", frame(pc.UIState(tab="devices"), devices=d, media=MEDIA)
     st = pc.focus_device(pc.UIState(tab="devices", dev_focus=("card", BUS_INV.find_card("GCS-8").id)), d)
-    yield "devices-profile", frame(st, devices=d, media=MEDIA)
+    lines = frame(st, devices=d, media=MEDIA)
+    yield detail("devices-profile", lines, _framed(lines, "> Profile", "Back", before=1, cols=(0, 80)))
     st = pc.UIState(tab="devices", dev_cursor=dev_at(d, "row", "SYSTEM Audio/Duplex sink"))
     st, _ = pc.handle_key(st, "enter", CUR, devices=d)
-    yield "devices-bus", frame(st, devices=d, media=MEDIA)
+    lines = frame(st, devices=d, media=MEDIA)
+    yield detail("devices-bus", lines, _framed(lines, "┌─ Buses", "+ Add bus", cols=(0, 80)))
     add = next(n for n, (k, _) in enumerate(pc.dev_selectable(d, pc.UIState(tab="devices"))) if k == "addbus")
-    yield "devices-add-bus", prompt(frame(pc.UIState(tab="devices", dev_cursor=add), devices=d, media=MEDIA),
-                                    "bus name (letters, digits, - _; empty cancels): OBS")
+    lines = prompt(frame(pc.UIState(tab="devices", dev_cursor=add), devices=d, media=MEDIA),
+                   "bus name (letters, digits, - _; empty cancels): OBS")
+    yield detail("devices-add-bus", lines, _prompt(lines))
+    yield detail("task-bus", lines, _framed(lines, "┌─ Buses", "+ Add bus", cols=(0, 80)))
 
     st = patch_at(g, pc.UIState(tab="patch"), source="GCS-8 CH 2")
-    yield "patch", frame(st, patch=g, media=MEDIA)
-    yield "patch-portal", frame(st, patch=g, media=MEDIA)
+    lines = frame(st, patch=g, media=MEDIA)
+    yield "patch", lines
+    yield "patch-portal", lines
+    yield detail("task-mic", lines, ((2, _at(lines, "└", 2) + 1), (0, None)))
     st = patch_at(g, pc.UIState(tab="patch"), source="GCS-8 CH USB (monitor)")
-    yield "patch-monitors", frame(st, patch=g, media=MEDIA)
+    lines = frame(st, patch=g, media=MEDIA)
+    yield detail("patch-monitors", lines, ((2, _at(lines, "└", 2) + 1), (0, None)))
     st = patch_at(g, pc.UIState(tab="patch", patch_view="grid"), source="GCS-8 CH 2", dest="REAPER")
     yield "patch-grid", frame(st, patch=g, media=MEDIA)
-    st = patch_at(g, pc.UIState(tab="patch", patch_side="dst", patch_menu=True), source="GCS-8 CH 4", dest="REAPER")
-    yield "patch-slots", frame(st, patch=g, media=MEDIA)
+    st = patch_at(g, pc.UIState(tab="patch", patch_side="dst", patch_menu=True, patch_menu_cursor=1),
+                  source="GCS-8 CH 4", dest="REAPER")  # the menu opens on the next free pair, In 3-4
+    lines = frame(st, patch=g, media=MEDIA)
+    yield detail("patch-slots", lines, ((2, _at(lines, "In 7-8") + 2), (0, None)))
     st = patch_at(g, pc.UIState(tab="patch", patch_ports=True, patch_side="dst"), source="GCS-8 CH 2", dest="REAPER")
-    yield "patch-ports", frame(st, patch=g, media=MEDIA)
+    lines = frame(st, patch=g, media=MEDIA)
+    yield detail("patch-ports", lines, _framed(lines, "GCS-8 CH 2 → REAPER", "FR", cols=(0, 70)))
 
     # Settings scrolls to the cursor; these are taken on a taller terminal to show more of it. Audio: nothing
     # forced, the GCS-8 driving at 256 samples, and a card of each kind in Devices.
@@ -327,20 +398,30 @@ def shots():
              pr.CardRates("HDA ATI HDMI", None, "off")]
     bad, good = pc.audio_rows(realtime_status(False), cards), pc.audio_rows(realtime_status(True), cards)
     yield "settings", frame(pc.UIState(tab="settings", settings_focus="pane", cursor=bad.index(("setting", 1))),
-                            height=50, current=free,
+                            height=56, current=free,
                             block=driving, rates=cards, media=MEDIA, realtime=realtime_status(False))
-    yield "settings-realtime-ok", frame(pc.UIState(tab="settings", settings_focus="pane",
-                                                   cursor=good.index(("realtime",))),
-                                        height=50, current=free, block=driving, rates=cards, media=MEDIA,
-                                        realtime=realtime_status(True))
+    lines = frame(pc.UIState(tab="settings", settings_focus="pane", cursor=good.index(("realtime",))),
+                  height=56, current=free, block=driving, rates=cards, media=MEDIA, realtime=realtime_status(True))
+    yield detail("settings-realtime-ok", lines, _framed(lines, "┌─ PipeWire", "rate set by", cols=(15, None)))
+    st = pc.with_audio_rows(pc.UIState(tab="settings", settings_focus="pane"), good)
+    st.cursor = good.index(("setting", 1))  # Force buffer size, opened and stepped to 128
+    for key in ["enter"] + ["right"] * 5:
+        st, _ = pc.handle_key(st, key, free)
+    lines = frame(st, height=56, current=free, block=driving, rates=cards, media=MEDIA, realtime=realtime_status(True))
+    yield detail("task-latency", lines, _framed(lines, "┌─ Clock", "[ Apply ]", cols=(15, None)))
     yield "settings-preferences", frame(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane",
-                                                   cursor=pc.BAR_ROW), height=40, media=MEDIA)
+                                                   cursor=pc.BAR_ROW), height=44, media=MEDIA)
     yield "settings-keys", frame(pc.UIState(tab="settings", settings_cat="prefs", settings_focus="pane",
                                             cursor=pc.KEYS_ROW + [x for _, x in pc.BINDING_ROWS].index(
                                                 pc.pk.BY_ID["devices.show_hidden"]),
                                             keys={"devices.show_hidden": "z", "mixer.meters": None}),
-                                 height=50, media=MEDIA)
+                                 height=56, media=MEDIA)
     yield "network", frame(network(g), media=MEDIA)
+    st = network(g)
+    st.cursor = pc.net_rows(st.net).index(("out_add",))
+    st, _ = pc.handle_key(st, "enter", {})
+    lines = frame(st, media=MEDIA)
+    yield detail("task-vban", lines, _popover(lines, "Add outgoing stream", "Detect on network"))
     yield "about-pipecraft", frame(pc.UIState(tab="about", theme="pipecraft"), media=MEDIA,
                                    about={"pipewire": "1.0.5", "wireplumber": "0.4.17", "config": "~/.config/pipewrench"})
     yield "top", frame(pc.UIState(tab="top"), block=block, media=MEDIA)
@@ -380,7 +461,10 @@ def main(out=OUT):
     out.mkdir(parents=True, exist_ok=True)
     names = []
     for name, lines in shots():
-        png(lines, theme=SHOT_THEMES.get(name, "dark")).save(out / f"{name}.png", optimize=True)
+        img = png(lines, theme=SHOT_THEMES.get(name, "dark"))
+        if name in CROPS:
+            img = crop(img, *CROPS[name])
+        img.save(out / f"{name}.png", optimize=True)
         names.append(f"{name}.png")
     themes_gif(out / "themes.gif")
     return names + ["themes.gif"]

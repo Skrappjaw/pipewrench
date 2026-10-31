@@ -92,9 +92,13 @@ Each of these takes a minute or two. The steps link into the reference if you wa
 
 ### Make your interface the default
 
-Open the **Mixer** and use `↑` and `↓` to select your interface's output, for example "GCS-8 CH USB". Press
+Open the **Mixer** and use `↑` and `↓` to select your interface's output, for example "GCS-8 MAIN-AUX". Press
 `Enter` to open its menu. **Set as system default** is the first item, so pressing `Enter` again makes it
-the default, and every app that follows the default moves to it. Do the same in the Recording box for your
+the default, and every app that follows the default moves to it. (On a channel that's already the default,
+that item reads ★ System default instead.)
+
+![The Mixer with an output selected and its menu open on Set as system default|755](guide/task-default.png)
+Do the same in the Recording box for your
 mic. The ★ moves to show the new defaults.
 
 ### Give your channels names that make sense
@@ -102,6 +106,8 @@ mic. The ★ moves to show the new defaults.
 On a multi-channel interface the names PipeWire picks, like "GCS-8 CH 2", say little about what's plugged
 in. Select the channel on the **Mixer**, press `Enter` and choose **Rename…**. Type a name such as "Mic"
 and press `Enter`.
+
+![A channel's menu with Rename… selected|743](guide/task-rename.png)
 
 WirePlumber reads names when it starts, so PipeWrench offers to restart it so that the new name shows right
 away. If you're on a call, choose Cancel: a restart can drop apps like Discord. Your name is saved either
@@ -112,12 +118,16 @@ way and appears at the next restart or login.
 Say you want your mic in both OBS and Discord. Go to **Patch** and select the mic in the **Sources** box.
 Press `→` to move into **Destinations**, select `OBS · Mic/Aux` and press `Enter` to connect it. Then
 select Discord and press `Enter` again. A ● next to each destination shows that the mic goes there, and the
-mic itself shows `●2`.
+number next to the mic counts its destinations: `●3` in the picture, where REAPER records it too.
+
+![Patch with GCS-8 CH 2 selected, feeding Discord, OBS and REAPER](guide/task-mic.png)
 
 ### Put music on its own bus for a stream
 
 On **Devices**, press `a` (or select **+ Add bus…** and press `Enter`) and name the bus "Music". It's
-created immediately, with no restart. Then go to **Patch**, select your music player in **Sources**, and
+created immediately, with no restart.
+
+![The Buses box on Devices with + Add bus… selected](guide/task-bus.png) Then go to **Patch**, select your music player in **Sources**, and
 connect it to the Music bus in **Destinations**. In OBS, add an audio capture of the Music bus. The music
 now reaches the stream on its own fader, separate from your game and your mic, so you can balance them in
 OBS. To keep hearing the music yourself, connect the Music bus's monitor to your headphones on Patch as well.
@@ -129,12 +139,16 @@ that something is already recording from appear under their own **Monitors** hea
 shows all of them. If OBS is capturing the wrong thing, select the monitor of the output you listen on,
 for example "GCS-8 CH USB (monitor)", and connect it to `OBS · Desktop Audio`.
 
+![Patch with an output's monitor feeding OBS Desktop Audio](guide/patch-monitors.png)
+
 ### Record into REAPER's inputs
 
 REAPER, running through PipeWire's JACK support, shows its inputs as plain numbered ports. On **Patch**,
 select the source you want to record, press `→`, select REAPER and press `Enter`. A short menu offers its
 input pairs, starting with the next free one. Pick **In 3-4**, for example, and the source records into
 REAPER's inputs 3 and 4. For single channels, see [Port by port](#port-by-port).
+
+![The REAPER input menu open on In 3-4](guide/patch-slots.png)
 
 ### Lower your latency for recording
 
@@ -143,7 +157,9 @@ Open **Settings → Audio**. First check the **Realtime** line in the PipeWire b
 you do.
 
 Then go down to the **Clock** box, select **Force buffer size**, press `Enter` to open the row, and use `←`
-and `→` to pick 128. Press `Enter` to apply it live. The row shows the latency each buffer adds in
+and `→` to pick 128. Press `Enter` to apply it live.
+
+![The Clock box with Force buffer size open at 128](guide/task-latency.png) The row shows the latency each buffer adds in
 milliseconds; 128 samples at 48 kHz is 2.67 ms. Go lower if your machine keeps up without dropouts, and
 back up to 1024 or so when you're mixing and latency no longer matters. **Save** keeps the setting for the
 next time PipeWire starts.
@@ -151,7 +167,9 @@ next time PipeWire starts.
 ### Send audio to another computer
 
 Both machines need PipeWrench, or any VBAN app on the other end. Start on the machine that **sends**. Open
-**Settings → Network**, select **+ Add stream…** in the Outgoing box and choose **Detect on network**. Pick
+**Settings → Network**, select **+ Add stream…** in the Outgoing box and choose **Detect on network**.
+
+![The Add outgoing stream question: Detect on network or Manual](guide/task-vban.png) Pick
 the receiving computer from the list, then pick the source to send, such as your mic or the monitor of the
 output you listen on.
 
