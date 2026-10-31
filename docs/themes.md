@@ -4,6 +4,11 @@ Every PipeWrench theme is a small text file. Yours live in `~/.config/pipewrench
 come with PipeWrench are in the `themes/` folder of the repo, in the same format. You can start from any of
 them, change a line or two, and pick the result in Settings.
 
+[Quick start](#quick-start) · [How a theme is built](#how-a-theme-is-built) ·
+[What each color paints](#what-each-color-paints) · [Every role](#every-role) ·
+[Colors and styles](#colors-and-styles) · [`extends` and `logo`](#extends-and-logo) · [Recipes](#recipes) ·
+[Checking a theme](#checking-a-theme) · [Back to the user guide](guide.md)
+
 ## Quick start
 
 1. Copy a theme you like into a file of your own:
@@ -19,7 +24,7 @@ them, change a line or two, and pick the result in Settings.
    selected = { fg = "#000000", bg = "#ff9a1f" }
    ```
 
-3. In PipeWrench, open **Settings → Display → Theme** (Enter). Opening that row reads the theme files again,
+3. In PipeWrench, open **Settings → Preferences → Display → Theme** and press Enter. Opening that row reads the theme files again,
    and the status band says how many it found, or what's wrong with one. Pick yours with ←→ and press Enter.
 
 ## How a theme is built
@@ -34,11 +39,12 @@ A theme has three layers. You only fill in the ones you need.
 [specific]   one role per element    head_play, head_src, … follow title unless you set them
 ```
 
-- **Palette:** names for colors, so you can write `sky` instead of `#00bfff` everywhere.
-- **General:** the base roles: text, the cursor, titles, ok/pending/alert, key chips, bars. Change these
-  and the whole screen follows.
-- **Specific:** one role for each element, like the Mixer's Playback heading or the chosen popover button.
-  Each one follows a general role (the table below says which) until you set it yourself.
+- The **palette** gives names to colors, so you can write `sky` instead of `#00bfff` everywhere you use it.
+- The **general** roles are the building blocks of the whole screen: ordinary text, the cursor, titles, the
+  ok, pending and alert states, key chips and volume bars. Change one of these and everything that uses it
+  follows.
+- The **specific** roles cover one element each, like the Mixer's Playback heading or the chosen button in
+  a popover. Each one follows a general role, which the table below names, until you set it yourself.
 
 A whole theme can be this short:
 
@@ -54,7 +60,8 @@ title = { fg = "#ff9a1f", attr = "bold" }
 
 ![The theme map](guide/theme-map.png)
 
-The theme map (`tools/theme-map.toml`, a complete example theme) gives each general role its own color:
+The picture above uses the theme map, `tools/theme-map.toml`, which is also a complete example theme. It
+gives each general role its own color, so you can see which role paints which part of the screen:
 
 | Color in the picture | Role | Where |
 |---|---|---|
@@ -115,7 +122,8 @@ them.
 
 ## Colors and styles
 
-Each role is `{ fg = "…", bg = "…", attr = "…" }`. Leave any part out.
+Each role is written as `{ fg = "…", bg = "…", attr = "…" }`, for the text color, the background and the
+style. You can leave any part out.
 
 - **Colors:** `#rrggbb`; one of the eight terminal colors (`black red green yellow blue magenta cyan white`),
   or a bright one (`brightwhite`…); or a name from `[palette]`. Leaving a color out uses the terminal's own.
@@ -174,7 +182,8 @@ pwrench theme check           problems in your themes folder
 pwrench theme check FILE      problems in one file
 ```
 
-A theme with a problem is left out whole, and the rest still load. Messages name the file and the line:
+If a theme has a problem, that whole theme is left out and the others still load. Each message names the
+file and the line, for example:
 
 - `themes/studio.toml: general.chip.bg "blu" is not a color`: a typo, or a palette name that isn't in
   `[palette]`.
