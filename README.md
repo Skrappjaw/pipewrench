@@ -11,7 +11,8 @@ PipeWire unless you ask.
 ## Install
 
 Needs Python 3 and PipeWire's tools (`pw-dump`, `pw-metadata`, `pw-top`, `pw-link`, `wpctl`). No other packages;
-`nmap`, if you have it, helps Settings → Network find computers to send to.
+`nmap`, if you have it, helps Settings → Network find computers to send to. On PipeWire before 1.4.2
+(Linux Mint 22 has 1.0.5) Detect depends on it; [the guide says why](docs/guide.md#network).
 
 ```
 git clone https://github.com/Skrappjaw/pipewrench.git
@@ -58,3 +59,8 @@ Make your own colours: [the theme guide](docs/themes.md).
 - Network streams (VBAN): `~/.config/pipewrench/vban/` and `~/.config/systemd/user/pipewrench-vban@.service`
 
 PipeWrench only touches files it made, and keeps the previous version so `pwrench devices rollback` can undo.
+
+## Licence
+
+Copyright © 2026 Skrappjaw. PipeWrench is free software under the GNU General Public License, version 3
+or (at your option) any later version. See [LICENSE](LICENSE).

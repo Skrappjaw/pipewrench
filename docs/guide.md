@@ -405,6 +405,17 @@ Remove (it asks first). Format… has the common ones (48 kHz 16-bit stereo, whi
   (monitor)").
 - **Detect needs port 6980 free.** While an incoming stream listens there it can't, and says so; Manual
   still works.
+- **On PipeWire before 1.4.2, Detect leans on `nmap`.** Listening alone can't find much there:
+  - PipeWire doesn't answer VBAN's "who's there" ping, so nothing can ask the network which machines
+    speak VBAN. Listening only hears machines that are already sending.
+  - Before 1.4.2 an incoming stream holds port 6980, so once you have one, Detect can't listen at all.
+    A received stream also doesn't say which machine it came from.
+
+  So Detect also searches the network. `nmap -sn` checks every address on your network and lists the
+  machines that are up. It needs no root and doesn't look at what they run. PipeWrench keeps the ones
+  that answer like a computer. Without `nmap` it only finds machines this one has talked to lately, so
+  install it: `sudo apt install nmap`. From 1.4.2, listening does more of the work, but the search still
+  finds machines that aren't sending yet.
 - **A firewall can block it.** VBAN uses UDP port 6980 (and up, before 1.4.2). If Detect hears nothing,
   check the receiving machine's firewall.
 - VBAN isn't encrypted. Use it on your own network.
